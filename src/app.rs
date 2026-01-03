@@ -11,6 +11,9 @@ use crate::terminal::PseudoTerminal;
 use crate::ui::file_browser::FileBrowserState;
 use crate::ui::preview::PreviewState;
 
+use crate::ui::menu::MenuBar;
+use crate::ui::dialog::Dialog;
+
 pub struct App {
     pub config: Config,
     pub session: SessionState,
@@ -23,6 +26,8 @@ pub struct App {
     pub show_terminal: bool,
     pub show_lazygit: bool,
     pub last_refresh: std::time::Instant,
+    pub menu: MenuBar,
+    pub dialog: Dialog,
 }
 
 impl App {
@@ -69,6 +74,8 @@ impl App {
             show_terminal: false,
             show_lazygit: false,
             last_refresh: std::time::Instant::now(),
+            menu: MenuBar::default(),
+            dialog: Dialog::default(),
         };
         
         
@@ -113,7 +120,7 @@ impl App {
                     Event::Mouse(mouse) => {
                          let size = terminal.size()?;
                          let area = Rect::new(0, 0, size.width, size.height);
-                         let (files, preview, claude, lazygit, term, _footer) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit);
+                         let (files, preview, claude, lazygit, term, footer_area) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit);
                          
                          let x = mouse.column;
                          let y = mouse.row;
@@ -125,11 +132,37 @@ impl App {
 
                          match mouse.kind {
                             crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
-                                if is_inside(files, x, y) { self.active_pane = PaneId::FileBrowser; }
+                                if is_inside(files, x, y) { 
+                                    self.active_pane = PaneId::FileBrowser;
+                                    // Calculate which item was clicked (account for border)
+                                    let relative_y = y.saturating_sub(files.y + 1); // +1 for border
+                                    let idx = relative_y as usize;
+                                    if idx < self.file_browser.entries.len() {
+                                        self.file_browser.list_state.select(Some(idx));
+                                        self.update_preview();
+                                    }
+                                }
                                 else if is_inside(preview, x, y) { self.active_pane = PaneId::Preview; }
                                 else if is_inside(claude, x, y) { self.active_pane = PaneId::Claude; }
                                 else if is_inside(lazygit, x, y) { self.active_pane = PaneId::LazyGit; }
                                 else if is_inside(term, x, y) { self.active_pane = PaneId::Terminal; }
+                                else if is_inside(footer_area, x, y) {
+                                    // Footer clicks - approximate button positions
+                                    // Buttons are roughly 10 chars each, positioned sequentially
+                                    let footer_x = x.saturating_sub(footer_area.x);
+                                    let btn_idx = footer_x / 10;  // Approximate button width
+                                    match btn_idx {
+                                        0 => self.active_pane = PaneId::FileBrowser,  // F1 Files
+                                        1 => self.active_pane = PaneId::Preview,       // F2 Preview
+                                        2 => { self.file_browser.refresh(); self.update_preview(); } // F3 Refresh
+                                        3 => self.active_pane = PaneId::Claude,        // F4 Claude
+                                        4 => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } } // F5 Git
+                                        5 => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } } // F6 Term
+                                        6 => self.menu.toggle(),  // F9 Menu
+                                        7 => self.show_help = true, // ? Help
+                                        _ => {}
+                                    }
+                                }
                             }
                             crossterm::event::MouseEventKind::ScrollDown => {
                                 if is_inside(files, x, y) { 
@@ -156,6 +189,61 @@ impl App {
                     }
                     Event::Key(key) => {
                         if key.kind == KeyEventKind::Press {
+                        
+                        // Dialog handling (highest priority)
+                        if self.dialog.is_active() {
+                            match &mut self.dialog.dialog_type {
+                                ui::dialog::DialogType::Input { value, action, .. } => {
+                                    match key.code {
+                                        KeyCode::Esc => self.dialog.close(),
+                                        KeyCode::Enter => {
+                                            let val = value.clone();
+                                            let act = action.clone();
+                                            self.dialog.close();
+                                            self.execute_dialog_action(act, Some(val));
+                                        }
+                                        KeyCode::Backspace => { value.pop(); }
+                                        KeyCode::Char(c) => { value.push(c); }
+                                        _ => {}
+                                    }
+                                }
+                                ui::dialog::DialogType::Confirm { action, .. } => {
+                                    match key.code {
+                                        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => self.dialog.close(),
+                                        KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                                            let act = action.clone();
+                                            self.dialog.close();
+                                            self.execute_dialog_action(act, None);
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                ui::dialog::DialogType::None => {}
+                            }
+                            continue;
+                        }
+                        
+                        // Menu handling
+                        if self.menu.visible {
+                            match key.code {
+                                KeyCode::Esc => self.menu.visible = false,
+                                KeyCode::Up | KeyCode::Char('k') => self.menu.prev(),
+                                KeyCode::Down | KeyCode::Char('j') => self.menu.next(),
+                                KeyCode::Enter => {
+                                    let action = self.menu.action();
+                                    self.menu.visible = false;
+                                    self.handle_menu_action(action);
+                                }
+                                KeyCode::Char('n') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::NewFile); }
+                                KeyCode::Char('r') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::RenameFile); }
+                                KeyCode::Char('d') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::DeleteFile); }
+                                KeyCode::Char('y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyAbsolutePath); }
+                                KeyCode::Char('Y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyRelativePath); }
+                                _ => {}
+                            }
+                            continue;
+                        }
+                        
                         if self.show_help {
                             match key.code {
                                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
@@ -168,6 +256,11 @@ impl App {
                         // Global Keys
                         if key.code == KeyCode::Char('?') {
                             self.show_help = true;
+                            continue;
+                        }
+                        
+                        if key.code == KeyCode::F(9) {
+                            self.menu.toggle();
                             continue;
                         }
 
@@ -302,6 +395,14 @@ impl App {
         if self.show_help {
             ui::help::render(frame);
         }
+        
+        if self.menu.visible {
+            ui::menu::render(frame, area, &self.menu);
+        }
+        
+        if self.dialog.is_active() {
+            ui::dialog::render(frame, area, &self.dialog);
+        }
     }
 
     fn sync_terminals(&mut self) {
@@ -315,4 +416,128 @@ impl App {
             }
         }
     }
+    
+    fn handle_menu_action(&mut self, action: ui::menu::MenuAction) {
+        use ui::menu::MenuAction;
+        use ui::dialog::{DialogType, DialogAction};
+        
+        match action {
+            MenuAction::NewFile => {
+                self.dialog.dialog_type = DialogType::Input {
+                    title: "New File".to_string(),
+                    value: String::new(),
+                    action: DialogAction::NewFile,
+                };
+            }
+            MenuAction::RenameFile => {
+                if let Some(selected) = self.file_browser.selected_file() {
+                    let name = selected.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    self.dialog.dialog_type = DialogType::Input {
+                        title: "Rename".to_string(),
+                        value: name,
+                        action: DialogAction::RenameFile { old_path: selected },
+                    };
+                }
+            }
+            MenuAction::DeleteFile => {
+                if let Some(selected) = self.file_browser.selected_file() {
+                    if selected.file_name().map(|n| n.to_string_lossy()) != Some("..".into()) {
+                        let name = selected.file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        self.dialog.dialog_type = DialogType::Confirm {
+                            title: "Delete".to_string(),
+                            message: format!("Delete '{}'?", name),
+                            action: DialogAction::DeleteFile { path: selected },
+                        };
+                    }
+                }
+            }
+            MenuAction::CopyAbsolutePath => {
+                if let Some(selected) = self.file_browser.selected_file() {
+                    let path = selected.to_string_lossy().to_string();
+                    let encoded = base64_encode(&path);
+                    print!("\x1b]52;c;{}\x07", encoded);
+                }
+            }
+            MenuAction::CopyRelativePath => {
+                if let Some(selected) = self.file_browser.selected_file() {
+                    if let Ok(rel) = selected.strip_prefix(&self.file_browser.current_dir) {
+                        let path = rel.to_string_lossy().to_string();
+                        let encoded = base64_encode(&path);
+                        print!("\x1b]52;c;{}\x07", encoded);
+                    }
+                }
+            }
+            MenuAction::None => {}
+        }
+    }
+    
+    fn execute_dialog_action(&mut self, action: ui::dialog::DialogAction, value: Option<String>) {
+        use ui::dialog::DialogAction;
+        
+        match action {
+            DialogAction::NewFile => {
+                if let Some(name) = value {
+                    if !name.is_empty() {
+                        let new_path = self.file_browser.current_dir.join(&name);
+                        let _ = std::fs::write(&new_path, "");
+                        self.file_browser.refresh();
+                    }
+                }
+            }
+            DialogAction::RenameFile { old_path } => {
+                if let Some(new_name) = value {
+                    if !new_name.is_empty() {
+                        let new_path = old_path.parent()
+                            .map(|p| p.join(&new_name))
+                            .unwrap_or_else(|| std::path::PathBuf::from(&new_name));
+                        let _ = std::fs::rename(&old_path, &new_path);
+                        self.file_browser.refresh();
+                    }
+                }
+            }
+            DialogAction::DeleteFile { path } => {
+                if path.is_file() {
+                    let _ = std::fs::remove_file(&path);
+                } else if path.is_dir() {
+                    let _ = std::fs::remove_dir_all(&path);
+                }
+                self.file_browser.refresh();
+            }
+        }
+    }
+}
+
+fn base64_encode(input: &str) -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes = input.as_bytes();
+    let mut result = String::new();
+    
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).map(|&b| b as u32).unwrap_or(0);
+        let b2 = chunk.get(2).map(|&b| b as u32).unwrap_or(0);
+        
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        
+        result.push(CHARSET[((n >> 18) & 0x3F) as usize] as char);
+        result.push(CHARSET[((n >> 12) & 0x3F) as usize] as char);
+        
+        if chunk.len() > 1 {
+            result.push(CHARSET[((n >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        
+        if chunk.len() > 2 {
+            result.push(CHARSET[(n & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    
+    result
 }

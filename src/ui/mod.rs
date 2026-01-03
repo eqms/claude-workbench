@@ -4,3 +4,5 @@ pub mod preview;
 pub mod terminal_pane;
 pub mod footer;
 pub mod help;
+pub mod menu;
+pub mod dialog;

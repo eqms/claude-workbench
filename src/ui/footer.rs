@@ -15,10 +15,10 @@ impl Widget for Footer {
             ("F2", "Preview"),
             ("F3", "Refresh"),
             ("F4", "Claude"),
-            ("F5", "LazyGit"),
+            ("F5", "Git"),
             ("F6", "Term"),
+            ("F9", "Menu"),
             ("?", "Help"),
-            ("^Q", "Quit"),
         ];
 
         let mut spans = Vec::new();
