@@ -2,7 +2,7 @@ use ratatui::{
     prelude::Rect,
     style::{Color, Modifier, Style},
     text::Line,
-    widgets::{Block, Paragraph, Wrap},
+    widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
     Frame,
 };
 use std::fs;
@@ -179,6 +179,19 @@ pub fn render(f: &mut Frame, area: Rect, state: &PreviewState, is_focused: bool)
                 .scroll((state.scroll, 0));
 
             f.render_widget(paragraph, area);
+
+            // Scrollbar for read-only mode
+            let content_length = state.highlighted_lines.len();
+            if content_length > 0 {
+                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("▲"))
+                    .end_symbol(Some("▼"));
+
+                let mut scrollbar_state = ScrollbarState::new(content_length)
+                    .position(state.scroll as usize);
+
+                f.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+            }
         }
     }
 }

@@ -382,33 +382,33 @@ impl App {
                                     PaneId::Preview => {
                                         // Edit mode handling
                                         if self.preview.mode == EditorMode::Edit {
-                                            match key.code {
-                                                KeyCode::Esc => {
-                                                    if self.preview.is_modified() {
-                                                        // Show discard dialog
-                                                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
-                                                            title: "Unsaved Changes".to_string(),
-                                                            message: "Discard changes?".to_string(),
-                                                            action: ui::dialog::DialogAction::DiscardEditorChanges,
-                                                        };
-                                                    } else {
-                                                        self.preview.exit_edit_mode(true);
-                                                    }
+                                            // Check for Ctrl+S (save) - handle both modifier and control char
+                                            let is_ctrl_s = (key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL))
+                                                || key.code == KeyCode::Char('\x13'); // Ctrl+S as control char
+
+                                            if key.code == KeyCode::Esc {
+                                                if self.preview.is_modified() {
+                                                    // Show discard dialog
+                                                    self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                                        title: "Unsaved Changes".to_string(),
+                                                        message: "Discard changes?".to_string(),
+                                                        action: ui::dialog::DialogAction::DiscardEditorChanges,
+                                                    };
+                                                } else {
+                                                    self.preview.exit_edit_mode(true);
                                                 }
-                                                KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                                    if let Err(_e) = self.preview.save() {
-                                                        // Could show error dialog here
-                                                    } else {
-                                                        // Refresh highlighting after save
-                                                        self.preview.refresh_highlighting(&self.syntax_manager);
-                                                    }
+                                            } else if is_ctrl_s {
+                                                if let Err(_e) = self.preview.save() {
+                                                    // Could show error dialog here
+                                                } else {
+                                                    // Refresh highlighting after save
+                                                    self.preview.refresh_highlighting(&self.syntax_manager);
                                                 }
-                                                _ => {
-                                                    // Forward to TextArea (convert KeyEvent to Event)
-                                                    if let Some(editor) = &mut self.preview.editor {
-                                                        editor.input(Event::Key(key));
-                                                        self.preview.update_modified();
-                                                    }
+                                            } else {
+                                                // Forward to TextArea (handles Ctrl+Z, Ctrl+Y, etc.)
+                                                if let Some(editor) = &mut self.preview.editor {
+                                                    editor.input(Event::Key(key));
+                                                    self.preview.update_modified();
                                                 }
                                             }
                                         } else {

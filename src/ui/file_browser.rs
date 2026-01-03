@@ -1,5 +1,5 @@
 use ratatui::{
-    widgets::{Block, List, ListItem, ListState},
+    widgets::{Block, List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState},
     style::{Style, Modifier, Color},
     Frame,
     prelude::Rect,
@@ -195,7 +195,24 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
     f.render_stateful_widget(list, list_area, &mut state.list_state);
-    
+
+    // Scrollbar
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("▲"))
+        .end_symbol(Some("▼"));
+
+    let mut scrollbar_state = ScrollbarState::new(state.entries.len())
+        .position(state.list_state.selected().unwrap_or(0));
+
+    // Render scrollbar in the inner area (inside the border)
+    let scrollbar_area = Rect {
+        x: list_area.x,
+        y: list_area.y,
+        width: list_area.width,
+        height: list_area.height.saturating_sub(1), // Account for border
+    };
+    f.render_stateful_widget(scrollbar, scrollbar_area, &mut scrollbar_state);
+
     // File info bar
     let info_text = if let Some(idx) = state.list_state.selected() {
         if let Some(entry) = state.entries.get(idx) {
