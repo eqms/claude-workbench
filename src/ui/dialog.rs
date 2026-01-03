@@ -18,6 +18,7 @@ pub enum DialogAction {
     NewFile,
     RenameFile { old_path: std::path::PathBuf },
     DeleteFile { path: std::path::PathBuf },
+    DiscardEditorChanges,
 }
 
 #[derive(Debug, Clone)]

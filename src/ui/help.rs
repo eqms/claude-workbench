@@ -53,6 +53,13 @@ pub fn render(f: &mut Frame) {
         "  Enter      : Go to file",
         "  Esc        : Close finder",
         "",
+        "Editor (F2 Preview Pane):",
+        "  E          : Enter Edit Mode",
+        "  Ctrl+S     : Save File",
+        "  Ctrl+Z     : Undo",
+        "  Ctrl+Y     : Redo",
+        "  Esc        : Exit (confirm if modified)",
+        "",
         "Terminal Use:",
         "  Arrow keys, Ctrl keys map to PTY.",
     ].join("\n");

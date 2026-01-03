@@ -7,3 +7,4 @@ pub mod help;
 pub mod menu;
 pub mod dialog;
 pub mod fuzzy_finder;
+pub mod syntax;

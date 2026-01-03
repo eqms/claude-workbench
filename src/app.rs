@@ -1,15 +1,16 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{layout::Rect, DefaultTerminal, Frame};
 use std::collections::HashMap;
 
 use crate::config::Config;
 use crate::session::SessionState;
 use crate::ui;
-use crate::types::PaneId;
+use crate::types::{EditorMode, PaneId};
 use crate::terminal::PseudoTerminal;
 use crate::ui::file_browser::FileBrowserState;
 use crate::ui::preview::PreviewState;
+use crate::ui::syntax::SyntaxManager;
 
 use crate::ui::menu::MenuBar;
 use crate::ui::dialog::Dialog;
@@ -30,6 +31,7 @@ pub struct App {
     pub menu: MenuBar,
     pub dialog: Dialog,
     pub fuzzy_finder: FuzzyFinder,
+    pub syntax_manager: SyntaxManager,
 }
 
 impl App {
@@ -64,6 +66,8 @@ impl App {
              terminals.insert(PaneId::Terminal, pty);
         }
 
+        let syntax_manager = SyntaxManager::new();
+
         let mut app = Self {
             config,
             session,
@@ -79,6 +83,7 @@ impl App {
             menu: MenuBar::default(),
             dialog: Dialog::default(),
             fuzzy_finder: FuzzyFinder::default(),
+            syntax_manager,
         };
         
         
@@ -99,7 +104,7 @@ impl App {
     fn update_preview(&mut self) {
         if let Some(path) = self.file_browser.selected_file() {
             if self.preview.current_file.as_ref() != Some(&path) {
-                self.preview.load_file(path);
+                self.preview.load_file(path, &self.syntax_manager);
             }
         }
     }
@@ -375,10 +380,47 @@ impl App {
                                     }
 
                                     PaneId::Preview => {
-                                        match key.code {
-                                            KeyCode::Down | KeyCode::Char('j') => self.preview.scroll_down(),
-                                            KeyCode::Up | KeyCode::Char('k') => self.preview.scroll_up(),
-                                            _ => {}
+                                        // Edit mode handling
+                                        if self.preview.mode == EditorMode::Edit {
+                                            match key.code {
+                                                KeyCode::Esc => {
+                                                    if self.preview.is_modified() {
+                                                        // Show discard dialog
+                                                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                                            title: "Unsaved Changes".to_string(),
+                                                            message: "Discard changes?".to_string(),
+                                                            action: ui::dialog::DialogAction::DiscardEditorChanges,
+                                                        };
+                                                    } else {
+                                                        self.preview.exit_edit_mode(true);
+                                                    }
+                                                }
+                                                KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                                    if let Err(_e) = self.preview.save() {
+                                                        // Could show error dialog here
+                                                    } else {
+                                                        // Refresh highlighting after save
+                                                        self.preview.refresh_highlighting(&self.syntax_manager);
+                                                    }
+                                                }
+                                                _ => {
+                                                    // Forward to TextArea (convert KeyEvent to Event)
+                                                    if let Some(editor) = &mut self.preview.editor {
+                                                        editor.input(Event::Key(key));
+                                                        self.preview.update_modified();
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // Read-only mode
+                                            match key.code {
+                                                KeyCode::Down | KeyCode::Char('j') => self.preview.scroll_down(),
+                                                KeyCode::Up | KeyCode::Char('k') => self.preview.scroll_up(),
+                                                KeyCode::Char('e') | KeyCode::Char('E') => {
+                                                    self.preview.enter_edit_mode();
+                                                }
+                                                _ => {}
+                                            }
                                         }
                                     }
                                     PaneId::Terminal | PaneId::Claude | PaneId::LazyGit => {
@@ -440,7 +482,12 @@ impl App {
         ui::terminal_pane::render(frame, lazygit, PaneId::LazyGit, self);
         ui::terminal_pane::render(frame, terminal, PaneId::Terminal, self);
 
-        frame.render_widget(ui::footer::Footer, footer);
+        let footer_widget = ui::footer::Footer {
+            active_pane: self.active_pane,
+            editor_mode: self.preview.mode,
+            editor_modified: self.preview.modified,
+        };
+        frame.render_widget(footer_widget, footer);
 
         if self.show_help {
             ui::help::render(frame);
@@ -560,6 +607,10 @@ impl App {
                     let _ = std::fs::remove_dir_all(&path);
                 }
                 self.file_browser.refresh();
+            }
+            DialogAction::DiscardEditorChanges => {
+                self.preview.exit_edit_mode(true); // true = discard changes
+                self.preview.refresh_highlighting(&self.syntax_manager);
             }
         }
     }
