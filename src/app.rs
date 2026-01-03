@@ -20,6 +20,7 @@ pub struct App {
     pub file_browser: FileBrowserState,
     pub preview: PreviewState,
     pub show_help: bool,
+    pub show_terminal: bool,
 }
 
 impl App {
@@ -63,6 +64,7 @@ impl App {
             file_browser,
             preview: PreviewState::new(),
             show_help: false,
+            show_terminal: false,
         };
         
         
@@ -97,7 +99,7 @@ impl App {
                     Event::Mouse(mouse) => {
                          let size = terminal.size()?;
                          let area = Rect::new(0, 0, size.width, size.height);
-                         let (files, preview, claude, lazygit, term, _footer) = ui::layout::compute_layout(area);
+                         let (files, preview, claude, lazygit, term, _footer) = ui::layout::compute_layout(area, self.show_terminal);
                          
                          let x = mouse.column;
                          let y = mouse.row;
@@ -161,7 +163,14 @@ impl App {
                             KeyCode::F(2) => self.active_pane = PaneId::Preview,
                             KeyCode::F(4) => self.active_pane = PaneId::Claude,
                             KeyCode::F(5) => self.active_pane = PaneId::LazyGit,
-                            KeyCode::F(6) => self.active_pane = PaneId::Terminal,
+                            KeyCode::F(6) => {
+                                self.show_terminal = !self.show_terminal;
+                                if self.show_terminal {
+                                    self.active_pane = PaneId::Terminal;
+                                } else if self.active_pane == PaneId::Terminal {
+                                    self.active_pane = PaneId::LazyGit;
+                                }
+                            }
                             // QUIT: Ctrl+Q
                             KeyCode::Char('q') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                                 self.should_quit = true;
@@ -240,7 +249,7 @@ impl App {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
-        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area);
+        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area, self.show_terminal);
 
         // Helper to resize PTY
         // We need to account for borders (1px each side => -2)

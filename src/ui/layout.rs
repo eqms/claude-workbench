@@ -1,6 +1,6 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
-pub fn compute_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
+pub fn compute_layout(area: Rect, show_terminal: bool) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
     // 1. Vertical Split: Top (Work Area), Bottom (Claude Code), Footer
     let vertical = Layout::default()
         .direction(Direction::Vertical)
@@ -30,16 +30,18 @@ pub fn compute_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
     let right_stack_area = top_chunks[2];
 
     // 3. Vertical Split of Right Stack (LazyGit + Terminal)
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(50), // LazyGit
-            Constraint::Percentage(50), // Terminal
-        ])
-        .split(right_stack_area);
-        
-    let lazygit_area = right_chunks[0];
-    let terminal_area = right_chunks[1];
+    let (lazygit_area, terminal_area) = if show_terminal {
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(50), // LazyGit
+                Constraint::Percentage(50), // Terminal
+            ])
+            .split(right_stack_area);
+        (right_chunks[0], right_chunks[1])
+    } else {
+        (right_stack_area, Rect::default())
+    };
 
     (
         file_area,
