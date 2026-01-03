@@ -24,20 +24,23 @@ pub struct App {
 
 impl App {
     pub fn new(config: Config, session: SessionState) -> Self {
-        let mut terminals = HashMap::new();
-        
         let rows = 24; 
         let cols = 80;
 
+        let file_browser = FileBrowserState::new();
+        let cwd = file_browser.current_dir.clone();
+
+        let mut terminals = HashMap::new();
+
         // 1. Claude Code
         let claude_cmd = vec!["/bin/bash".to_string(), "-c".to_string(), "echo 'Claude Code PTY'; exec bash".to_string()];
-        if let Ok(pty) = PseudoTerminal::new(&claude_cmd, rows, cols) {
+        if let Ok(pty) = PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
              terminals.insert(PaneId::Claude, pty);
         }
 
         // 2. LazyGit
         let lazygit_cmd = vec!["lazygit".to_string()];
-        if let Ok(pty) = PseudoTerminal::new(&lazygit_cmd, rows, cols) {
+        if let Ok(pty) = PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
              terminals.insert(PaneId::LazyGit, pty);
         }
 
@@ -47,7 +50,7 @@ impl App {
         let mut cmd = vec![shell.clone()];
         cmd.extend(args.clone());
         
-        if let Ok(pty) = PseudoTerminal::new(&cmd, rows, cols) {
+        if let Ok(pty) = PseudoTerminal::new(&cmd, rows, cols, &cwd) {
              terminals.insert(PaneId::Terminal, pty);
         }
 
@@ -57,12 +60,13 @@ impl App {
             should_quit: false,
             terminals,
             active_pane: PaneId::Terminal,
-            file_browser: FileBrowserState::new(),
+            file_browser,
             preview: PreviewState::new(),
             show_help: false,
         };
         
         app.update_preview();
+        app.sync_terminals();
         app
     }
 
@@ -127,11 +131,13 @@ impl App {
                                                     // File opened
                                                 } else {
                                                     self.update_preview();
+                                                    self.sync_terminals();
                                                 }
                                             }
                                             KeyCode::Backspace | KeyCode::Left | KeyCode::Char('h') => {
                                                 self.file_browser.go_parent();
                                                 self.update_preview();
+                                                self.sync_terminals();
                                             }
                                             // Allow single q to quit if in browser
                                             KeyCode::Char('q') => {
@@ -181,6 +187,18 @@ impl App {
 
         if self.show_help {
             ui::help::render(frame);
+        }
+    }
+
+    fn sync_terminals(&mut self) {
+        let path_str = self.file_browser.current_dir.to_string_lossy().to_string();
+        let esc_path = path_str.replace("\"", "\\\"");
+        let cmd = format!("cd \"{}\"\r", esc_path);
+
+        for id in [PaneId::Terminal, PaneId::Claude] {
+            if let Some(pty) = self.terminals.get_mut(&id) {
+                let _ = pty.write_input(cmd.as_bytes());
+            }
         }
     }
 }

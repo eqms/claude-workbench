@@ -11,7 +11,7 @@ pub struct PseudoTerminal {
 }
 
 impl PseudoTerminal {
-    pub fn new(command: &[String], rows: u16, cols: u16) -> Result<Self> {
+    pub fn new(command: &[String], rows: u16, cols: u16, cwd: &std::path::Path) -> Result<Self> {
         let pty_system = NativePtySystem::default();
         let pair = pty_system.openpty(PtySize {
             rows,
@@ -44,6 +44,7 @@ impl PseudoTerminal {
         let args = &command[1..];
         let mut cmd = CommandBuilder::new(cmd_str);
         cmd.args(args);
+        cmd.cwd(cwd);
         
         // Create environment that suppresses Fish's DA query but keeps colors
         cmd.env("TERM", "xterm-256color");
