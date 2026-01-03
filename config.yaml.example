@@ -1,6 +1,9 @@
+# Claude Workbench Configuration
+# Copy this file to ~/.config/claude-workbench/config.yaml or ./config.yaml
+
 terminal:
-  shell_path: "/opt/homebrew/bin/fish"
-  shell_args: ["-l"]
+  shell_path: "/bin/bash"
+  shell_args: []
 
 ui:
   theme: "default"

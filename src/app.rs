@@ -21,6 +21,8 @@ pub struct App {
     pub preview: PreviewState,
     pub show_help: bool,
     pub show_terminal: bool,
+    pub show_lazygit: bool,
+    pub last_refresh: std::time::Instant,
 }
 
 impl App {
@@ -60,11 +62,13 @@ impl App {
             session,
             should_quit: false,
             terminals,
-            active_pane: PaneId::Terminal,
+            active_pane: PaneId::FileBrowser,
             file_browser,
             preview: PreviewState::new(),
             show_help: false,
             show_terminal: false,
+            show_lazygit: false,
+            last_refresh: std::time::Instant::now(),
         };
         
         
@@ -92,6 +96,16 @@ impl App {
 
     pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while !self.should_quit {
+            // Auto-refresh file browser
+            let refresh_interval = self.config.file_browser.auto_refresh_ms;
+            if refresh_interval > 0 {
+                let elapsed = self.last_refresh.elapsed().as_millis() as u64;
+                if elapsed >= refresh_interval {
+                    self.file_browser.refresh();
+                    self.last_refresh = std::time::Instant::now();
+                }
+            }
+            
             terminal.draw(|frame| self.draw(frame))?;
 
             if event::poll(std::time::Duration::from_millis(16))? {
@@ -99,7 +113,7 @@ impl App {
                     Event::Mouse(mouse) => {
                          let size = terminal.size()?;
                          let area = Rect::new(0, 0, size.width, size.height);
-                         let (files, preview, claude, lazygit, term, _footer) = ui::layout::compute_layout(area, self.show_terminal);
+                         let (files, preview, claude, lazygit, term, _footer) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit);
                          
                          let x = mouse.column;
                          let y = mouse.row;
@@ -163,13 +177,20 @@ impl App {
                             KeyCode::F(2) => self.active_pane = PaneId::Preview,
                             KeyCode::F(3) => { self.file_browser.refresh(); self.update_preview(); }
                             KeyCode::F(4) => self.active_pane = PaneId::Claude,
-                            KeyCode::F(5) => self.active_pane = PaneId::LazyGit,
+                            KeyCode::F(5) => {
+                                self.show_lazygit = !self.show_lazygit;
+                                if self.show_lazygit {
+                                    self.active_pane = PaneId::LazyGit;
+                                } else if self.active_pane == PaneId::LazyGit {
+                                    self.active_pane = PaneId::Preview;
+                                }
+                            }
                             KeyCode::F(6) => {
                                 self.show_terminal = !self.show_terminal;
                                 if self.show_terminal {
                                     self.active_pane = PaneId::Terminal;
                                 } else if self.active_pane == PaneId::Terminal {
-                                    self.active_pane = PaneId::LazyGit;
+                                    self.active_pane = PaneId::Preview;
                                 }
                             }
                             // QUIT: Ctrl+Q
@@ -250,7 +271,7 @@ impl App {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
-        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area, self.show_terminal);
+        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit);
 
         // Helper to resize PTY
         // We need to account for borders (1px each side => -2)
