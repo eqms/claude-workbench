@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::{DefaultTerminal, Frame};
+use ratatui::{layout::Rect, DefaultTerminal, Frame};
 use std::collections::HashMap;
 
 use crate::config::Config;
@@ -93,8 +93,53 @@ impl App {
             terminal.draw(|frame| self.draw(frame))?;
 
             if event::poll(std::time::Duration::from_millis(16))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
+                match event::read()? {
+                    Event::Mouse(mouse) => {
+                         let size = terminal.size()?;
+                         let area = Rect::new(0, 0, size.width, size.height);
+                         let (files, preview, claude, lazygit, term, _footer) = ui::layout::compute_layout(area);
+                         
+                         let x = mouse.column;
+                         let y = mouse.row;
+                         
+                         // Helper closure for hit testing
+                         let is_inside = |r: Rect, x: u16, y: u16| -> bool {
+                             x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
+                         };
+
+                         match mouse.kind {
+                            crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                                if is_inside(files, x, y) { self.active_pane = PaneId::FileBrowser; }
+                                else if is_inside(preview, x, y) { self.active_pane = PaneId::Preview; }
+                                else if is_inside(claude, x, y) { self.active_pane = PaneId::Claude; }
+                                else if is_inside(lazygit, x, y) { self.active_pane = PaneId::LazyGit; }
+                                else if is_inside(term, x, y) { self.active_pane = PaneId::Terminal; }
+                            }
+                            crossterm::event::MouseEventKind::ScrollDown => {
+                                if is_inside(files, x, y) { 
+                                    self.file_browser.down(); 
+                                    self.update_preview(); 
+                                }
+                                else if is_inside(preview, x, y) { self.preview.scroll_down(); }
+                                else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_down(3); } }
+                                else if is_inside(lazygit, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) { pty.scroll_down(3); } }
+                                else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_down(3); } }
+                            }
+                            crossterm::event::MouseEventKind::ScrollUp => {
+                                if is_inside(files, x, y) { 
+                                    self.file_browser.up(); 
+                                    self.update_preview(); 
+                                }
+                                else if is_inside(preview, x, y) { self.preview.scroll_up(); }
+                                else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_up(3); } }
+                                else if is_inside(lazygit, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) { pty.scroll_up(3); } }
+                                else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_up(3); } }
+                            }
+                            _ => {}
+                         }
+                    }
+                    Event::Key(key) => {
+                        if key.kind == KeyEventKind::Press {
                         if self.show_help {
                             match key.code {
                                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
@@ -121,8 +166,6 @@ impl App {
                             KeyCode::Char('q') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                                 self.should_quit = true;
                             }
-                            // QUIT: Ctrl+C (Global override if we really want to force quit, 
-                            // though usually Ctrl+C is sent to PTY. We prioritize PTY if focused).
                              _ => {
                                 // Pane specific handling
                                 match self.active_pane {
@@ -187,7 +230,9 @@ impl App {
                             }
                         }
                     }
-                }
+                } // End Key
+                _ => {}
+            } // End Match
             }
         }
         Ok(())
