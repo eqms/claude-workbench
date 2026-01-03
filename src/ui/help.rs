@@ -45,6 +45,7 @@ pub fn render(f: &mut Frame) {
         "File Browser:",
         "  j/k, Up/Down : Navigate",
         "  Enter        : Open / Go to Dir",
+        "  Double-Click : Open / Go to Dir",
         "  Back/Left    : Go to Parent",
         "",
         "Fuzzy Finder (Ctrl+P):",

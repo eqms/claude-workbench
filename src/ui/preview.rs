@@ -1,7 +1,7 @@
 use ratatui::{
     prelude::Rect,
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
     Frame,
 };
@@ -28,6 +28,9 @@ pub struct PreviewState {
     // Syntax highlighting cache
     pub highlighted_lines: Vec<Line<'static>>,
     pub syntax_name: Option<String>,
+
+    // Edit-mode highlighting cache (updated on each change)
+    pub edit_highlighted_lines: Vec<Line<'static>>,
 }
 
 impl Default for PreviewState {
@@ -42,6 +45,7 @@ impl Default for PreviewState {
             original_content: String::new(),
             highlighted_lines: Vec::new(),
             syntax_name: None,
+            edit_highlighted_lines: Vec::new(),
         }
     }
 }
@@ -98,15 +102,18 @@ impl PreviewState {
         let lines: Vec<String> = self.content.lines().map(String::from).collect();
         let mut textarea = TextArea::new(lines);
 
-        // Configure textarea appearance
+        // Configure textarea appearance (minimal - we render our own highlighting)
         textarea.set_line_number_style(Style::default().fg(Color::DarkGray));
-        textarea.set_cursor_line_style(Style::default().add_modifier(Modifier::UNDERLINED));
+        textarea.set_cursor_line_style(Style::default());
         textarea.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
 
         self.editor = Some(textarea);
         self.original_content = self.content.clone();
         self.mode = EditorMode::Edit;
         self.modified = false;
+
+        // Copy highlighted lines for edit mode
+        self.edit_highlighted_lines = self.highlighted_lines.clone();
     }
 
     /// Exit edit mode
@@ -152,6 +159,14 @@ impl PreviewState {
             self.highlighted_lines = syntax_manager.highlight(&self.content, path);
         }
     }
+
+    /// Update edit-mode highlighting based on current editor content
+    pub fn update_edit_highlighting(&mut self, syntax_manager: &SyntaxManager) {
+        if let (Some(editor), Some(path)) = (&self.editor, &self.current_file) {
+            let content = editor.lines().join("\n");
+            self.edit_highlighted_lines = syntax_manager.highlight(&content, path);
+        }
+    }
 }
 
 pub fn render(f: &mut Frame, area: Rect, state: &PreviewState, is_focused: bool) {
@@ -164,11 +179,57 @@ pub fn render(f: &mut Frame, area: Rect, state: &PreviewState, is_focused: bool)
 
     match state.mode {
         EditorMode::Edit => {
-            // Render TextArea in edit mode
+            // Render highlighted content with cursor overlay in edit mode
             if let Some(editor) = &state.editor {
                 let inner = block.inner(area);
-                f.render_widget(block, area);
-                f.render_widget(editor, inner);
+                let (cursor_row, cursor_col) = editor.cursor();
+
+                // Calculate scroll to keep cursor visible
+                let visible_height = inner.height.saturating_sub(1) as usize;
+                let scroll_offset = if cursor_row >= visible_height {
+                    cursor_row.saturating_sub(visible_height / 2)
+                } else {
+                    0
+                };
+
+                // Build lines with cursor
+                let mut lines_with_cursor: Vec<Line<'static>> = Vec::new();
+                let editor_lines = editor.lines();
+
+                for (idx, line_content) in editor_lines.iter().enumerate() {
+                    // Get the highlighted line if available, otherwise use plain text
+                    let base_line = state.edit_highlighted_lines
+                        .get(idx)
+                        .cloned()
+                        .unwrap_or_else(|| Line::from(line_content.clone()));
+
+                    if idx == cursor_row {
+                        // Insert cursor into this line
+                        let line_with_cursor = insert_cursor_into_line(&base_line, cursor_col, line_content);
+                        lines_with_cursor.push(line_with_cursor);
+                    } else {
+                        lines_with_cursor.push(base_line);
+                    }
+                }
+
+                let paragraph = Paragraph::new(lines_with_cursor)
+                    .block(block)
+                    .scroll((scroll_offset as u16, 0));
+
+                f.render_widget(paragraph, area);
+
+                // Scrollbar
+                let content_length = editor_lines.len();
+                if content_length > 0 {
+                    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                        .begin_symbol(Some("▲"))
+                        .end_symbol(Some("▼"));
+
+                    let mut scrollbar_state = ScrollbarState::new(content_length)
+                        .position(scroll_offset);
+
+                    f.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+                }
             }
         }
         EditorMode::ReadOnly => {
@@ -194,6 +255,63 @@ pub fn render(f: &mut Frame, area: Rect, state: &PreviewState, is_focused: bool)
             }
         }
     }
+}
+
+/// Insert a cursor (reversed style) into a line at the given column
+fn insert_cursor_into_line(line: &Line<'static>, col: usize, raw_text: &str) -> Line<'static> {
+    // Use REVERSED + SLOW_BLINK for maximum visibility
+    let cursor_style = Style::default()
+        .add_modifier(Modifier::REVERSED | Modifier::SLOW_BLINK);
+
+    // Get the character at cursor position, or use block char for visibility at end of line
+    let cursor_char: char = raw_text.chars().nth(col).unwrap_or('█');
+
+    // Build spans: before cursor, cursor char, after cursor
+    let mut result_spans: Vec<Span<'static>> = Vec::new();
+    let mut current_col = 0;
+    let mut cursor_inserted = false;
+
+    for span in line.spans.iter() {
+        let span_text = span.content.as_ref();
+        let span_len = span_text.chars().count();
+
+        if !cursor_inserted && current_col + span_len > col {
+            // Cursor is within this span
+            let offset_in_span = col - current_col;
+            let chars: Vec<char> = span_text.chars().collect();
+
+            // Part before cursor
+            if offset_in_span > 0 {
+                let before: String = chars[..offset_in_span].iter().collect();
+                result_spans.push(Span::styled(before, span.style));
+            }
+
+            // Cursor character
+            result_spans.push(Span::styled(cursor_char.to_string(), cursor_style));
+
+            // Part after cursor
+            if offset_in_span + 1 < chars.len() {
+                let after: String = chars[offset_in_span + 1..].iter().collect();
+                result_spans.push(Span::styled(after, span.style));
+            }
+
+            cursor_inserted = true;
+        } else if !cursor_inserted && current_col + span_len == col {
+            // Cursor is right after this span
+            result_spans.push(span.clone());
+        } else {
+            result_spans.push(span.clone());
+        }
+
+        current_col += span_len;
+    }
+
+    // If cursor wasn't inserted (at end of line), add it
+    if !cursor_inserted {
+        result_spans.push(Span::styled(cursor_char.to_string(), cursor_style));
+    }
+
+    Line::from(result_spans)
 }
 
 fn build_title(state: &PreviewState) -> String {

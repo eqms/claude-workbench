@@ -32,6 +32,9 @@ pub struct App {
     pub dialog: Dialog,
     pub fuzzy_finder: FuzzyFinder,
     pub syntax_manager: SyntaxManager,
+    // Double-click tracking
+    last_click_time: std::time::Instant,
+    last_click_idx: Option<usize>,
 }
 
 impl App {
@@ -84,12 +87,16 @@ impl App {
             dialog: Dialog::default(),
             fuzzy_finder: FuzzyFinder::default(),
             syntax_manager,
+            last_click_time: std::time::Instant::now(),
+            last_click_idx: None,
         };
         
         
         app.update_preview();
-        app.sync_terminals();
-        
+
+        // Initial cd for BOTH Terminal and Claude (Claude only gets cd at startup)
+        app.sync_terminals_initial();
+
         // Initial Clear
         for id in [PaneId::Terminal, PaneId::Claude] {
             if let Some(pty) = app.terminals.get_mut(&id) {
@@ -140,14 +147,54 @@ impl App {
 
                          match mouse.kind {
                             crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
-                                if is_inside(files, x, y) { 
+                                if is_inside(files, x, y) {
                                     self.active_pane = PaneId::FileBrowser;
                                     // Calculate which item was clicked (account for border)
                                     let relative_y = y.saturating_sub(files.y + 1); // +1 for border
                                     let idx = relative_y as usize;
                                     if idx < self.file_browser.entries.len() {
-                                        self.file_browser.list_state.select(Some(idx));
-                                        self.update_preview();
+                                        // Check for double-click (same item within 300ms)
+                                        let now = std::time::Instant::now();
+                                        let is_double_click = self.last_click_idx == Some(idx)
+                                            && now.duration_since(self.last_click_time).as_millis() < 300;
+
+                                        // Update tracking for next click
+                                        self.last_click_time = now;
+                                        self.last_click_idx = Some(idx);
+
+                                        // Check if editor has unsaved changes before switching
+                                        let has_unsaved = self.preview.mode == EditorMode::Edit && self.preview.is_modified();
+
+                                        if is_double_click {
+                                            // Double-click: enter directory or open file
+                                            let is_dir = self.file_browser.entries.get(idx).map(|e| e.is_dir).unwrap_or(false);
+                                            if is_dir {
+                                                if has_unsaved {
+                                                    self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                                        title: "Unsaved Changes".to_string(),
+                                                        message: "Discard changes and enter directory?".to_string(),
+                                                        action: ui::dialog::DialogAction::EnterDirectory { target_idx: idx },
+                                                    };
+                                                } else {
+                                                    self.file_browser.list_state.select(Some(idx));
+                                                    self.file_browser.enter_selected();
+                                                    self.update_preview();
+                                                    self.sync_terminals();
+                                                }
+                                            }
+                                        } else {
+                                            // Single click: just select (but check for unsaved changes)
+                                            if has_unsaved {
+                                                self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                                    title: "Unsaved Changes".to_string(),
+                                                    message: "Discard changes and switch file?".to_string(),
+                                                    action: ui::dialog::DialogAction::SwitchFile { target_idx: idx },
+                                                };
+                                            } else {
+                                                self.file_browser.list_state.select(Some(idx));
+                                                self.update_preview();
+                                            }
+                                        }
                                     }
                                 }
                                 else if is_inside(preview, x, y) { self.active_pane = PaneId::Preview; }
@@ -409,6 +456,8 @@ impl App {
                                                 if let Some(editor) = &mut self.preview.editor {
                                                     editor.input(Event::Key(key));
                                                     self.preview.update_modified();
+                                                    // Update syntax highlighting for edit mode
+                                                    self.preview.update_edit_highlighting(&self.syntax_manager);
                                                 }
                                             }
                                         } else {
@@ -506,18 +555,32 @@ impl App {
         }
     }
 
-    fn sync_terminals(&mut self) {
+    /// Initial sync: send cd to BOTH Terminal and Claude (called once at startup)
+    fn sync_terminals_initial(&mut self) {
         let path_str = self.file_browser.current_dir.to_string_lossy().to_string();
         let esc_path = path_str.replace("\"", "\\\"");
         let cmd = format!("cd \"{}\"\r", esc_path);
 
+        // Send to both Terminal and Claude at startup
         for id in [PaneId::Terminal, PaneId::Claude] {
             if let Some(pty) = self.terminals.get_mut(&id) {
                 let _ = pty.write_input(cmd.as_bytes());
             }
         }
     }
-    
+
+    /// Sync directory to Terminal pane only (not Claude - Claude only gets cd at startup)
+    fn sync_terminals(&mut self) {
+        let path_str = self.file_browser.current_dir.to_string_lossy().to_string();
+        let esc_path = path_str.replace("\"", "\\\"");
+        let cmd = format!("cd \"{}\"\r", esc_path);
+
+        // Only sync to Terminal, not Claude (Claude should keep its initial directory)
+        if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
+            let _ = pty.write_input(cmd.as_bytes());
+        }
+    }
+
     fn handle_menu_action(&mut self, action: ui::menu::MenuAction) {
         use ui::menu::MenuAction;
         use ui::dialog::{DialogType, DialogAction};
@@ -611,6 +674,22 @@ impl App {
             DialogAction::DiscardEditorChanges => {
                 self.preview.exit_edit_mode(true); // true = discard changes
                 self.preview.refresh_highlighting(&self.syntax_manager);
+            }
+            DialogAction::SwitchFile { target_idx } => {
+                // Discard changes and switch to clicked file
+                self.preview.exit_edit_mode(true);
+                self.preview.refresh_highlighting(&self.syntax_manager);
+                self.file_browser.list_state.select(Some(target_idx));
+                self.update_preview();
+            }
+            DialogAction::EnterDirectory { target_idx } => {
+                // Discard changes and enter the clicked directory
+                self.preview.exit_edit_mode(true);
+                self.preview.refresh_highlighting(&self.syntax_manager);
+                self.file_browser.list_state.select(Some(target_idx));
+                self.file_browser.enter_selected();
+                self.update_preview();
+                self.sync_terminals();
             }
         }
     }
