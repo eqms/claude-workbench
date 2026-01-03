@@ -13,6 +13,7 @@ use crate::ui::preview::PreviewState;
 
 use crate::ui::menu::MenuBar;
 use crate::ui::dialog::Dialog;
+use crate::ui::fuzzy_finder::FuzzyFinder;
 
 pub struct App {
     pub config: Config,
@@ -28,6 +29,7 @@ pub struct App {
     pub last_refresh: std::time::Instant,
     pub menu: MenuBar,
     pub dialog: Dialog,
+    pub fuzzy_finder: FuzzyFinder,
 }
 
 impl App {
@@ -76,6 +78,7 @@ impl App {
             last_refresh: std::time::Instant::now(),
             menu: MenuBar::default(),
             dialog: Dialog::default(),
+            fuzzy_finder: FuzzyFinder::default(),
         };
         
         
@@ -195,6 +198,42 @@ impl App {
                     Event::Key(key) => {
                         if key.kind == KeyEventKind::Press {
                         
+                        // Fuzzy finder handling (highest priority)
+                        if self.fuzzy_finder.visible {
+                            match key.code {
+                                KeyCode::Esc => self.fuzzy_finder.close(),
+                                KeyCode::Enter => {
+                                    if let Some(selected) = self.fuzzy_finder.selected() {
+                                        let full_path = self.fuzzy_finder.base_dir.join(&selected);
+                                        // Navigate to file's directory and select it
+                                        if let Some(parent) = full_path.parent() {
+                                            self.file_browser.current_dir = parent.to_path_buf();
+                                            self.file_browser.load_directory();
+                                            // Try to select the file
+                                            let file_name = full_path.file_name().map(|n| n.to_string_lossy().to_string());
+                                            if let Some(name) = file_name {
+                                                for (i, entry) in self.file_browser.entries.iter().enumerate() {
+                                                    if entry.name == name {
+                                                        self.file_browser.list_state.select(Some(i));
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            self.update_preview();
+                                            self.sync_terminals();
+                                        }
+                                        self.fuzzy_finder.close();
+                                    }
+                                }
+                                KeyCode::Up => self.fuzzy_finder.prev(),
+                                KeyCode::Down => self.fuzzy_finder.next(),
+                                KeyCode::Backspace => self.fuzzy_finder.pop_char(),
+                                KeyCode::Char(c) => self.fuzzy_finder.push_char(c),
+                                _ => {}
+                            }
+                            continue;
+                        }
+                        
                         // Dialog handling (highest priority)
                         if self.dialog.is_active() {
                             match &mut self.dialog.dialog_type {
@@ -266,6 +305,12 @@ impl App {
                         
                         if key.code == KeyCode::F(9) {
                             self.menu.toggle();
+                            continue;
+                        }
+                        
+                        // Ctrl+P: Open fuzzy finder
+                        if key.code == KeyCode::Char('p') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            self.fuzzy_finder.open(&self.file_browser.current_dir);
                             continue;
                         }
 
@@ -407,6 +452,10 @@ impl App {
         
         if self.dialog.is_active() {
             ui::dialog::render(frame, area, &self.dialog);
+        }
+        
+        if self.fuzzy_finder.visible {
+            ui::fuzzy_finder::render(frame, area, &mut self.fuzzy_finder);
         }
     }
 

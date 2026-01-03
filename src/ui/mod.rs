@@ -6,3 +6,4 @@ pub mod footer;
 pub mod help;
 pub mod menu;
 pub mod dialog;
+pub mod fuzzy_finder;
