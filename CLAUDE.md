@@ -10,6 +10,7 @@ A Rust-based TUI (Terminal User Interface) multiplexer called "claude-workbench"
 - Mouse and keyboard navigation
 - Scrollback support for terminal panes
 
+
 Built with Ratatui (TUI framework), Crossterm (terminal handling), and portable-pty (pseudo-terminal).
 
 ## Development Commands
