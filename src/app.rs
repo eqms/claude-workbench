@@ -161,6 +161,7 @@ impl App {
                         match key.code {
                             KeyCode::F(1) => self.active_pane = PaneId::FileBrowser,
                             KeyCode::F(2) => self.active_pane = PaneId::Preview,
+                            KeyCode::F(3) => { self.file_browser.refresh(); self.update_preview(); }
                             KeyCode::F(4) => self.active_pane = PaneId::Claude,
                             KeyCode::F(5) => self.active_pane = PaneId::LazyGit,
                             KeyCode::F(6) => {

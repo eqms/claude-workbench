@@ -13,6 +13,7 @@ impl Widget for Footer {
         let keys = vec![
             ("F1", "Files"),
             ("F2", "Preview"),
+            ("F3", "Refresh"),
             ("F4", "Claude"),
             ("F5", "LazyGit"),
             ("F6", "Term"),
@@ -38,8 +39,23 @@ impl Widget for Footer {
             spans.push(Span::raw(" "));
         }
 
+        // Version info on the right
+        let version = env!("CARGO_PKG_VERSION");
+        let version_text = format!(" v{} ", version);
+        let version_width = version_text.len() as u16;
+        
+        // Calculate positions
+        let keys_area = Rect::new(area.x, area.y, area.width.saturating_sub(version_width), area.height);
+        let version_area = Rect::new(area.x + area.width.saturating_sub(version_width), area.y, version_width, area.height);
+
+        // Render keys on left
         Paragraph::new(Line::from(spans))
             .style(Style::default().bg(Color::Blue))
-            .render(area, buf);
+            .render(keys_area, buf);
+        
+        // Render version on right
+        Paragraph::new(version_text)
+            .style(Style::default().bg(Color::DarkGray).fg(Color::White))
+            .render(version_area, buf);
     }
 }

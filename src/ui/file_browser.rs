@@ -126,6 +126,17 @@ impl FileBrowserState {
     pub fn selected_file(&self) -> Option<PathBuf> {
         self.list_state.selected().and_then(|i| self.entries.get(i).map(|e| e.path.clone()))
     }
+    
+    pub fn refresh(&mut self) {
+        let selected = self.list_state.selected();
+        self.load_directory();
+        // Try to restore selection
+        if let Some(idx) = selected {
+            if idx < self.entries.len() {
+                self.list_state.select(Some(idx));
+            }
+        }
+    }
 }
 
 pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focused: bool) {
