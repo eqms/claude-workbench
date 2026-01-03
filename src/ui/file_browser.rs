@@ -3,7 +3,6 @@ use ratatui::{
     style::{Style, Modifier, Color},
     Frame,
     prelude::Rect,
-    text::{Line, Span},
 };
 use std::path::PathBuf;
 use std::fs;

@@ -147,20 +147,25 @@ impl App {
                                 else if is_inside(lazygit, x, y) { self.active_pane = PaneId::LazyGit; }
                                 else if is_inside(term, x, y) { self.active_pane = PaneId::Terminal; }
                                 else if is_inside(footer_area, x, y) {
-                                    // Footer clicks - approximate button positions
-                                    // Buttons are roughly 10 chars each, positioned sequentially
+                                    // Use precise button positions
                                     let footer_x = x.saturating_sub(footer_area.x);
-                                    let btn_idx = footer_x / 10;  // Approximate button width
-                                    match btn_idx {
-                                        0 => self.active_pane = PaneId::FileBrowser,  // F1 Files
-                                        1 => self.active_pane = PaneId::Preview,       // F2 Preview
-                                        2 => { self.file_browser.refresh(); self.update_preview(); } // F3 Refresh
-                                        3 => self.active_pane = PaneId::Claude,        // F4 Claude
-                                        4 => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } } // F5 Git
-                                        5 => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } } // F6 Term
-                                        6 => self.menu.toggle(),  // F9 Menu
-                                        7 => self.show_help = true, // ? Help
-                                        _ => {}
+                                    let positions = ui::footer::get_button_positions();
+                                    
+                                    for (start, end, idx) in positions {
+                                        if footer_x >= start && footer_x < end {
+                                            match idx {
+                                                0 => self.active_pane = PaneId::FileBrowser,  // F1 Files
+                                                1 => self.active_pane = PaneId::Preview,       // F2 Preview
+                                                2 => { self.file_browser.refresh(); self.update_preview(); } // F3 Refresh
+                                                3 => self.active_pane = PaneId::Claude,        // F4 Claude
+                                                4 => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } } // F5 Git
+                                                5 => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } } // F6 Term
+                                                6 => self.menu.toggle(),  // F9 Menu
+                                                7 => self.show_help = true, // ? Help
+                                                _ => {}
+                                            }
+                                            break;
+                                        }
                                     }
                                 }
                             }

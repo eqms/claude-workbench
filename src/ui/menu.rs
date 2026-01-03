@@ -1,9 +1,8 @@
 use ratatui::{
-    buffer::Buffer,
     layout::Rect,
     style::{Color, Style, Modifier},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 

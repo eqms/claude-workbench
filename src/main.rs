@@ -29,10 +29,10 @@ async fn main() -> Result<()> {
     let config = load_config()?;
     let session = load_session();
     
-    let mut terminal = ratatui::init();
+    let terminal = ratatui::init();
     crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
     
-    let mut app = App::new(config, session);
+    let app = App::new(config, session);
     
     // Initialize PTYs (async or sync) logic could go here or inside App::new
     // For now App::new spawns them.
