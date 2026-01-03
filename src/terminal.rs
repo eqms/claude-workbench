@@ -20,7 +20,7 @@ impl PseudoTerminal {
             pixel_height: 0,
         })?;
 
-        let parser = Arc::new(Mutex::new(vt100::Parser::new(rows, cols, 0)));
+        let parser = Arc::new(Mutex::new(vt100::Parser::new(rows, cols, 1000)));
         let mut reader = pair.master.try_clone_reader()?;
         let parser_clone = parser.clone();
 
@@ -77,8 +77,34 @@ impl PseudoTerminal {
     }
 
     pub fn write_input(&mut self, input: &[u8]) -> Result<()> {
+        // If typing, reset scrollback
+        {
+            let mut parser = self.parser.lock().unwrap();
+            let screen = parser.screen_mut();
+            if screen.scrollback() > 0 {
+                screen.set_scrollback(0);
+            }
+        }
         self.writer.write_all(input)?;
         self.writer.flush()?;
         Ok(())
+    }
+
+    pub fn scroll_up(&self, lines: usize) {
+        let mut parser = self.parser.lock().unwrap();
+        let screen = parser.screen_mut();
+        let current = screen.scrollback();
+        screen.set_scrollback(current + lines);
+    }
+
+    pub fn scroll_down(&self, lines: usize) {
+        let mut parser = self.parser.lock().unwrap();
+        let screen = parser.screen_mut();
+        let current = screen.scrollback();
+        if current >= lines {
+            screen.set_scrollback(current - lines);
+        } else {
+            screen.set_scrollback(0);
+        }
     }
 }

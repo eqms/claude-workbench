@@ -65,8 +65,18 @@ impl App {
             show_help: false,
         };
         
+        
         app.update_preview();
         app.sync_terminals();
+        
+        // Initial Clear
+        for id in [PaneId::Terminal, PaneId::Claude] {
+            if let Some(pty) = app.terminals.get_mut(&id) {
+                 // Use Form Feed \x0c (Ctrl+L) to clear screen in most shells
+                let _ = pty.write_input(b"\x0c");
+            }
+        }
+        
         app
     }
 
@@ -155,7 +165,18 @@ impl App {
                                         }
                                     }
                                     PaneId::Terminal | PaneId::Claude | PaneId::LazyGit => {
-                if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
+                                        if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
+                                            // Scroll Handling
+                                            if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
+                                                match key.code {
+                                                    KeyCode::PageUp => { pty.scroll_up(10); continue; }
+                                                    KeyCode::PageDown => { pty.scroll_down(10); continue; }
+                                                    KeyCode::Up => { pty.scroll_up(1); continue; }
+                                                    KeyCode::Down => { pty.scroll_down(1); continue; }
+                                                    _ => {}
+                                                }
+                                            }
+
                                             if let Some(bytes) = crate::input::map_key_to_pty(key) {
                                                 let _ = pty.write_input(&bytes);
                                             }
