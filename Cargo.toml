@@ -1,0 +1,17 @@
+[package]
+name = "claude-workbench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.30.0" # Bumped to match modern deps
+crossterm = "0.28.1"
+tokio = { version = "1.42.0", features = ["full"] }
+anyhow = "1.0.94"
+serde = { version = "1.0.216", features = ["derive"] }
+serde_yaml = "0.9.33"
+directories = "5.0.1"
+tui-textarea = "0.4.0"
+portable-pty = "0.8.1"
+clap = { version = "4.5.21", features = ["derive"] }
+vt100 = "0.16"

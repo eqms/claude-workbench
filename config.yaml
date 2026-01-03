@@ -1,0 +1,6 @@
+terminal:
+  shell_path: "/opt/homebrew/bin/fish"
+  shell_args: ["-l"]
+
+ui:
+  theme: "default"
