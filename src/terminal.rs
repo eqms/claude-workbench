@@ -65,6 +65,15 @@ impl PseudoTerminal {
     }
 
     pub fn resize(&mut self, rows: u16, cols: u16) -> Result<()> {
+        {
+            let parser = self.parser.lock().unwrap();
+            let screen = parser.screen();
+            let (curr_rows, curr_cols) = screen.size();
+            if curr_rows == rows && curr_cols == cols {
+                return Ok(());
+            }
+        }
+        
         self.master.resize(PtySize {
             rows,
             cols,

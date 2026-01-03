@@ -6,7 +6,7 @@ pub fn compute_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(1),             // Top Area (dynamic)
-            Constraint::Percentage(30),     // Claude Code (Bottom)
+            Constraint::Percentage(40),     // Claude Code (Bottom)
             Constraint::Length(1),          // Footer
         ])
         .split(area);

@@ -19,28 +19,38 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
         Style::default()
     };
 
+    use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
+
     let block = Block::bordered().title(title).border_style(border_style);
     let inner_area = block.inner(area);
     
     f.render_widget(block, area);
 
     if let Some(pty) = app.terminals.get(&pane_id) {
-        // RESIZE PTY if needed (hacky interior mutability or update step needed properly)
-        // Since we are in render (immutable app), we interpret the parser state.
-        // To resize properly, we should do it in the update loop. 
-        // For now, let's assume PTY size logic is handled elsewhere or ignored.
-        // (We will add a resize helper in App later).
-        
         let parser = pty.parser.lock().unwrap();
         let screen = parser.screen();
         
-        // Render the screen content to the buffer
-        // Simple iteration over vt100::Screen
-        
-        // NOTE: vt100 screen size might differ from visual area if not resized.
-        // We clip.
-        
         TerminalWidget::new(screen).render(inner_area, f.buffer_mut());
+        
+        // Scrollbar
+        let scrollback = screen.scrollback();
+        // Assuming max history 1000 as configured.
+        // Invert logic: scrollback 0 is bottom (pos 1000), scrollback 1000 is top (pos 0).
+        let max_scroll = 1000; 
+        // Clamp scrollback to max
+        let effective_scroll = scrollback.min(max_scroll);
+        let scroll_pos = max_scroll - effective_scroll;
+        
+        let mut scrollbar_state = ScrollbarState::new(max_scroll).position(scroll_pos);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("↑"))
+            .end_symbol(Some("↓"));
+            
+        f.render_stateful_widget(
+            scrollbar,
+            area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 0 }), // Inside border
+            &mut scrollbar_state,
+        );
     }
 }
 

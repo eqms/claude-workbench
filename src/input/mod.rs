@@ -29,6 +29,7 @@ pub fn map_key_to_pty(key: KeyEvent) -> Option<Vec<u8>> {
         KeyCode::Enter => bytes.push(b'\r'),
         KeyCode::Backspace => bytes.push(127),
         KeyCode::Tab => bytes.push(9),
+        KeyCode::BackTab => bytes.extend_from_slice(b"\x1b[Z"),
         KeyCode::Esc => bytes.push(27),
         
         KeyCode::Up => bytes.extend_from_slice(b"\x1b[A"),

@@ -242,6 +242,23 @@ impl App {
         let area = frame.area();
         let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area);
 
+        // Helper to resize PTY
+        // We need to account for borders (1px each side => -2)
+        // Ensure strictly positive
+        let resize_pty = |terminals: &mut HashMap<PaneId, PseudoTerminal>, id: PaneId, rect: Rect| {
+            if let Some(pty) = terminals.get_mut(&id) {
+                let w = rect.width.saturating_sub(2);
+                let h = rect.height.saturating_sub(2);
+                if w > 0 && h > 0 {
+                    let _ = pty.resize(h, w);
+                }
+            }
+        };
+
+        resize_pty(&mut self.terminals, PaneId::Claude, claude);
+        resize_pty(&mut self.terminals, PaneId::LazyGit, lazygit);
+        resize_pty(&mut self.terminals, PaneId::Terminal, terminal);
+
         ui::file_browser::render(frame, files, &mut self.file_browser, self.active_pane == PaneId::FileBrowser);
         ui::preview::render(frame, preview, &self.preview, self.active_pane == PaneId::Preview);
         
