@@ -1,6 +1,6 @@
 [package]
 name = "claude-workbench"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 
 [dependencies]
@@ -16,3 +16,4 @@ portable-pty = "0.8.1"
 clap = { version = "4.5.21", features = ["derive"] }
 vt100 = "0.16"
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
+tui-markdown = "0.3"

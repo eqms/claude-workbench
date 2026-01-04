@@ -6,11 +6,19 @@ use ratatui::{
     Frame,
 };
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tui_textarea::TextArea;
 
 use crate::types::EditorMode;
 use crate::ui::syntax::SyntaxManager;
+
+/// Check if a file is a Markdown file based on extension
+fn is_markdown_file(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("md") | Some("markdown") | Some("mdown") | Some("mkd")
+    )
+}
 
 #[derive(Debug)]
 pub struct PreviewState {
@@ -31,6 +39,9 @@ pub struct PreviewState {
 
     // Edit-mode highlighting cache (updated on each change)
     pub edit_highlighted_lines: Vec<Line<'static>>,
+
+    // Markdown rendering flag
+    pub is_markdown: bool,
 }
 
 impl Default for PreviewState {
@@ -46,6 +57,7 @@ impl Default for PreviewState {
             highlighted_lines: Vec::new(),
             syntax_name: None,
             edit_highlighted_lines: Vec::new(),
+            is_markdown: false,
         }
     }
 }
@@ -63,18 +75,46 @@ impl PreviewState {
 
         self.current_file = Some(path.clone());
         self.scroll = 0;
-        self.syntax_name = syntax_manager.detect_syntax_name(&path);
+        self.is_markdown = is_markdown_file(&path);
+
+        // Set syntax name (Markdown or detected syntax)
+        if self.is_markdown {
+            self.syntax_name = Some("Markdown".to_string());
+        } else {
+            self.syntax_name = syntax_manager.detect_syntax_name(&path);
+        }
 
         if let Ok(content) = fs::read_to_string(&path) {
             self.content = content.clone();
             self.original_content = content.clone();
-            self.highlighted_lines = syntax_manager.highlight(&content, &path);
+
+            // Use tui-markdown for markdown files, syntect for others
+            if self.is_markdown {
+                let md_text = tui_markdown::from_str(&content);
+                // Convert to owned Lines to avoid lifetime issues
+                self.highlighted_lines = md_text
+                    .lines
+                    .into_iter()
+                    .map(|line| {
+                        Line::from(
+                            line.spans
+                                .into_iter()
+                                .map(|span| Span::styled(span.content.to_string(), span.style))
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect();
+            } else {
+                self.highlighted_lines = syntax_manager.highlight(&content, &path);
+            }
         } else if path.is_dir() {
             self.content = "[Directory]".to_string();
             self.highlighted_lines = vec![Line::from("[Directory]")];
+            self.is_markdown = false;
         } else {
             self.content = "[Binary or unreadable file]".to_string();
             self.highlighted_lines = vec![Line::from("[Binary or unreadable file]")];
+            self.is_markdown = false;
         }
     }
 
