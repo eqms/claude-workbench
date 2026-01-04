@@ -1,5 +1,6 @@
 pub mod app;
 pub mod config;
+pub mod git;
 pub mod session;
 pub mod types;
 pub mod ui;
