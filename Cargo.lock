@@ -255,13 +255,14 @@ checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
 name = "claude-workbench"
-version = "0.7.4"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "clap",
  "crossterm 0.28.1",
  "dirs",
  "portable-pty",
+ "pulldown-cmark 0.10.3",
  "ratatui",
  "serde",
  "serde_yaml",
@@ -1304,6 +1305,19 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76979bea66e7875e7509c4ec5300112b316af87fa7a252ca91c448b32dfe3993"
+dependencies = [
+ "bitflags 2.10.0",
+ "getopts",
+ "memchr",
+ "pulldown-cmark-escape 0.10.1",
+ "unicase",
+]
+
+[[package]]
+name = "pulldown-cmark"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e8bbe1a966bd2f362681a44f6edce3c2310ac21e4d5067a6e7ec396297a6ea0"
@@ -1311,9 +1325,15 @@ dependencies = [
  "bitflags 2.10.0",
  "getopts",
  "memchr",
- "pulldown-cmark-escape",
+ "pulldown-cmark-escape 0.11.0",
  "unicase",
 ]
+
+[[package]]
+name = "pulldown-cmark-escape"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd348ff538bc9caeda7ee8cad2d1d48236a1f443c1fa3913c6a02fe0043b1dd3"
 
 [[package]]
 name = "pulldown-cmark-escape"
@@ -2118,7 +2138,7 @@ dependencies = [
  "ansi-to-tui",
  "itertools 0.14.0",
  "pretty_assertions",
- "pulldown-cmark",
+ "pulldown-cmark 0.13.0",
  "ratatui-core",
  "rstest",
  "syntect",

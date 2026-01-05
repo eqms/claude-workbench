@@ -18,6 +18,7 @@ use crate::ui::fuzzy_finder::FuzzyFinder;
 use crate::ui::settings::SettingsState;
 use crate::ui::about::AboutState;
 use crate::setup::wizard::WizardState;
+use crate::browser;
 
 pub struct App {
     pub config: Config,
@@ -253,9 +254,23 @@ impl App {
                                                 4 => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } } // F5 Git
                                                 5 => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } } // F6 Term
                                                 6 => { self.fuzzy_finder.open(&self.file_browser.current_dir); } // ^P Find
-                                                7 => { let cfg = self.config.clone(); self.settings.open(&cfg); }  // ^, Settings
-                                                8 => self.about.open(),     // i Info
-                                                9 => self.show_help = true, // ? Help
+                                                7 => {
+                                                    // o Open: Open file in browser
+                                                    if let Some(path) = self.file_browser.selected_file() {
+                                                        if browser::can_preview_in_browser(&path) {
+                                                            let preview_path = if browser::is_markdown(&path) {
+                                                                browser::markdown_to_html(&path).unwrap_or(path)
+                                                            } else {
+                                                                path
+                                                            };
+                                                            let _ = browser::open_file(&preview_path);
+                                                        }
+                                                    }
+                                                }
+                                                8 => { let _ = browser::open_in_file_manager(&self.file_browser.current_dir); } // O Finder
+                                                9 => { let cfg = self.config.clone(); self.settings.open(&cfg); }  // ^, Settings
+                                                10 => self.about.open(),     // i Info
+                                                11 => self.show_help = true, // ? Help
                                                 _ => {}
                                             }
                                             break;
@@ -517,9 +532,26 @@ impl App {
                                                 self.update_preview();
                                                 self.sync_terminals();
                                             }
+                                            // Open file in browser/external viewer
+                                            KeyCode::Char('o') => {
+                                                if let Some(path) = self.file_browser.selected_file() {
+                                                    if browser::can_preview_in_browser(&path) {
+                                                        let preview_path = if browser::is_markdown(&path) {
+                                                            browser::markdown_to_html(&path).unwrap_or(path)
+                                                        } else {
+                                                            path
+                                                        };
+                                                        let _ = browser::open_file(&preview_path);
+                                                    }
+                                                }
+                                            }
+                                            // Open current directory in file manager
+                                            KeyCode::Char('O') => {
+                                                let _ = browser::open_in_file_manager(&self.file_browser.current_dir);
+                                            }
                                             // Allow single q to quit if in browser
                                             KeyCode::Char('q') => {
-                                                 self.should_quit = true; 
+                                                 self.should_quit = true;
                                             }
                                             _ => {}
                                         }

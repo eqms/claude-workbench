@@ -1,4 +1,5 @@
 pub mod app;
+pub mod browser;
 pub mod config;
 pub mod git;
 pub mod session;

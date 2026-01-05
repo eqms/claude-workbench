@@ -50,6 +50,8 @@ pub fn render(f: &mut Frame) {
         "  Enter        : Open / Go to Dir",
         "  Double-Click : Open / Go to Dir",
         "  Back/Left    : Go to Parent",
+        "  o            : Open in Browser (HTML/MD/PDF/Images)",
+        "  O (Shift+O)  : Open Directory in Finder",
         "",
         "Fuzzy Finder (Ctrl+P):",
         "  Type       : Filter files",
