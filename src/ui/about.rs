@@ -13,25 +13,81 @@ use ratatui::{
 pub struct AboutState {
     pub visible: bool,
     pub scroll: usize,
+    pub selected: usize,
+    /// Cached popup area for mouse hit testing
+    pub popup_area: Option<Rect>,
+    pub list_area: Option<Rect>,
 }
 
 impl AboutState {
     pub fn open(&mut self) {
         self.visible = true;
         self.scroll = 0;
+        self.selected = 0;
     }
 
     pub fn close(&mut self) {
         self.visible = false;
+        self.popup_area = None;
+        self.list_area = None;
     }
 
     pub fn scroll_up(&mut self) {
-        self.scroll = self.scroll.saturating_sub(1);
+        if self.selected > 0 {
+            self.selected -= 1;
+            // Adjust scroll to keep selection visible
+            if self.selected < self.scroll {
+                self.scroll = self.selected;
+            }
+        }
     }
 
     pub fn scroll_down(&mut self) {
-        self.scroll = self.scroll.saturating_add(1);
+        if self.selected < component_count() - 1 {
+            self.selected += 1;
+        }
     }
+
+    /// Handle mouse click at coordinates
+    pub fn handle_click(&mut self, x: u16, y: u16) -> bool {
+        if let Some(list_area) = self.list_area {
+            if x >= list_area.x && x < list_area.x + list_area.width
+                && y >= list_area.y && y < list_area.y + list_area.height
+            {
+                let relative_y = y.saturating_sub(list_area.y) as usize;
+                let clicked_idx = self.scroll + relative_y;
+                if clicked_idx < component_count() {
+                    self.selected = clicked_idx;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Handle scroll in the about dialog
+    pub fn handle_scroll(&mut self, down: bool, visible_height: usize) {
+        let max_scroll = component_count().saturating_sub(visible_height);
+        if down {
+            self.scroll = (self.scroll + 1).min(max_scroll);
+        } else {
+            self.scroll = self.scroll.saturating_sub(1);
+        }
+    }
+
+    /// Ensure selection is visible after scroll
+    pub fn ensure_selection_visible(&mut self, visible_height: usize) {
+        if self.selected < self.scroll {
+            self.scroll = self.selected;
+        } else if self.selected >= self.scroll + visible_height {
+            self.scroll = self.selected.saturating_sub(visible_height - 1);
+        }
+    }
+}
+
+/// Get the number of components
+pub fn component_count() -> usize {
+    COMPONENTS.len()
 }
 
 /// Component license information
@@ -125,7 +181,7 @@ const COMPONENTS: &[ComponentLicense] = &[
 ];
 
 /// Render the about dialog
-pub fn render(frame: &mut Frame, area: Rect, state: &AboutState) {
+pub fn render(frame: &mut Frame, area: Rect, state: &mut AboutState) {
     // Calculate centered popup area (60% width, 70% height)
     let popup_width = (area.width as f32 * 0.6) as u16;
     let popup_height = (area.height as f32 * 0.7) as u16;
@@ -134,6 +190,9 @@ pub fn render(frame: &mut Frame, area: Rect, state: &AboutState) {
     let popup_y = (area.height.saturating_sub(popup_height)) / 2;
 
     let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    // Store popup area for mouse hit testing
+    state.popup_area = Some(popup_area);
 
     // Clear background
     frame.render_widget(Clear, popup_area);
@@ -162,7 +221,7 @@ pub fn render(frame: &mut Frame, area: Rect, state: &AboutState) {
         Line::from(""),
         Line::from(vec![
             Span::styled("Copyright ", Style::default().fg(Color::DarkGray)),
-            Span::styled("(c) 2025 Equitania Software GmbH", Style::default().fg(Color::White)),
+            Span::styled("(c) 2025 Martin Schmid", Style::default().fg(Color::White)),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -181,23 +240,41 @@ pub fn render(frame: &mut Frame, area: Rect, state: &AboutState) {
     let max_scroll = COMPONENTS.len().saturating_sub(visible_height);
     let scroll = state.scroll.min(max_scroll);
 
+    // Store list area for mouse hit testing
+    state.list_area = Some(chunks[1]);
+
+    // Ensure selection is visible
+    state.ensure_selection_visible(visible_height);
+
     let items: Vec<ListItem> = COMPONENTS
         .iter()
+        .enumerate()
         .skip(scroll)
         .take(visible_height)
-        .map(|comp| {
+        .map(|(idx, comp)| {
+            let is_selected = idx == state.selected;
+            let style = if is_selected {
+                Style::default().bg(Color::DarkGray)
+            } else {
+                Style::default()
+            };
+
             ListItem::new(Line::from(vec![
                 Span::styled(
-                    format!("{:<15}", comp.name),
-                    Style::default().fg(Color::Cyan),
+                    if is_selected { "▸ " } else { "  " },
+                    style.fg(Color::Yellow),
                 ),
                 Span::styled(
-                    format!(" v{:<8}", comp.version),
-                    Style::default().fg(Color::DarkGray),
+                    format!("{:<13}", comp.name),
+                    style.fg(Color::Cyan),
+                ),
+                Span::styled(
+                    format!(" v{:<7}", comp.version),
+                    style.fg(Color::DarkGray),
                 ),
                 Span::styled(
                     format!(" {:<14}", comp.license),
-                    Style::default().fg(Color::Green),
+                    style.fg(Color::Green),
                 ),
             ]))
         })

@@ -172,6 +172,18 @@ impl App {
 
                          match mouse.kind {
                             crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                                // Handle About dialog clicks first
+                                if self.about.visible {
+                                    if let Some(popup) = self.about.popup_area {
+                                        if is_inside(popup, x, y) {
+                                            self.about.handle_click(x, y);
+                                        } else {
+                                            self.about.close();
+                                        }
+                                    }
+                                    continue;
+                                }
+
                                 if is_inside(files, x, y) {
                                     self.active_pane = PaneId::FileBrowser;
                                     // Calculate which item was clicked (account for border)
@@ -252,9 +264,19 @@ impl App {
                                 }
                             }
                             crossterm::event::MouseEventKind::ScrollDown => {
-                                if is_inside(files, x, y) { 
-                                    self.file_browser.down(); 
-                                    self.update_preview(); 
+                                // Handle About dialog scroll first
+                                if self.about.visible {
+                                    if let Some(popup) = self.about.popup_area {
+                                        if is_inside(popup, x, y) {
+                                            self.about.scroll_down();
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                if is_inside(files, x, y) {
+                                    self.file_browser.down();
+                                    self.update_preview();
                                 }
                                 else if is_inside(preview, x, y) { self.preview.scroll_down(); }
                                 else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_down(3); } }
@@ -262,9 +284,19 @@ impl App {
                                 else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_down(3); } }
                             }
                             crossterm::event::MouseEventKind::ScrollUp => {
-                                if is_inside(files, x, y) { 
-                                    self.file_browser.up(); 
-                                    self.update_preview(); 
+                                // Handle About dialog scroll first
+                                if self.about.visible {
+                                    if let Some(popup) = self.about.popup_area {
+                                        if is_inside(popup, x, y) {
+                                            self.about.scroll_up();
+                                        }
+                                    }
+                                    continue;
+                                }
+
+                                if is_inside(files, x, y) {
+                                    self.file_browser.up();
+                                    self.update_preview();
                                 }
                                 else if is_inside(preview, x, y) { self.preview.scroll_up(); }
                                 else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_up(3); } }
@@ -610,7 +642,7 @@ impl App {
         }
 
         if self.about.visible {
-            ui::about::render(frame, area, &self.about);
+            ui::about::render(frame, area, &mut self.about);
         }
 
         if self.menu.visible {
