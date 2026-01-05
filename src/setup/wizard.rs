@@ -2,9 +2,8 @@
 
 use crate::config::Config;
 use crate::setup::dependency_checker::DependencyReport;
-use crate::setup::templates::{Template, get_builtin_templates};
 
-/// Wizard step enumeration
+/// Wizard step enumeration (5 steps, no template selection)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WizardStep {
     #[default]
@@ -12,7 +11,6 @@ pub enum WizardStep {
     Dependencies,
     ShellSelection,
     ClaudeConfig,
-    TemplateSelection,
     Confirmation,
     Complete,
 }
@@ -23,8 +21,7 @@ impl WizardStep {
             WizardStep::Welcome => WizardStep::Dependencies,
             WizardStep::Dependencies => WizardStep::ShellSelection,
             WizardStep::ShellSelection => WizardStep::ClaudeConfig,
-            WizardStep::ClaudeConfig => WizardStep::TemplateSelection,
-            WizardStep::TemplateSelection => WizardStep::Confirmation,
+            WizardStep::ClaudeConfig => WizardStep::Confirmation,
             WizardStep::Confirmation => WizardStep::Complete,
             WizardStep::Complete => WizardStep::Complete,
         }
@@ -36,8 +33,7 @@ impl WizardStep {
             WizardStep::Dependencies => WizardStep::Welcome,
             WizardStep::ShellSelection => WizardStep::Dependencies,
             WizardStep::ClaudeConfig => WizardStep::ShellSelection,
-            WizardStep::TemplateSelection => WizardStep::ClaudeConfig,
-            WizardStep::Confirmation => WizardStep::TemplateSelection,
+            WizardStep::Confirmation => WizardStep::ClaudeConfig,
             WizardStep::Complete => WizardStep::Confirmation,
         }
     }
@@ -48,14 +44,13 @@ impl WizardStep {
             WizardStep::Dependencies => 2,
             WizardStep::ShellSelection => 3,
             WizardStep::ClaudeConfig => 4,
-            WizardStep::TemplateSelection => 5,
-            WizardStep::Confirmation => 6,
-            WizardStep::Complete => 6,
+            WizardStep::Confirmation => 5,
+            WizardStep::Complete => 5,
         }
     }
 
     pub fn total_steps() -> u8 {
-        6
+        5
     }
 
     pub fn title(&self) -> &'static str {
@@ -64,7 +59,6 @@ impl WizardStep {
             WizardStep::Dependencies => "Dependency Check",
             WizardStep::ShellSelection => "Shell Selection",
             WizardStep::ClaudeConfig => "Tool Configuration",
-            WizardStep::TemplateSelection => "Choose Template",
             WizardStep::Confirmation => "Confirmation",
             WizardStep::Complete => "Complete",
         }
@@ -90,11 +84,9 @@ pub struct WizardState {
     pub selected_shell_idx: usize,
     pub claude_path: String,
     pub lazygit_path: String,
-    pub selected_template_idx: usize,
 
     // Available options
     pub available_shells: Vec<String>,
-    pub available_templates: Vec<Template>,
 
     // Input state for path editing
     pub editing_field: Option<WizardField>,
@@ -107,7 +99,6 @@ pub struct WizardState {
 impl Default for WizardState {
     fn default() -> Self {
         let deps = DependencyReport::check();
-        let templates = get_builtin_templates();
 
         let available_shells: Vec<String> = deps
             .shells
@@ -140,16 +131,11 @@ impl Default for WizardState {
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_else(|| "lazygit".to_string()),
-            selected_template_idx: 0,
             available_shells: if available_shells.is_empty() {
                 vec![default_shell]
             } else {
                 available_shells
             },
-            available_templates: templates
-                .into_iter()
-                .filter(|t| t.category == "workflow")
-                .collect(),
             editing_field: None,
             input_buffer: String::new(),
             focused_field: 0,
@@ -227,21 +213,11 @@ impl WizardState {
             .unwrap_or_else(|| "/bin/bash".to_string())
     }
 
-    /// Get the selected template
-    pub fn selected_template(&self) -> Option<&Template> {
-        self.available_templates.get(self.selected_template_idx)
-    }
-
     /// Generate final config from wizard selections
     pub fn generate_config(&self) -> Config {
         let mut config = Config::default();
 
-        // Apply template first (provides base layout/pty settings)
-        if let Some(template) = self.selected_template() {
-            crate::setup::templates::apply_template(&mut config, template);
-        }
-
-        // Then apply wizard-specific selections (overrides template)
+        // Apply wizard selections
         config.terminal.shell_path = self.selected_shell();
         config.pty.claude_command = vec![self.claude_path.clone()];
         config.pty.lazygit_command = vec![self.lazygit_path.clone()];
@@ -260,7 +236,6 @@ impl WizardState {
             WizardStep::Dependencies => self.deps.all_required_met(),
             WizardStep::ShellSelection => !self.available_shells.is_empty(),
             WizardStep::ClaudeConfig => true, // Paths can be defaults
-            WizardStep::TemplateSelection => true,
             WizardStep::Confirmation => true,
             WizardStep::Complete => false,
         }

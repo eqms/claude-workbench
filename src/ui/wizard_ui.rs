@@ -46,7 +46,6 @@ pub fn render(frame: &mut Frame, area: Rect, state: &WizardState) {
         WizardStep::Dependencies => render_dependencies(frame, inner, state),
         WizardStep::ShellSelection => render_shell_selection(frame, inner, state),
         WizardStep::ClaudeConfig => render_claude_config(frame, inner, state),
-        WizardStep::TemplateSelection => render_template_selection(frame, inner, state),
         WizardStep::Confirmation => render_confirmation(frame, inner, state),
         WizardStep::Complete => render_complete(frame, inner),
     }
@@ -338,51 +337,6 @@ fn render_claude_config(frame: &mut Frame, area: Rect, state: &WizardState) {
     frame.render_widget(lazygit_block, chunks[3]);
 }
 
-fn render_template_selection(frame: &mut Frame, area: Rect, state: &WizardState) {
-    let chunks = Layout::vertical([
-        Constraint::Length(2),
-        Constraint::Min(1),
-    ])
-    .split(area);
-
-    let header = Paragraph::new("Choose a workflow template:");
-    frame.render_widget(header, chunks[0]);
-
-    let items: Vec<ListItem> = state
-        .available_templates
-        .iter()
-        .enumerate()
-        .map(|(i, template)| {
-            let prefix = if i == state.selected_template_idx { "● " } else { "○ " };
-            let style = if i == state.selected_template_idx {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            };
-            let desc_style = if i == state.selected_template_idx {
-                Style::default().fg(Color::White)
-            } else {
-                Style::default().fg(Color::DarkGray)
-            };
-
-            ListItem::new(vec![
-                Line::from(vec![
-                    Span::styled(prefix, style),
-                    Span::styled(&template.name, style),
-                ]),
-                Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled(&template.description, desc_style),
-                ]),
-                Line::from(""),
-            ])
-        })
-        .collect();
-
-    let list = List::new(items);
-    frame.render_widget(list, chunks[1]);
-}
-
 fn render_confirmation(frame: &mut Frame, area: Rect, state: &WizardState) {
     let chunks = Layout::vertical([
         Constraint::Length(2),
@@ -394,11 +348,6 @@ fn render_confirmation(frame: &mut Frame, area: Rect, state: &WizardState) {
     let header = Paragraph::new("Summary of your configuration:")
         .style(Style::default().add_modifier(Modifier::BOLD));
     frame.render_widget(header, chunks[0]);
-
-    let template_name = state
-        .selected_template()
-        .map(|t| t.name.as_str())
-        .unwrap_or("None");
 
     let summary = Paragraph::new(vec![
         Line::from(""),
@@ -413,10 +362,6 @@ fn render_confirmation(frame: &mut Frame, area: Rect, state: &WizardState) {
         Line::from(vec![
             Span::styled("  LazyGit:     ", Style::default().fg(Color::DarkGray)),
             Span::raw(&state.lazygit_path),
-        ]),
-        Line::from(vec![
-            Span::styled("  Template:    ", Style::default().fg(Color::DarkGray)),
-            Span::raw(template_name),
         ]),
         Line::from(""),
         Line::from(vec![

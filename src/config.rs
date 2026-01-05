@@ -144,8 +144,17 @@ pub fn load_config() -> Result<Config> {
     Ok(Config::default())
 }
 
-/// Save config to user config directory (~/.config/claude-workbench/)
+/// Save config - updates local config.yaml if it exists, otherwise XDG config
 pub fn save_config(config: &Config) -> Result<()> {
+    // If local config.yaml exists, update it (maintains project-specific settings)
+    let local_config = Path::new("config.yaml");
+    if local_config.exists() {
+        let yaml = serde_yaml::to_string(config)?;
+        fs::write(local_config, yaml)?;
+        return Ok(());
+    }
+
+    // Otherwise save to XDG config directory
     if let Some(config_dir) = get_config_dir() {
         let config_path = config_dir.join("config.yaml");
         fs::create_dir_all(&config_dir)?;

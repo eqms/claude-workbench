@@ -774,13 +774,16 @@ impl App {
                 }
             }
             KeyCode::Enter => {
-                if self.wizard.step == WizardStep::Complete {
-                    // Apply wizard config and close
+                if self.wizard.step == WizardStep::Confirmation {
+                    // Save config immediately when confirming
                     let new_config = self.wizard.generate_config();
                     self.config = new_config;
                     if let Err(e) = crate::config::save_config(&self.config) {
                         eprintln!("Failed to save config: {}", e);
                     }
+                    self.wizard.next_step(); // Go to Complete
+                } else if self.wizard.step == WizardStep::Complete {
+                    // Just close on Complete step
                     self.wizard.close();
                 } else if self.wizard.can_proceed() {
                     self.wizard.next_step();
@@ -806,11 +809,6 @@ impl App {
                             self.wizard.focused_field -= 1;
                         }
                     }
-                    WizardStep::TemplateSelection => {
-                        if self.wizard.selected_template_idx > 0 {
-                            self.wizard.selected_template_idx -= 1;
-                        }
-                    }
                     _ => {}
                 }
             }
@@ -824,11 +822,6 @@ impl App {
                     WizardStep::ClaudeConfig => {
                         if self.wizard.focused_field < 1 {
                             self.wizard.focused_field += 1;
-                        }
-                    }
-                    WizardStep::TemplateSelection => {
-                        if self.wizard.selected_template_idx < self.wizard.available_templates.len().saturating_sub(1) {
-                            self.wizard.selected_template_idx += 1;
                         }
                     }
                     _ => {}

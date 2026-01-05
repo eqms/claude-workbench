@@ -16,3 +16,8 @@ file_browser:
   show_file_info: true
   date_format: "%d.%m.%Y %H:%M:%S"
   auto_refresh_ms: 2000  # 0 = disabled, 2000 = every 2 seconds
+
+setup:
+  wizard_completed: true
+  wizard_version: 1
+  active_template: ''
