@@ -8,3 +8,5 @@ pub mod menu;
 pub mod dialog;
 pub mod fuzzy_finder;
 pub mod syntax;
+pub mod wizard_ui;
+pub mod settings;

@@ -11,6 +11,36 @@ pub struct Config {
     pub layout: LayoutConfig,
     #[serde(default)]
     pub file_browser: FileBrowserConfig,
+    #[serde(default)]
+    pub pty: PtyConfig,
+    #[serde(default)]
+    pub setup: SetupConfig,
+}
+
+/// PTY configuration for all terminal panes
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PtyConfig {
+    pub claude_command: Vec<String>,
+    pub lazygit_command: Vec<String>,
+    pub scrollback_lines: usize,
+}
+
+impl Default for PtyConfig {
+    fn default() -> Self {
+        Self {
+            claude_command: vec!["claude".to_string()],
+            lazygit_command: vec!["lazygit".to_string()],
+            scrollback_lines: 1000,
+        }
+    }
+}
+
+/// Setup/wizard state persisted in config
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct SetupConfig {
+    pub wizard_completed: bool,
+    pub wizard_version: u8,
+    pub active_template: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -74,6 +104,8 @@ impl Default for Config {
             },
             layout: LayoutConfig::default(),
             file_browser: FileBrowserConfig::default(),
+            pty: PtyConfig::default(),
+            setup: SetupConfig::default(),
         }
     }
 }
@@ -103,4 +135,21 @@ pub fn load_config() -> Result<Config> {
     // Fallback: Check if user provided shell in env?
     // Or just return default
     Ok(Config::default())
+}
+
+/// Save config to user config directory
+pub fn save_config(config: &Config) -> Result<()> {
+    if let Some(config_dir) = directories::ProjectDirs::from("com", "antigravity", "claude-workbench") {
+        let config_path = config_dir.config_dir().join("config.yaml");
+        fs::create_dir_all(config_dir.config_dir())?;
+        let yaml = serde_yaml::to_string(config)?;
+        fs::write(config_path, yaml)?;
+    }
+    Ok(())
+}
+
+/// Get the config file path (for display purposes)
+pub fn get_config_path() -> Option<std::path::PathBuf> {
+    directories::ProjectDirs::from("com", "antigravity", "claude-workbench")
+        .map(|d| d.config_dir().join("config.yaml"))
 }

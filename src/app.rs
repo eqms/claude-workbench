@@ -15,6 +15,8 @@ use crate::ui::syntax::SyntaxManager;
 use crate::ui::menu::MenuBar;
 use crate::ui::dialog::Dialog;
 use crate::ui::fuzzy_finder::FuzzyFinder;
+use crate::ui::settings::SettingsState;
+use crate::setup::wizard::WizardState;
 
 pub struct App {
     pub config: Config,
@@ -32,6 +34,8 @@ pub struct App {
     pub dialog: Dialog,
     pub fuzzy_finder: FuzzyFinder,
     pub syntax_manager: SyntaxManager,
+    pub wizard: WizardState,
+    pub settings: SettingsState,
     // Double-click tracking
     last_click_time: std::time::Instant,
     last_click_idx: Option<usize>,
@@ -47,14 +51,22 @@ impl App {
 
         let mut terminals = HashMap::new();
 
-        // 1. Claude Code
-        let claude_cmd = vec!["/bin/bash".to_string(), "-c".to_string(), "echo 'Claude Code PTY'; exec bash".to_string()];
+        // 1. Claude Code (from Config)
+        let claude_cmd = if config.pty.claude_command.is_empty() {
+            vec!["claude".to_string()]
+        } else {
+            config.pty.claude_command.clone()
+        };
         if let Ok(pty) = PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
              terminals.insert(PaneId::Claude, pty);
         }
 
-        // 2. LazyGit
-        let lazygit_cmd = vec!["lazygit".to_string()];
+        // 2. LazyGit (from Config)
+        let lazygit_cmd = if config.pty.lazygit_command.is_empty() {
+            vec!["lazygit".to_string()]
+        } else {
+            config.pty.lazygit_command.clone()
+        };
         if let Ok(pty) = PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
              terminals.insert(PaneId::LazyGit, pty);
         }
@@ -64,12 +76,15 @@ impl App {
         let args = &config.terminal.shell_args;
         let mut cmd = vec![shell.clone()];
         cmd.extend(args.clone());
-        
+
         if let Ok(pty) = PseudoTerminal::new(&cmd, rows, cols, &cwd) {
              terminals.insert(PaneId::Terminal, pty);
         }
 
         let syntax_manager = SyntaxManager::new();
+
+        // Check if wizard should open (first run)
+        let should_open_wizard = !config.setup.wizard_completed;
 
         let mut app = Self {
             config,
@@ -87,9 +102,16 @@ impl App {
             dialog: Dialog::default(),
             fuzzy_finder: FuzzyFinder::default(),
             syntax_manager,
+            wizard: WizardState::new(),
+            settings: SettingsState::new(),
             last_click_time: std::time::Instant::now(),
             last_click_idx: None,
         };
+
+        // Open wizard on first run
+        if should_open_wizard {
+            app.wizard.open();
+        }
         
         
         app.update_preview();
@@ -285,7 +307,19 @@ impl App {
                             }
                             continue;
                         }
-                        
+
+                        // Wizard handling (high priority)
+                        if self.wizard.visible {
+                            self.handle_wizard_input(key.code, key.modifiers);
+                            continue;
+                        }
+
+                        // Settings handling (high priority)
+                        if self.settings.visible {
+                            self.handle_settings_input(key.code, key.modifiers);
+                            continue;
+                        }
+
                         // Dialog handling (highest priority)
                         if self.dialog.is_active() {
                             match &mut self.dialog.dialog_type {
@@ -363,6 +397,12 @@ impl App {
                         // Ctrl+P: Open fuzzy finder
                         if key.code == KeyCode::Char('p') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
                             self.fuzzy_finder.open(&self.file_browser.current_dir);
+                            continue;
+                        }
+
+                        // Ctrl+,: Open settings
+                        if key.code == KeyCode::Char(',') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            self.settings.open(&self.config);
                             continue;
                         }
 
@@ -553,6 +593,14 @@ impl App {
         if self.fuzzy_finder.visible {
             ui::fuzzy_finder::render(frame, area, &mut self.fuzzy_finder);
         }
+
+        if self.wizard.visible {
+            ui::wizard_ui::render(frame, area, &self.wizard);
+        }
+
+        if self.settings.visible {
+            ui::settings::render(frame, area, &self.settings);
+        }
     }
 
     /// Initial sync: send cd to BOTH Terminal and Claude (called once at startup)
@@ -691,6 +739,158 @@ impl App {
                 self.update_preview();
                 self.sync_terminals();
             }
+        }
+    }
+
+    /// Handle wizard input
+    fn handle_wizard_input(&mut self, code: KeyCode, _modifiers: KeyModifiers) {
+        use crate::setup::wizard::WizardStep;
+
+        // If editing a field
+        if self.wizard.editing_field.is_some() {
+            match code {
+                KeyCode::Esc => self.wizard.cancel_editing(),
+                KeyCode::Enter => self.wizard.finish_editing(),
+                KeyCode::Backspace => { self.wizard.input_buffer.pop(); }
+                KeyCode::Char(c) => self.wizard.input_buffer.push(c),
+                _ => {}
+            }
+            return;
+        }
+
+        match code {
+            KeyCode::Esc => {
+                // On Welcome, Esc closes wizard; on other steps, go back
+                if self.wizard.step == WizardStep::Welcome {
+                    self.wizard.close();
+                } else {
+                    self.wizard.prev_step();
+                }
+            }
+            KeyCode::Enter => {
+                if self.wizard.step == WizardStep::Complete {
+                    // Apply wizard config and close
+                    let new_config = self.wizard.generate_config();
+                    self.config = new_config;
+                    if let Err(e) = crate::config::save_config(&self.config) {
+                        eprintln!("Failed to save config: {}", e);
+                    }
+                    self.wizard.close();
+                } else if self.wizard.can_proceed() {
+                    self.wizard.next_step();
+                }
+            }
+            KeyCode::Tab | KeyCode::Right => {
+                if self.wizard.can_proceed() {
+                    self.wizard.next_step();
+                }
+            }
+            KeyCode::BackTab | KeyCode::Left => {
+                self.wizard.prev_step();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                match self.wizard.step {
+                    WizardStep::ShellSelection => {
+                        if self.wizard.selected_shell_idx > 0 {
+                            self.wizard.selected_shell_idx -= 1;
+                        }
+                    }
+                    WizardStep::ClaudeConfig => {
+                        if self.wizard.focused_field > 0 {
+                            self.wizard.focused_field -= 1;
+                        }
+                    }
+                    WizardStep::TemplateSelection => {
+                        if self.wizard.selected_template_idx > 0 {
+                            self.wizard.selected_template_idx -= 1;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                match self.wizard.step {
+                    WizardStep::ShellSelection => {
+                        if self.wizard.selected_shell_idx < self.wizard.available_shells.len().saturating_sub(1) {
+                            self.wizard.selected_shell_idx += 1;
+                        }
+                    }
+                    WizardStep::ClaudeConfig => {
+                        if self.wizard.focused_field < 1 {
+                            self.wizard.focused_field += 1;
+                        }
+                    }
+                    WizardStep::TemplateSelection => {
+                        if self.wizard.selected_template_idx < self.wizard.available_templates.len().saturating_sub(1) {
+                            self.wizard.selected_template_idx += 1;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            KeyCode::Char('e') | KeyCode::Char('E') => {
+                // Edit in ClaudeConfig step
+                if self.wizard.step == WizardStep::ClaudeConfig {
+                    use crate::setup::wizard::WizardField;
+                    let field = if self.wizard.focused_field == 0 {
+                        WizardField::ClaudePath
+                    } else {
+                        WizardField::LazygitPath
+                    };
+                    self.wizard.start_editing(field);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Handle settings input
+    fn handle_settings_input(&mut self, code: KeyCode, _modifiers: KeyModifiers) {
+        // If editing a field
+        if self.settings.editing.is_some() {
+            match code {
+                KeyCode::Esc => self.settings.cancel_editing(),
+                KeyCode::Enter => self.settings.finish_editing(),
+                KeyCode::Backspace => { self.settings.input_buffer.pop(); }
+                KeyCode::Char(c) => self.settings.input_buffer.push(c),
+                _ => {}
+            }
+            return;
+        }
+
+        match code {
+            KeyCode::Esc => {
+                self.settings.close();
+            }
+            KeyCode::Tab => {
+                self.settings.next_category();
+            }
+            KeyCode::BackTab => {
+                self.settings.prev_category();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.settings.move_up();
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.settings.move_down();
+            }
+            KeyCode::Enter => {
+                self.settings.toggle_or_select();
+            }
+            KeyCode::Char(' ') => {
+                self.settings.toggle_or_select();
+            }
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                // Save and close
+                if self.settings.has_changes {
+                    self.settings.apply_to_config(&mut self.config);
+                    if let Err(e) = crate::config::save_config(&self.config) {
+                        eprintln!("Failed to save config: {}", e);
+                    }
+                }
+                self.settings.close();
+            }
+            _ => {}
         }
     }
 }

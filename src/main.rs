@@ -2,6 +2,7 @@ pub mod app;
 pub mod config;
 pub mod git;
 pub mod session;
+pub mod setup;
 pub mod types;
 pub mod ui;
 pub mod terminal;
