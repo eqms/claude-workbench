@@ -406,6 +406,12 @@ impl App {
                             continue;
                         }
 
+                        // Ctrl+Shift+W: Re-run setup wizard
+                        if key.code == KeyCode::Char('W') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL | crossterm::event::KeyModifiers::SHIFT) {
+                            self.wizard.open();
+                            continue;
+                        }
+
                         // Global Focus Switching
                         match key.code {
                             KeyCode::F(1) => self.active_pane = PaneId::FileBrowser,

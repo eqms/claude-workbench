@@ -1,6 +1,6 @@
 [package]
 name = "claude-workbench"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 
 [dependencies]
@@ -10,7 +10,7 @@ tokio = { version = "1.42.0", features = ["full"] }
 anyhow = "1.0.94"
 serde = { version = "1.0.216", features = ["derive"] }
 serde_yaml = "0.9.33"
-directories = "5.0.1"
+dirs = "5.0"
 tui-textarea = { git = "https://github.com/0xferrous/tui-textarea.git", branch = "update-ratatui" }
 portable-pty = "0.8.1"
 clap = { version = "4.5.21", features = ["derive"] }
