@@ -35,6 +35,7 @@ pub fn get_button_positions() -> Vec<(u16, u16, u8)> {
         ("F6", "Term"),
         ("^P", "Find"),
         ("^,", "Settings"),
+        ("i", "Info"),
         ("?", "Help"),
     ];
 
@@ -90,6 +91,7 @@ impl Widget for Footer {
                 ("F6", "Term"),
                 ("^P", "Find"),
                 ("^,", "Settings"),
+                ("i", "Info"),
                 ("?", "Help"),
             ]
         };

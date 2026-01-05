@@ -10,3 +10,4 @@ pub mod fuzzy_finder;
 pub mod syntax;
 pub mod wizard_ui;
 pub mod settings;
+pub mod about;

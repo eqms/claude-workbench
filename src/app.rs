@@ -16,6 +16,7 @@ use crate::ui::menu::MenuBar;
 use crate::ui::dialog::Dialog;
 use crate::ui::fuzzy_finder::FuzzyFinder;
 use crate::ui::settings::SettingsState;
+use crate::ui::about::AboutState;
 use crate::setup::wizard::WizardState;
 
 pub struct App {
@@ -36,6 +37,7 @@ pub struct App {
     pub syntax_manager: SyntaxManager,
     pub wizard: WizardState,
     pub settings: SettingsState,
+    pub about: AboutState,
     // Double-click tracking
     last_click_time: std::time::Instant,
     last_click_idx: Option<usize>,
@@ -104,6 +106,7 @@ impl App {
             syntax_manager,
             wizard: WizardState::new(),
             settings: SettingsState::new(),
+            about: AboutState::default(),
             last_click_time: std::time::Instant::now(),
             last_click_idx: None,
         };
@@ -237,8 +240,10 @@ impl App {
                                                 3 => self.active_pane = PaneId::Claude,        // F4 Claude
                                                 4 => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } } // F5 Git
                                                 5 => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } } // F6 Term
-                                                6 => self.menu.toggle(),  // F9 Menu
-                                                7 => self.show_help = true, // ? Help
+                                                6 => { self.fuzzy_finder.open(&self.file_browser.current_dir); } // ^P Find
+                                                7 => { let cfg = self.config.clone(); self.settings.open(&cfg); }  // ^, Settings
+                                                8 => self.about.open(),     // i Info
+                                                9 => self.show_help = true, // ? Help
                                                 _ => {}
                                             }
                                             break;
@@ -374,6 +379,17 @@ impl App {
                             continue;
                         }
                         
+                        // About dialog handling
+                        if self.about.visible {
+                            match key.code {
+                                KeyCode::Esc | KeyCode::Char('i') | KeyCode::Char('q') => self.about.close(),
+                                KeyCode::Up | KeyCode::Char('k') => self.about.scroll_up(),
+                                KeyCode::Down | KeyCode::Char('j') => self.about.scroll_down(),
+                                _ => {}
+                            }
+                            continue;
+                        }
+
                         if self.show_help {
                             match key.code {
                                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
@@ -386,6 +402,11 @@ impl App {
                         // Global Keys
                         if key.code == KeyCode::Char('?') {
                             self.show_help = true;
+                            continue;
+                        }
+
+                        if key.code == KeyCode::Char('i') && self.preview.mode != EditorMode::Edit {
+                            self.about.open();
                             continue;
                         }
                         
@@ -587,11 +608,15 @@ impl App {
         if self.show_help {
             ui::help::render(frame);
         }
-        
+
+        if self.about.visible {
+            ui::about::render(frame, area, &self.about);
+        }
+
         if self.menu.visible {
             ui::menu::render(frame, area, &self.menu);
         }
-        
+
         if self.dialog.is_active() {
             ui::dialog::render(frame, area, &self.dialog);
         }

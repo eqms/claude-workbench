@@ -34,6 +34,7 @@ pub fn render(f: &mut Frame) {
         "  Ctrl+P       : Fuzzy Find Files",
         "  Ctrl+,       : Open Settings Menu",
         "  Ctrl+Shift+W : Re-run Setup Wizard",
+        "  i            : About / License Info",
         "  ?            : Toggle this Help",
         "  Esc          : Close Dialogs / Help",
         "",
