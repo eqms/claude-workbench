@@ -26,7 +26,7 @@ pub fn render(f: &mut Frame) {
     f.render_widget(Clear, rect);
 
     let text = vec![
-        "Claude Workbench v0.12.0 Help",
+        "Claude Workbench v0.12.1 Help",
         "============================",
         "",
         "Global Shortcuts:",

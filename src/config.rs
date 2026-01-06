@@ -3,6 +3,9 @@ use anyhow::Result;
 use std::path::Path;
 use std::fs;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
     pub terminal: TerminalConfig,
@@ -164,13 +167,29 @@ pub fn load_config() -> Result<Config> {
     Ok(Config::default())
 }
 
+/// Set restrictive file permissions (0600 - owner read/write only) on Unix systems
+#[cfg(unix)]
+fn set_restrictive_permissions(path: &Path) -> Result<()> {
+    let mut perms = fs::metadata(path)?.permissions();
+    perms.set_mode(0o600);
+    fs::set_permissions(path, perms)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn set_restrictive_permissions(_path: &Path) -> Result<()> {
+    // No-op on non-Unix systems (Windows handles permissions differently)
+    Ok(())
+}
+
 /// Save config - updates local config.yaml if it exists, otherwise XDG config
 pub fn save_config(config: &Config) -> Result<()> {
     // If local config.yaml exists, update it (maintains project-specific settings)
     let local_config = Path::new("config.yaml");
     if local_config.exists() {
         let yaml = serde_yaml::to_string(config)?;
-        fs::write(local_config, yaml)?;
+        fs::write(local_config, &yaml)?;
+        set_restrictive_permissions(local_config)?;
         return Ok(());
     }
 
@@ -179,7 +198,8 @@ pub fn save_config(config: &Config) -> Result<()> {
         let config_path = config_dir.join("config.yaml");
         fs::create_dir_all(&config_dir)?;
         let yaml = serde_yaml::to_string(config)?;
-        fs::write(config_path, yaml)?;
+        fs::write(&config_path, &yaml)?;
+        set_restrictive_permissions(&config_path)?;
     }
     Ok(())
 }

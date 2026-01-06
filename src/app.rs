@@ -8,7 +8,9 @@ use crate::session::SessionState;
 use crate::ui;
 use crate::types::{EditorMode, PaneId, TerminalSelection, DragState};
 use crate::terminal::PseudoTerminal;
+use std::borrow::Cow;
 use std::path::Path;
+use shell_escape::escape;
 use crate::ui::file_browser::FileBrowserState;
 use crate::ui::preview::PreviewState;
 use crate::ui::syntax::SyntaxManager;
@@ -930,9 +932,9 @@ impl App {
 
     /// Initial sync: send cd to Terminal only (Claude should not receive early commands)
     fn sync_terminals_initial(&mut self) {
-        let path_str = self.file_browser.current_dir.to_string_lossy().to_string();
-        let esc_path = path_str.replace("\"", "\\\"");
-        let cmd = format!("cd \"{}\"\r", esc_path);
+        let path_str = self.file_browser.current_dir.to_string_lossy();
+        let escaped = escape(Cow::Borrowed(&path_str));
+        let cmd = format!("cd {}\r", escaped);
 
         // Only sync to Terminal, NOT Claude (Claude needs time to start)
         if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
@@ -942,9 +944,9 @@ impl App {
 
     /// Sync directory to Terminal pane only (not Claude - Claude only gets cd at startup)
     fn sync_terminals(&mut self) {
-        let path_str = self.file_browser.current_dir.to_string_lossy().to_string();
-        let esc_path = path_str.replace("\"", "\\\"");
-        let cmd = format!("cd \"{}\"\r", esc_path);
+        let path_str = self.file_browser.current_dir.to_string_lossy();
+        let escaped = escape(Cow::Borrowed(&path_str));
+        let cmd = format!("cd {}\r", escaped);
 
         // Only sync to Terminal, not Claude (Claude should keep its initial directory)
         if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
@@ -1247,14 +1249,8 @@ impl App {
     fn insert_path_at_cursor(&mut self, target: PaneId, path: &Path) {
         if let Some(pty) = self.terminals.get_mut(&target) {
             let path_str = path.to_string_lossy();
-
-            // Escape special characters for shell
-            let escaped = if path_str.contains(' ') || path_str.contains('\'') || path_str.contains('"') || path_str.contains('$') {
-                // Use single quotes and escape existing single quotes
-                format!("'{}'", path_str.replace("'", "'\\''"))
-            } else {
-                path_str.to_string()
-            };
+            // Use shell-escape crate for proper escaping of special characters
+            let escaped = escape(Cow::Borrowed(&path_str));
 
             // Write to PTY (no newline - just insert the path)
             let _ = pty.write_input(escaped.as_bytes());

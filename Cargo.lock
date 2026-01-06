@@ -255,7 +255,7 @@ checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
 name = "claude-workbench"
-version = "0.11.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -266,6 +266,7 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_yaml",
+ "shell-escape",
  "syntect",
  "tokio",
  "tui-markdown",
@@ -1735,6 +1736,12 @@ dependencies = [
  "lazy_static",
  "libc",
 ]
+
+[[package]]
+name = "shell-escape"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45bb67a18fa91266cc7807181f62f9178a6873bfad7dc788c42e6430db40184f"
 
 [[package]]
 name = "shell-words"
