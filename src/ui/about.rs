@@ -178,6 +178,12 @@ const COMPONENTS: &[ComponentLicense] = &[
         license: "MIT/Apache-2.0",
         url: "https://github.com/dirs-dev/dirs-rs",
     },
+    ComponentLicense {
+        name: "pulldown-cmark",
+        version: "0.10",
+        license: "MIT",
+        url: "https://github.com/pulldown-cmark/pulldown-cmark",
+    },
 ];
 
 /// Render the about dialog

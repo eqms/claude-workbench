@@ -45,10 +45,19 @@ impl PseudoTerminal {
         let mut cmd = CommandBuilder::new(cmd_str);
         cmd.args(args);
         cmd.cwd(cwd);
-        
-        // Create environment that suppresses Fish's DA query but keeps colors
+
+        // Inherit all environment variables from parent process
+        // This is critical for Claude CLI which needs LANG, LC_ALL, HOME, PATH, etc.
+        for (key, value) in std::env::vars() {
+            cmd.env(key, value);
+        }
+
+        // Override specific settings for terminal compatibility
         cmd.env("TERM", "xterm-256color");
         cmd.env("fish_features", "no-query-term");
+        // Ensure UTF-8 encoding for proper character handling
+        cmd.env("LANG", "en_US.UTF-8");
+        cmd.env("LC_ALL", "en_US.UTF-8");
         
         let _child = pair.slave.spawn_command(cmd)?;
         
@@ -115,5 +124,44 @@ impl PseudoTerminal {
         } else {
             screen.set_scrollback(0);
         }
+    }
+
+    /// Extract text content from specified line range (screen-relative, 0-based)
+    /// Returns lines as strings with trailing whitespace trimmed
+    pub fn extract_lines(&self, start: usize, end: usize) -> Vec<String> {
+        let parser = self.parser.lock().unwrap();
+        let screen = parser.screen();
+        let (rows, cols) = screen.size();
+
+        let mut lines = Vec::new();
+        for row in start..=end {
+            if row >= rows as usize {
+                break;
+            }
+
+            let mut line = String::new();
+            for col in 0..cols {
+                if let Some(cell) = screen.cell(row as u16, col) {
+                    line.push_str(cell.contents());
+                }
+            }
+            // Trim trailing whitespace but preserve leading
+            lines.push(line.trim_end().to_string());
+        }
+
+        lines
+    }
+
+    /// Get the current visible cursor row (0-based)
+    pub fn cursor_row(&self) -> u16 {
+        let parser = self.parser.lock().unwrap();
+        let screen = parser.screen();
+        screen.cursor_position().0
+    }
+
+    /// Get current scrollback offset
+    pub fn scrollback(&self) -> usize {
+        let parser = self.parser.lock().unwrap();
+        parser.screen().scrollback()
     }
 }

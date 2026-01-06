@@ -21,3 +21,26 @@ setup:
   wizard_completed: true
   wizard_version: 1
   active_template: ''
+
+# PTY configuration - Claude pane uses shell by default (user starts claude manually)
+# pty:
+#   claude_command: []  # Empty = use terminal shell, or ["claude"] to auto-start
+#   lazygit_command: ["lazygit"]
+#   scrollback_lines: 1000
+
+# Claude startup prefixes (optional)
+# Uncomment and customize to show a selection dialog when opening Claude
+# claude:
+#   startup_prefixes:
+#     - name: "Code Review"
+#       prefix: "/review"
+#       description: "Review code changes"
+#     - name: "Write Tests"
+#       prefix: "/test"
+#       description: "Generate unit tests"
+#     - name: "Explain Code"
+#       prefix: "/explain"
+#       description: "Explain selected code"
+#     - name: "Plain Start"
+#       prefix: ""
+#       description: "Start without prefix"

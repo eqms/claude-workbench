@@ -6,8 +6,9 @@ use std::collections::HashMap;
 use crate::config::Config;
 use crate::session::SessionState;
 use crate::ui;
-use crate::types::{EditorMode, PaneId};
+use crate::types::{EditorMode, PaneId, TerminalSelection, DragState};
 use crate::terminal::PseudoTerminal;
+use std::path::Path;
 use crate::ui::file_browser::FileBrowserState;
 use crate::ui::preview::PreviewState;
 use crate::ui::syntax::SyntaxManager;
@@ -39,9 +40,18 @@ pub struct App {
     pub wizard: WizardState,
     pub settings: SettingsState,
     pub about: AboutState,
+    // Claude PTY error tracking
+    pub claude_error: Option<String>,
+    pub claude_command_used: String,
+    // Startup prefix dialog
+    pub claude_startup: ui::claude_startup::ClaudeStartupState,
     // Double-click tracking
     last_click_time: std::time::Instant,
     last_click_idx: Option<usize>,
+    // Terminal line selection for copying to Claude
+    pub terminal_selection: TerminalSelection,
+    // Drag and drop state for file paths
+    pub drag_state: DragState,
 }
 
 impl App {
@@ -53,15 +63,29 @@ impl App {
         let cwd = file_browser.current_dir.clone();
 
         let mut terminals = HashMap::new();
+        let mut claude_error: Option<String> = None;
 
-        // 1. Claude Code (from Config)
+        // 1. Claude Pane - uses shell from pty config (same as terminal)
+        // User starts claude manually when ready
         let claude_cmd = if config.pty.claude_command.is_empty() {
-            vec!["claude".to_string()]
+            // Default: use the same shell as Terminal pane
+            let mut cmd = vec![config.terminal.shell_path.clone()];
+            cmd.extend(config.terminal.shell_args.clone());
+            cmd
         } else {
             config.pty.claude_command.clone()
         };
-        if let Ok(pty) = PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
-             terminals.insert(PaneId::Claude, pty);
+        let claude_command_str = claude_cmd.join(" ");
+        match PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
+            Ok(pty) => {
+                terminals.insert(PaneId::Claude, pty);
+            }
+            Err(e) => {
+                claude_error = Some(format!(
+                    "Failed to start shell\n\nCommand: {}\n\nError: {}",
+                    claude_command_str, e
+                ));
+            }
         }
 
         // 2. LazyGit (from Config)
@@ -108,8 +132,13 @@ impl App {
             wizard: WizardState::new(),
             settings: SettingsState::new(),
             about: AboutState::default(),
+            claude_error,
+            claude_command_used: claude_command_str,
+            claude_startup: ui::claude_startup::ClaudeStartupState::default(),
             last_click_time: std::time::Instant::now(),
             last_click_idx: None,
+            terminal_selection: TerminalSelection::default(),
+            drag_state: DragState::default(),
         };
 
         // Open wizard on first run
@@ -120,17 +149,14 @@ impl App {
         
         app.update_preview();
 
-        // Initial cd for BOTH Terminal and Claude (Claude only gets cd at startup)
+        // Initial cd for Terminal only (Claude should not receive early commands)
         app.sync_terminals_initial();
 
-        // Initial Clear
-        for id in [PaneId::Terminal, PaneId::Claude] {
-            if let Some(pty) = app.terminals.get_mut(&id) {
-                 // Use Form Feed \x0c (Ctrl+L) to clear screen in most shells
-                let _ = pty.write_input(b"\x0c");
-            }
+        // Initial Clear - ONLY for Terminal pane (not Claude, which needs time to start)
+        if let Some(pty) = app.terminals.get_mut(&PaneId::Terminal) {
+            let _ = pty.write_input(b"\x0c");
         }
-        
+
         app
     }
 
@@ -191,6 +217,9 @@ impl App {
                                     let relative_y = y.saturating_sub(files.y + 1); // +1 for border
                                     let idx = relative_y as usize;
                                     if idx < self.file_browser.entries.len() {
+                                        // Start drag with the file path
+                                        let entry = &self.file_browser.entries[idx];
+                                        self.drag_state.start(entry.path.clone(), x, y);
                                         // Check for double-click (same item within 300ms)
                                         let now = std::time::Instant::now();
                                         let is_double_click = self.last_click_idx == Some(idx)
@@ -236,7 +265,14 @@ impl App {
                                     }
                                 }
                                 else if is_inside(preview, x, y) { self.active_pane = PaneId::Preview; }
-                                else if is_inside(claude, x, y) { self.active_pane = PaneId::Claude; }
+                                else if is_inside(claude, x, y) {
+                                    // Show startup dialog if prefixes configured and not yet shown
+                                    if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
+                                        self.claude_startup.open(self.config.claude.startup_prefixes.clone());
+                                    } else {
+                                        self.active_pane = PaneId::Claude;
+                                    }
+                                }
                                 else if is_inside(lazygit, x, y) { self.active_pane = PaneId::LazyGit; }
                                 else if is_inside(term, x, y) { self.active_pane = PaneId::Terminal; }
                                 else if is_inside(footer_area, x, y) {
@@ -250,7 +286,14 @@ impl App {
                                                 0 => self.active_pane = PaneId::FileBrowser,  // F1 Files
                                                 1 => self.active_pane = PaneId::Preview,       // F2 Preview
                                                 2 => { self.file_browser.refresh(); self.update_preview(); } // F3 Refresh
-                                                3 => self.active_pane = PaneId::Claude,        // F4 Claude
+                                                3 => {
+                                                    // F4 Claude - show startup dialog if prefixes configured
+                                                    if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
+                                                        self.claude_startup.open(self.config.claude.startup_prefixes.clone());
+                                                    } else {
+                                                        self.active_pane = PaneId::Claude;
+                                                    }
+                                                }
                                                 4 => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } } // F5 Git
                                                 5 => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } } // F6 Term
                                                 6 => { self.fuzzy_finder.open(&self.file_browser.current_dir); } // ^P Find
@@ -275,6 +318,35 @@ impl App {
                                             }
                                             break;
                                         }
+                                    }
+                                }
+                            }
+                            // Handle drag movement
+                            crossterm::event::MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
+                                if self.drag_state.dragging {
+                                    self.drag_state.update_position(x, y);
+                                }
+                            }
+                            // Handle drag drop
+                            crossterm::event::MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
+                                if self.drag_state.dragging {
+                                    // Determine drop target
+                                    let drop_target = if is_inside(claude, x, y) {
+                                        Some(PaneId::Claude)
+                                    } else if is_inside(term, x, y) {
+                                        Some(PaneId::Terminal)
+                                    } else if is_inside(lazygit, x, y) {
+                                        Some(PaneId::LazyGit)
+                                    } else {
+                                        None
+                                    };
+
+                                    if let Some(target_pane) = drop_target {
+                                        if let Some(path) = self.drag_state.finish() {
+                                            self.insert_path_at_cursor(target_pane, &path);
+                                        }
+                                    } else {
+                                        self.drag_state.clear();
                                     }
                                 }
                             }
@@ -480,12 +552,45 @@ impl App {
                             continue;
                         }
 
+                        // Claude startup dialog handling (high priority)
+                        if self.claude_startup.visible {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.claude_startup.close();
+                                    self.active_pane = PaneId::Claude;
+                                }
+                                KeyCode::Enter => {
+                                    if let Some(prefix) = self.claude_startup.selected_prefix() {
+                                        if !prefix.is_empty() {
+                                            if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
+                                                let cmd = format!("{}\n", prefix);
+                                                let _ = pty.write_input(cmd.as_bytes());
+                                            }
+                                        }
+                                    }
+                                    self.claude_startup.close();
+                                    self.active_pane = PaneId::Claude;
+                                }
+                                KeyCode::Up | KeyCode::Char('k') => self.claude_startup.prev(),
+                                KeyCode::Down | KeyCode::Char('j') => self.claude_startup.next(),
+                                _ => {}
+                            }
+                            continue;
+                        }
+
                         // Global Focus Switching
                         match key.code {
                             KeyCode::F(1) => self.active_pane = PaneId::FileBrowser,
                             KeyCode::F(2) => self.active_pane = PaneId::Preview,
                             KeyCode::F(3) => { self.file_browser.refresh(); self.update_preview(); }
-                            KeyCode::F(4) => self.active_pane = PaneId::Claude,
+                            KeyCode::F(4) => {
+                                // Show startup dialog if prefixes configured and not yet shown
+                                if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
+                                    self.claude_startup.open(self.config.claude.startup_prefixes.clone());
+                                } else {
+                                    self.active_pane = PaneId::Claude;
+                                }
+                            }
                             KeyCode::F(5) => {
                                 self.show_lazygit = !self.show_lazygit;
                                 if self.show_lazygit {
@@ -604,6 +709,44 @@ impl App {
                                         }
                                     }
                                     PaneId::Terminal | PaneId::Claude | PaneId::LazyGit => {
+                                        // Terminal selection mode handling
+                                        if self.terminal_selection.active && self.terminal_selection.source_pane == Some(self.active_pane) {
+                                            match key.code {
+                                                KeyCode::Up | KeyCode::Char('k') => {
+                                                    if let Some(end) = self.terminal_selection.end_line {
+                                                        self.terminal_selection.extend(end.saturating_sub(1));
+                                                    }
+                                                    continue;
+                                                }
+                                                KeyCode::Down | KeyCode::Char('j') => {
+                                                    if let Some(end) = self.terminal_selection.end_line {
+                                                        self.terminal_selection.extend(end + 1);
+                                                    }
+                                                    continue;
+                                                }
+                                                KeyCode::Enter | KeyCode::Char('y') => {
+                                                    self.copy_selection_to_claude();
+                                                    self.terminal_selection.clear();
+                                                    continue;
+                                                }
+                                                KeyCode::Esc => {
+                                                    self.terminal_selection.clear();
+                                                    continue;
+                                                }
+                                                _ => {}
+                                            }
+                                            continue;
+                                        }
+
+                                        // Ctrl+S: Start terminal selection mode
+                                        if key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                                            if let Some(pty) = self.terminals.get(&self.active_pane) {
+                                                let cursor_row = pty.cursor_row() as usize;
+                                                self.terminal_selection.start(cursor_row, self.active_pane);
+                                            }
+                                            continue;
+                                        }
+
                                         if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
                                             // Scroll Handling
                                             if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
@@ -666,6 +809,7 @@ impl App {
             active_pane: self.active_pane,
             editor_mode: self.preview.mode,
             editor_modified: self.preview.modified,
+            selection_mode: self.terminal_selection.active,
         };
         frame.render_widget(footer_widget, footer);
 
@@ -696,19 +840,24 @@ impl App {
         if self.settings.visible {
             ui::settings::render(frame, area, &self.settings);
         }
+
+        if self.claude_startup.visible {
+            ui::claude_startup::render(frame, area, &self.claude_startup);
+        }
+
+        // Render drag ghost on top of everything
+        ui::drag_ghost::render(frame, &self.drag_state);
     }
 
-    /// Initial sync: send cd to BOTH Terminal and Claude (called once at startup)
+    /// Initial sync: send cd to Terminal only (Claude should not receive early commands)
     fn sync_terminals_initial(&mut self) {
         let path_str = self.file_browser.current_dir.to_string_lossy().to_string();
         let esc_path = path_str.replace("\"", "\\\"");
         let cmd = format!("cd \"{}\"\r", esc_path);
 
-        // Send to both Terminal and Claude at startup
-        for id in [PaneId::Terminal, PaneId::Claude] {
-            if let Some(pty) = self.terminals.get_mut(&id) {
-                let _ = pty.write_input(cmd.as_bytes());
-            }
+        // Only sync to Terminal, NOT Claude (Claude needs time to start)
+        if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
+            let _ = pty.write_input(cmd.as_bytes());
         }
     }
 
@@ -979,6 +1128,57 @@ impl App {
                 self.settings.close();
             }
             _ => {}
+        }
+    }
+
+    /// Copy selected terminal lines to Claude pane as a code block
+    fn copy_selection_to_claude(&mut self) {
+        let Some((start, end)) = self.terminal_selection.line_range() else {
+            return;
+        };
+
+        let Some(source_pane) = self.terminal_selection.source_pane else {
+            return;
+        };
+
+        // Extract lines from source terminal
+        let lines = if let Some(pty) = self.terminals.get(&source_pane) {
+            pty.extract_lines(start, end)
+        } else {
+            return;
+        };
+
+        if lines.is_empty() {
+            return;
+        }
+
+        // Format for Claude - wrap in markdown code block for context
+        let formatted = format!(
+            "```\n{}\n```\n",
+            lines.join("\n")
+        );
+
+        // Send to Claude PTY
+        if let Some(claude_pty) = self.terminals.get_mut(&PaneId::Claude) {
+            let _ = claude_pty.write_input(formatted.as_bytes());
+        }
+    }
+
+    /// Insert file path at cursor in target terminal pane
+    fn insert_path_at_cursor(&mut self, target: PaneId, path: &Path) {
+        if let Some(pty) = self.terminals.get_mut(&target) {
+            let path_str = path.to_string_lossy();
+
+            // Escape special characters for shell
+            let escaped = if path_str.contains(' ') || path_str.contains('\'') || path_str.contains('"') || path_str.contains('$') {
+                // Use single quotes and escape existing single quotes
+                format!("'{}'", path_str.replace("'", "'\\''"))
+            } else {
+                path_str.to_string()
+            };
+
+            // Write to PTY (no newline - just insert the path)
+            let _ = pty.write_input(escaped.as_bytes());
         }
     }
 }

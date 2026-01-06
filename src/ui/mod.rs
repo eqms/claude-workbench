@@ -11,3 +11,5 @@ pub mod syntax;
 pub mod wizard_ui;
 pub mod settings;
 pub mod about;
+pub mod claude_startup;
+pub mod drag_ghost;

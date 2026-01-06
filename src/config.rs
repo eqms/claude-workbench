@@ -15,6 +15,8 @@ pub struct Config {
     pub pty: PtyConfig,
     #[serde(default)]
     pub setup: SetupConfig,
+    #[serde(default)]
+    pub claude: ClaudeConfig,
 }
 
 /// PTY configuration for all terminal panes
@@ -28,7 +30,8 @@ pub struct PtyConfig {
 impl Default for PtyConfig {
     fn default() -> Self {
         Self {
-            claude_command: vec!["claude".to_string()],
+            // Empty = use terminal shell (Fish/Bash), user starts claude manually
+            claude_command: vec![],
             lazygit_command: vec!["lazygit".to_string()],
             scrollback_lines: 1000,
         }
@@ -41,6 +44,22 @@ pub struct SetupConfig {
     pub wizard_completed: bool,
     pub wizard_version: u8,
     pub active_template: String,
+}
+
+/// Claude startup prefix definition
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ClaudePrefix {
+    pub name: String,
+    pub prefix: String,
+    pub description: String,
+}
+
+/// Claude-specific configuration
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct ClaudeConfig {
+    /// Startup prefixes shown in dialog
+    #[serde(default)]
+    pub startup_prefixes: Vec<ClaudePrefix>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -106,6 +125,7 @@ impl Default for Config {
             file_browser: FileBrowserConfig::default(),
             pty: PtyConfig::default(),
             setup: SetupConfig::default(),
+            claude: ClaudeConfig::default(),
         }
     }
 }

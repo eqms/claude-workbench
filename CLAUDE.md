@@ -180,8 +180,46 @@ Terminal panes have 1px borders on all sides. When resizing PTY, subtract 2 from
 ## UI Module Structure
 
 - `layout.rs` - Computes 6-pane layout rectangles
-- `file_browser.rs` - File browser rendering and state
-- `preview.rs` - File preview rendering and state
+- `file_browser.rs` - File browser rendering with git status colors
+- `preview.rs` - File preview with syntax highlighting and markdown rendering
 - `terminal_pane.rs` - Renders PTY output using vt100 screen cells
-- `footer.rs` - Status bar with keyboard shortcuts
+- `footer.rs` - Status bar with shortcuts, date/time, and version
 - `help.rs` - Help overlay screen
+- `about.rs` - About dialog with license info
+- `settings.rs` - Settings menu
+- `wizard_ui.rs` - Setup wizard
+- `fuzzy_finder.rs` - Ctrl+P file finder
+- `syntax.rs` - Syntax highlighting (syntect integration)
+- `drag_ghost.rs` - Drag & drop visual feedback
+- `claude_startup.rs` - Claude startup prefix dialog
+
+## Browser Module (`src/browser/`)
+
+- `opener.rs` - Platform-specific file opening (open/xdg-open/start)
+- `markdown.rs` - Markdown to HTML conversion with styled template
+
+## Recent Features (v0.10)
+
+### Footer Date/Time Display
+Footer now shows current date/time (DD.MM.YYYY HH:MM:SS) alongside version number.
+
+### File Modification Date
+File browser status bar shows modification date for selected files (DD.MM.YYYY HH:MM).
+
+### Browser Preview (`o` key)
+- HTML/HTM: Direct browser opening
+- Markdown: Converts to styled HTML with dark mode support
+- PDF: Opens in default PDF viewer
+- Images: PNG/JPG/GIF/SVG/WebP in system viewer
+- `O` (Shift+O): Open directory in Finder/file manager
+
+### Git Status Integration
+- Color-coded file status (untracked, modified, staged, ignored, conflict)
+- Branch name and change counts in status bar
+- Directory status aggregation
+
+### Terminal Selection Mode (Ctrl+S)
+Select and copy terminal output lines to Claude as code blocks.
+
+### Environment Inheritance
+PTY processes now inherit all parent environment variables (critical for Claude CLI which needs HOME, PATH, LANG, etc.).
