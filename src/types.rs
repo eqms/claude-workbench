@@ -183,3 +183,156 @@ impl DragState {
         self.dragged_path = None;
     }
 }
+
+/// Help screen state with scrolling support
+#[derive(Debug, Clone, Default)]
+pub struct HelpState {
+    /// Whether help is visible
+    pub visible: bool,
+    /// Current scroll position (line offset)
+    pub scroll: usize,
+    /// Cached popup area for mouse events
+    pub popup_area: Option<ratatui::layout::Rect>,
+    /// Cached content area (inside borders)
+    pub content_area: Option<ratatui::layout::Rect>,
+    /// Total number of content lines
+    pub total_lines: usize,
+}
+
+impl HelpState {
+    pub fn open(&mut self) {
+        self.visible = true;
+        self.scroll = 0;
+    }
+
+    pub fn close(&mut self) {
+        self.visible = false;
+        self.scroll = 0;
+        self.popup_area = None;
+        self.content_area = None;
+    }
+
+    pub fn scroll_up(&mut self, amount: usize) {
+        self.scroll = self.scroll.saturating_sub(amount);
+    }
+
+    pub fn scroll_down(&mut self, amount: usize) {
+        let max_scroll = self.max_scroll();
+        self.scroll = (self.scroll + amount).min(max_scroll);
+    }
+
+    pub fn scroll_to_top(&mut self) {
+        self.scroll = 0;
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        self.scroll = self.max_scroll();
+    }
+
+    pub fn page_up(&mut self) {
+        self.scroll_up(10);
+    }
+
+    pub fn page_down(&mut self) {
+        self.scroll_down(10);
+    }
+
+    fn max_scroll(&self) -> usize {
+        let visible_lines = self.content_area.map(|r| r.height as usize).unwrap_or(20);
+        self.total_lines.saturating_sub(visible_lines)
+    }
+
+    /// Check if a point is inside the popup area
+    pub fn contains(&self, x: u16, y: u16) -> bool {
+        if let Some(area) = self.popup_area {
+            x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
+        } else {
+            false
+        }
+    }
+}
+
+/// Mouse-based text selection in terminal panes
+#[derive(Debug, Clone, Default)]
+pub struct MouseSelection {
+    /// Whether mouse selection is in progress
+    pub selecting: bool,
+    /// Source pane for the selection
+    pub source_pane: Option<PaneId>,
+    /// Starting Y position (screen coordinate)
+    pub start_y: u16,
+    /// Current Y position (screen coordinate)
+    pub current_y: u16,
+    /// Pane area for coordinate conversion
+    pub pane_area: Option<ratatui::layout::Rect>,
+}
+
+impl MouseSelection {
+    /// Start a new mouse selection
+    pub fn start(&mut self, pane: PaneId, y: u16, area: ratatui::layout::Rect) {
+        self.selecting = true;
+        self.source_pane = Some(pane);
+        self.start_y = y;
+        self.current_y = y;
+        self.pane_area = Some(area);
+    }
+
+    /// Update selection during drag
+    pub fn update(&mut self, y: u16) {
+        if self.selecting {
+            self.current_y = y;
+        }
+    }
+
+    /// Convert screen Y to line index within pane (0-based, accounting for border)
+    fn screen_y_to_line(&self, y: u16) -> Option<usize> {
+        let area = self.pane_area?;
+        // Account for top border (1 pixel)
+        if y <= area.y || y >= area.y + area.height - 1 {
+            return None;
+        }
+        Some((y - area.y - 1) as usize)
+    }
+
+    /// Get the selected line range (min, max) as terminal line indices
+    pub fn line_range(&self) -> Option<(usize, usize)> {
+        if !self.selecting {
+            return None;
+        }
+        let start_line = self.screen_y_to_line(self.start_y)?;
+        let end_line = self.screen_y_to_line(self.current_y)?;
+        Some((start_line.min(end_line), start_line.max(end_line)))
+    }
+
+    /// Check if a line is selected
+    pub fn is_line_selected(&self, line: usize) -> bool {
+        if let Some((min, max)) = self.line_range() {
+            line >= min && line <= max
+        } else {
+            false
+        }
+    }
+
+    /// Finish selection and return (start_line, end_line, pane)
+    pub fn finish(&mut self) -> Option<(usize, usize, PaneId)> {
+        if !self.selecting {
+            return None;
+        }
+        let (start, end) = self.line_range()?;
+        let pane = self.source_pane?;
+        self.clear();
+        Some((start, end, pane))
+    }
+
+    /// Clear selection state
+    pub fn clear(&mut self) {
+        self.selecting = false;
+        self.source_pane = None;
+        self.pane_area = None;
+    }
+
+    /// Check if selection is active for a specific pane
+    pub fn is_selecting_in(&self, pane: PaneId) -> bool {
+        self.selecting && self.source_pane == Some(pane)
+    }
+}

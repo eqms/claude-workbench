@@ -255,15 +255,17 @@ checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
 name = "claude-workbench"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "clap",
  "crossterm 0.28.1",
  "dirs",
+ "lazy_static",
  "portable-pty",
  "pulldown-cmark 0.10.3",
  "ratatui",
+ "regex",
  "serde",
  "serde_yaml",
  "shell-escape",

@@ -48,14 +48,30 @@ All terminal panes support:
 - Mouse wheel scrolling
 - Keyboard scrolling (Shift+PgUp/PgDn, Shift+Up/Down)
 
-#### Terminal Selection Mode (Ctrl+S)
+#### Terminal Selection Mode (Ctrl+S or Mouse)
 Select and copy terminal output to Claude as a code block:
+
+**Keyboard Selection (Ctrl+S):**
 - Start with Ctrl+S in any terminal pane
 - j/k or arrows to adjust selection
 - Shift+Up/Down for 5-line jumps
 - g/G to jump to start/end of buffer
 - Enter or y to copy to Claude
 - Esc to cancel
+
+**Mouse Selection (v0.14+):**
+- Click and drag to select lines in terminal panes
+- Release to confirm selection
+- Enter or y to copy to Claude
+- Highlighted in yellow during selection
+
+**Intelligent Filtering (v0.14+):**
+When copying to Claude, the output is automatically filtered:
+- Shell prompts removed (user@host$, >, >>>, etc.)
+- Error messages and stack traces preserved
+- Directory listing noise filtered (drwx, total N)
+- Consecutive blank lines collapsed (max 2)
+- Syntax auto-detection for code blocks (Python, Rust, JavaScript, Bash, XML)
 
 #### Drag & Drop
 - Drag files from File Browser to terminal panes
@@ -67,7 +83,7 @@ Select and copy terminal output to Claude as a code block:
 - **Settings Menu (Ctrl+,)**: Configure shell, layout, and more
 - **Setup Wizard (Ctrl+Shift+W)**: First-run configuration assistant
 - **About Dialog (F10)**: License info and open source components
-- **Help (F12)**: Keyboard shortcuts and usage guide
+- **Help (F12)**: Scrollable keyboard shortcuts and usage guide (j/k, arrows, PgUp/PgDn, g/G)
 - **Context Menu (F9)**: File operations (New, Rename, Delete, Copy Path)
 
 ### Installation
@@ -238,14 +254,30 @@ Alle Terminal-Bereiche unterstützen:
 - Mausrad-Scrolling
 - Tastatur-Scrolling (Shift+PgUp/PgDn, Shift+Up/Down)
 
-#### Terminal-Auswahlmodus (Ctrl+S)
+#### Terminal-Auswahlmodus (Ctrl+S oder Maus)
 Terminal-Ausgabe auswählen und als Code-Block an Claude kopieren:
+
+**Tastatur-Auswahl (Ctrl+S):**
 - Start mit Ctrl+S in jedem Terminal-Bereich
 - j/k oder Pfeiltasten zur Anpassung der Auswahl
 - Shift+Up/Down für 5-Zeilen-Sprünge
 - g/G zum Springen an Anfang/Ende des Buffers
 - Enter oder y zum Kopieren an Claude
 - Esc zum Abbrechen
+
+**Maus-Auswahl (v0.14+):**
+- Klicken und Ziehen um Zeilen in Terminal-Bereichen auszuwählen
+- Loslassen zur Bestätigung der Auswahl
+- Enter oder y zum Kopieren an Claude
+- Gelb hervorgehoben während der Auswahl
+
+**Intelligentes Filtering (v0.14+):**
+Beim Kopieren zu Claude wird die Ausgabe automatisch gefiltert:
+- Shell-Prompts entfernt (user@host$, >, >>>, etc.)
+- Fehlermeldungen und Stack-Traces bleiben erhalten
+- Verzeichnislisten-Rauschen gefiltert (drwx, total N)
+- Aufeinanderfolgende Leerzeilen komprimiert (max 2)
+- Syntax-Erkennung für Code-Blöcke (Python, Rust, JavaScript, Bash, XML)
 
 #### Drag & Drop
 - Dateien aus dem Dateibrowser in Terminal-Bereiche ziehen
@@ -257,7 +289,7 @@ Terminal-Ausgabe auswählen und als Code-Block an Claude kopieren:
 - **Einstellungsmenü (Ctrl+,)**: Shell, Layout und mehr konfigurieren
 - **Setup-Assistent (Ctrl+Shift+W)**: Erstkonfigurationsassistent
 - **Über-Dialog (F10)**: Lizenzinfo und Open-Source-Komponenten
-- **Hilfe (F12)**: Tastenkürzel und Bedienungsanleitung
+- **Hilfe (F12)**: Scrollbare Tastenkürzel und Bedienungsanleitung (j/k, Pfeile, PgUp/PgDn, g/G)
 - **Kontextmenü (F9)**: Dateioperationen (Neu, Umbenennen, Löschen, Pfad kopieren)
 
 ### Installation

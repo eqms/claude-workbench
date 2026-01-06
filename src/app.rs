@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::config::Config;
 use crate::session::SessionState;
 use crate::ui;
-use crate::types::{EditorMode, PaneId, TerminalSelection, DragState};
+use crate::types::{EditorMode, PaneId, TerminalSelection, DragState, HelpState, MouseSelection};
 use crate::terminal::PseudoTerminal;
 use std::borrow::Cow;
 use std::path::Path;
@@ -31,7 +31,7 @@ pub struct App {
     pub active_pane: PaneId,
     pub file_browser: FileBrowserState,
     pub preview: PreviewState,
-    pub show_help: bool,
+    pub help: HelpState,
     pub show_terminal: bool,
     pub show_lazygit: bool,
     pub last_refresh: std::time::Instant,
@@ -54,6 +54,8 @@ pub struct App {
     pub terminal_selection: TerminalSelection,
     // Drag and drop state for file paths
     pub drag_state: DragState,
+    // Mouse-based text selection in terminal panes
+    pub mouse_selection: MouseSelection,
 }
 
 impl App {
@@ -123,7 +125,7 @@ impl App {
             active_pane: PaneId::FileBrowser,
             file_browser,
             preview: PreviewState::new(),
-            show_help: false,
+            help: HelpState::default(),
             show_terminal: false,
             show_lazygit: false,
             last_refresh: std::time::Instant::now(),
@@ -141,6 +143,7 @@ impl App {
             last_click_idx: None,
             terminal_selection: TerminalSelection::default(),
             drag_state: DragState::default(),
+            mouse_selection: MouseSelection::default(),
         };
 
         // Open wizard on first run
@@ -214,9 +217,11 @@ impl App {
                                     continue;
                                 }
 
-                                // Help popup - click outside closes it
-                                if self.show_help {
-                                    self.show_help = false;
+                                // Help popup - click inside to interact, outside to close
+                                if self.help.visible {
+                                    if !self.help.contains(x, y) {
+                                        self.help.close();
+                                    }
                                     continue;
                                 }
 
@@ -314,11 +319,21 @@ impl App {
                                     if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
                                         self.claude_startup.open(self.config.claude.startup_prefixes.clone());
                                     } else {
+                                        // Start mouse text selection
+                                        self.mouse_selection.start(PaneId::Claude, y, claude);
                                         self.active_pane = PaneId::Claude;
                                     }
                                 }
-                                else if is_inside(lazygit, x, y) { self.active_pane = PaneId::LazyGit; }
-                                else if is_inside(term, x, y) { self.active_pane = PaneId::Terminal; }
+                                else if is_inside(lazygit, x, y) {
+                                    // Start mouse text selection
+                                    self.mouse_selection.start(PaneId::LazyGit, y, lazygit);
+                                    self.active_pane = PaneId::LazyGit;
+                                }
+                                else if is_inside(term, x, y) {
+                                    // Start mouse text selection
+                                    self.mouse_selection.start(PaneId::Terminal, y, term);
+                                    self.active_pane = PaneId::Terminal;
+                                }
                                 else if is_inside(footer_area, x, y) {
                                     // Use precise button positions
                                     let footer_x = x.saturating_sub(footer_area.x);
@@ -357,7 +372,7 @@ impl App {
                                                 8 => { let _ = browser::open_in_file_manager(&self.file_browser.current_dir); } // O Finder
                                                 9 => { let cfg = self.config.clone(); self.settings.open(&cfg); }  // ^, Settings
                                                 10 => self.about.open(),     // F10 Info
-                                                11 => self.show_help = true, // F12 Help
+                                                11 => self.help.open(),       // F12 Help
                                                 _ => {}
                                             }
                                             break;
@@ -368,24 +383,37 @@ impl App {
                             // Handle drag movement
                             crossterm::event::MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
                                 // Block drag when any modal is open
-                                if self.about.visible || self.show_help || self.settings.visible
+                                if self.about.visible || self.help.visible || self.settings.visible
                                     || self.dialog.is_active() || self.fuzzy_finder.visible
                                     || self.claude_startup.visible || self.wizard.visible || self.menu.visible {
                                     continue;
                                 }
-                                if self.drag_state.dragging {
+                                // Handle mouse text selection in terminal panes
+                                if self.mouse_selection.selecting {
+                                    self.mouse_selection.update(y);
+                                } else if self.drag_state.dragging {
                                     self.drag_state.update_position(x, y);
                                 }
                             }
-                            // Handle drag drop
+                            // Handle drag drop and mouse selection finish
                             crossterm::event::MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
                                 // Block drop when any modal is open
-                                if self.about.visible || self.show_help || self.settings.visible
+                                if self.about.visible || self.help.visible || self.settings.visible
                                     || self.dialog.is_active() || self.fuzzy_finder.visible
                                     || self.claude_startup.visible || self.wizard.visible || self.menu.visible {
                                     continue;
                                 }
-                                if self.drag_state.dragging {
+                                // Handle mouse text selection finish - convert to terminal selection
+                                if self.mouse_selection.selecting {
+                                    if let Some((start, end, pane)) = self.mouse_selection.finish() {
+                                        // Enter keyboard selection mode with the mouse-selected range
+                                        self.terminal_selection.active = true;
+                                        self.terminal_selection.start_line = Some(start);
+                                        self.terminal_selection.end_line = Some(end);
+                                        self.terminal_selection.source_pane = Some(pane);
+                                        self.active_pane = pane;
+                                    }
+                                } else if self.drag_state.dragging {
                                     // Determine drop target
                                     let drop_target = if is_inside(claude, x, y) {
                                         Some(PaneId::Claude)
@@ -417,8 +445,16 @@ impl App {
                                     continue;
                                 }
 
+                                // Help popup scroll handling
+                                if self.help.visible {
+                                    if self.help.contains(x, y) {
+                                        self.help.scroll_down(1);
+                                    }
+                                    continue;
+                                }
+
                                 // Block scroll for all other modals
-                                if self.show_help || self.settings.visible || self.dialog.is_active()
+                                if self.settings.visible || self.dialog.is_active()
                                     || self.fuzzy_finder.visible || self.claude_startup.visible
                                     || self.wizard.visible || self.menu.visible {
                                     continue;
@@ -444,8 +480,16 @@ impl App {
                                     continue;
                                 }
 
+                                // Help popup scroll handling
+                                if self.help.visible {
+                                    if self.help.contains(x, y) {
+                                        self.help.scroll_up(1);
+                                    }
+                                    continue;
+                                }
+
                                 // Block scroll for all other modals
-                                if self.show_help || self.settings.visible || self.dialog.is_active()
+                                if self.settings.visible || self.dialog.is_active()
                                     || self.fuzzy_finder.visible || self.claude_startup.visible
                                     || self.wizard.visible || self.menu.visible {
                                     continue;
@@ -579,9 +623,15 @@ impl App {
                             continue;
                         }
 
-                        if self.show_help {
+                        if self.help.visible {
                             match key.code {
-                                KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => self.show_help = false,
+                                KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => self.help.close(),
+                                KeyCode::Up | KeyCode::Char('k') => self.help.scroll_up(1),
+                                KeyCode::Down | KeyCode::Char('j') => self.help.scroll_down(1),
+                                KeyCode::PageUp => self.help.page_up(),
+                                KeyCode::PageDown => self.help.page_down(),
+                                KeyCode::Home | KeyCode::Char('g') => self.help.scroll_to_top(),
+                                KeyCode::End | KeyCode::Char('G') => self.help.scroll_to_bottom(),
                                 _ => {}
                             }
                             // Consume all keys while help is open
@@ -590,7 +640,7 @@ impl App {
 
                         // Global Keys - F10/F12 work everywhere
                         if key.code == KeyCode::F(12) {
-                            self.show_help = true;
+                            self.help.open();
                             continue;
                         }
 
@@ -604,7 +654,7 @@ impl App {
                         if key.code == KeyCode::Char('?')
                             && matches!(self.active_pane, PaneId::FileBrowser | PaneId::Preview)
                             && self.preview.mode != EditorMode::Edit {
-                            self.show_help = true;
+                            self.help.open();
                             continue;
                         }
 
@@ -910,8 +960,8 @@ impl App {
         };
         frame.render_widget(footer_widget, footer);
 
-        if self.show_help {
-            ui::help::render(frame);
+        if self.help.visible {
+            ui::help::render(frame, &mut self.help);
         }
 
         if self.about.visible {
@@ -1230,6 +1280,8 @@ impl App {
 
     /// Copy selected terminal lines to Claude pane as a code block
     fn copy_selection_to_claude(&mut self) {
+        use crate::filter::{filter_lines, FilterOptions};
+
         let Some((start, end)) = self.terminal_selection.line_range() else {
             return;
         };
@@ -1249,10 +1301,19 @@ impl App {
             return;
         }
 
-        // Format for Claude - wrap in markdown code block for context
+        // Apply intelligent filtering to remove shell prompts, collapse blanks, detect syntax
+        let filtered = filter_lines(lines, &FilterOptions::default());
+
+        if filtered.lines.is_empty() {
+            return;
+        }
+
+        // Format for Claude - wrap in markdown code block with syntax hint
+        let syntax = filtered.syntax_hint.as_deref().unwrap_or("");
         let formatted = format!(
-            "```\n{}\n```\n",
-            lines.join("\n")
+            "```{}\n{}\n```\n",
+            syntax,
+            filtered.lines.join("\n")
         );
 
         // Send to Claude PTY

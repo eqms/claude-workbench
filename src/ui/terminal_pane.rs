@@ -15,9 +15,10 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
 
     let is_focused = app.active_pane == pane_id;
 
-    // Check if this pane is in selection mode
+    // Check if this pane is in selection mode (keyboard selection or mouse selection)
     let selection_active = app.terminal_selection.active
         && app.terminal_selection.source_pane == Some(pane_id);
+    let mouse_selection_active = app.mouse_selection.is_selecting_in(pane_id);
 
     // Check if this pane is a drop target (dragging over it)
     let is_drop_target = app.drag_state.dragging && {
@@ -30,7 +31,7 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
     let has_error = pane_id == PaneId::Claude && app.claude_error.is_some();
     let border_style = if is_drop_target {
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-    } else if selection_active {
+    } else if selection_active || mouse_selection_active {
         Style::default().fg(Color::Yellow)
     } else if has_error {
         Style::default().fg(Color::Red)
@@ -73,9 +74,11 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
         let parser = pty.parser.lock().unwrap();
         let screen = parser.screen();
 
-        // Get selection range if this pane is the source
+        // Get selection range if this pane is the source (keyboard or mouse selection)
         let selection_range = if selection_active {
             app.terminal_selection.line_range()
+        } else if mouse_selection_active {
+            app.mouse_selection.line_range()
         } else {
             None
         };
