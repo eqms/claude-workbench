@@ -356,8 +356,8 @@ impl App {
                                                 }
                                                 8 => { let _ = browser::open_in_file_manager(&self.file_browser.current_dir); } // O Finder
                                                 9 => { let cfg = self.config.clone(); self.settings.open(&cfg); }  // ^, Settings
-                                                10 => self.about.open(),     // i Info
-                                                11 => self.show_help = true, // ? Help
+                                                10 => self.about.open(),     // F10 Info
+                                                11 => self.show_help = true, // F12 Help
                                                 _ => {}
                                             }
                                             break;
@@ -571,7 +571,7 @@ impl App {
                         // About dialog handling
                         if self.about.visible {
                             match key.code {
-                                KeyCode::Esc | KeyCode::Char('i') | KeyCode::Char('q') => self.about.close(),
+                                KeyCode::Esc | KeyCode::F(10) | KeyCode::Char('q') => self.about.close(),
                                 KeyCode::Up | KeyCode::Char('k') => self.about.scroll_up(),
                                 KeyCode::Down | KeyCode::Char('j') => self.about.scroll_down(),
                                 _ => {}
@@ -581,20 +581,36 @@ impl App {
 
                         if self.show_help {
                             match key.code {
-                                KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
+                                KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => self.show_help = false,
                                 _ => {}
                             }
                             // Consume all keys while help is open
                             continue;
                         }
 
-                        // Global Keys
-                        if key.code == KeyCode::Char('?') {
+                        // Global Keys - F10/F12 work everywhere
+                        if key.code == KeyCode::F(12) {
                             self.show_help = true;
                             continue;
                         }
 
-                        if key.code == KeyCode::Char('i') && self.preview.mode != EditorMode::Edit {
+                        if key.code == KeyCode::F(10) {
+                            self.about.open();
+                            continue;
+                        }
+
+                        // Context-specific shortcuts (only in non-terminal panes)
+                        // '?' for help - only in FileBrowser or Preview (read-only)
+                        if key.code == KeyCode::Char('?')
+                            && matches!(self.active_pane, PaneId::FileBrowser | PaneId::Preview)
+                            && self.preview.mode != EditorMode::Edit {
+                            self.show_help = true;
+                            continue;
+                        }
+
+                        // 'i' for about - only in FileBrowser (not Preview, as 'i' is common text)
+                        if key.code == KeyCode::Char('i')
+                            && self.active_pane == PaneId::FileBrowser {
                             self.about.open();
                             continue;
                         }

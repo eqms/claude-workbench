@@ -66,7 +66,8 @@ Select and copy terminal output to Claude as a code block:
 - **Fuzzy Finder (Ctrl+P)**: Quick file search and navigation
 - **Settings Menu (Ctrl+,)**: Configure shell, layout, and more
 - **Setup Wizard (Ctrl+Shift+W)**: First-run configuration assistant
-- **About Dialog (i)**: License info and open source components
+- **About Dialog (F10)**: License info and open source components
+- **Help (F12)**: Keyboard shortcuts and usage guide
 - **Context Menu (F9)**: File operations (New, Rename, Delete, Copy Path)
 
 ### Installation
@@ -129,7 +130,7 @@ claude:
 
 ### Keyboard Shortcuts
 
-#### Global
+#### Global (work everywhere, including terminals)
 | Key | Action |
 |-----|--------|
 | Ctrl+Q | Quit |
@@ -138,8 +139,14 @@ claude:
 | Ctrl+Shift+W | Setup Wizard |
 | F1-F6 | Switch panes |
 | F9 | Context Menu |
-| ? | Help |
-| i | About |
+| F10 | About |
+| F12 | Help |
+
+#### Context-specific (FileBrowser/Preview only)
+| Key | Action |
+|-----|--------|
+| ? | Help (not in terminals) |
+| i | About (FileBrowser only) |
 
 #### File Browser
 | Key | Action |
@@ -249,7 +256,8 @@ Terminal-Ausgabe auswählen und als Code-Block an Claude kopieren:
 - **Fuzzy-Finder (Ctrl+P)**: Schnelle Dateisuche und Navigation
 - **Einstellungsmenü (Ctrl+,)**: Shell, Layout und mehr konfigurieren
 - **Setup-Assistent (Ctrl+Shift+W)**: Erstkonfigurationsassistent
-- **Über-Dialog (i)**: Lizenzinfo und Open-Source-Komponenten
+- **Über-Dialog (F10)**: Lizenzinfo und Open-Source-Komponenten
+- **Hilfe (F12)**: Tastenkürzel und Bedienungsanleitung
 - **Kontextmenü (F9)**: Dateioperationen (Neu, Umbenennen, Löschen, Pfad kopieren)
 
 ### Installation
@@ -312,7 +320,7 @@ claude:
 
 ### Tastenkürzel
 
-#### Global
+#### Global (funktionieren überall, auch in Terminals)
 | Taste | Aktion |
 |-------|--------|
 | Ctrl+Q | Beenden |
@@ -321,8 +329,14 @@ claude:
 | Ctrl+Shift+W | Setup-Assistent |
 | F1-F6 | Bereiche wechseln |
 | F9 | Kontextmenü |
-| ? | Hilfe |
-| i | Über |
+| F10 | Über |
+| F12 | Hilfe |
+
+#### Kontext-spezifisch (nur FileBrowser/Preview)
+| Taste | Aktion |
+|-------|--------|
+| ? | Hilfe (nicht in Terminals) |
+| i | Über (nur im Dateibrowser) |
 
 #### Dateibrowser
 | Taste | Aktion |

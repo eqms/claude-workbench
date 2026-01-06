@@ -77,8 +77,8 @@ pub fn get_button_positions() -> Vec<(u16, u16, u8)> {
         ("o", "Open"),
         ("O", "Finder"),
         ("^,", "Settings"),
-        ("i", "Info"),
-        ("?", "Help"),
+        ("F10", "Info"),
+        ("F12", "Help"),
     ];
 
     let mut positions = Vec::new();
@@ -117,7 +117,7 @@ impl Widget for Footer {
                 ("^Y", "Redo"),
                 ("F1", "Files"),
                 ("F4", "Claude"),
-                ("?", "Help"),
+                ("F12", "Help"),
             ]
         } else if self.active_pane == PaneId::Preview {
             // Preview mode - show Edit option
@@ -129,7 +129,7 @@ impl Widget for Footer {
                 ("F5", "Git"),
                 ("F6", "Term"),
                 ("^P", "Find"),
-                ("?", "Help"),
+                ("F12", "Help"),
             ]
         } else if matches!(self.active_pane, PaneId::Claude | PaneId::LazyGit | PaneId::Terminal) {
             // Terminal pane keys - show ^S for selection mode
@@ -142,7 +142,7 @@ impl Widget for Footer {
                 ("F5", "Git"),
                 ("F6", "Term"),
                 ("^P", "Find"),
-                ("?", "Help"),
+                ("F12", "Help"),
             ]
         } else {
             // Default keys (file browser)
@@ -157,8 +157,8 @@ impl Widget for Footer {
                 ("o", "Open"),
                 ("O", "Finder"),
                 ("^,", "Settings"),
-                ("i", "Info"),
-                ("?", "Help"),
+                ("F10", "Info"),
+                ("F12", "Help"),
             ]
         };
 
