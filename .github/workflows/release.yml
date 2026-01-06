@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            binary_name: claude-workbench
+            asset_name: claude-workbench-linux-x64
+
+          # Linux ARM64 (cross-compiled)
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            binary_name: claude-workbench
+            asset_name: claude-workbench-linux-arm64
+            cross: true
+
+          # macOS Apple Silicon (M1/M2)
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            binary_name: claude-workbench
+            asset_name: claude-workbench-macos-arm64
+
+          # macOS Intel
+          - target: x86_64-apple-darwin
+            os: macos-13
+            binary_name: claude-workbench
+            asset_name: claude-workbench-macos-x64
+
+          # Windows x64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            binary_name: claude-workbench.exe
+            asset_name: claude-workbench-windows-x64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # Install cross for ARM64 Linux cross-compilation
+      - name: Install cross
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      # Install ARM64 cross-compilation tools for Linux
+      - name: Install cross-compilation tools
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      # Build with cross for ARM64 Linux
+      - name: Build (cross)
+        if: matrix.cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      # Build natively for other platforms
+      - name: Build (native)
+        if: ${{ !matrix.cross }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Prepare binary for upload
+      - name: Prepare binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} ${{ matrix.asset_name }}
+          chmod +x ${{ matrix.asset_name }}
+
+      - name: Prepare binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "${{ matrix.asset_name }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec mv {} release/ \;
+          ls -la release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Claude Workbench ${{ github.ref_name }}
+          body: |
+            ## Claude Workbench ${{ github.ref_name }}
+
+            ### Downloads
+
+            | Platform | Architecture | Download |
+            |----------|--------------|----------|
+            | Linux | x64 | `claude-workbench-linux-x64` |
+            | Linux | ARM64 | `claude-workbench-linux-arm64` |
+            | macOS | Apple Silicon (M1/M2) | `claude-workbench-macos-arm64` |
+            | macOS | Intel | `claude-workbench-macos-x64` |
+            | Windows | x64 | `claude-workbench-windows-x64.exe` |
+
+            ### Installation
+
+            1. Download the appropriate binary for your platform
+            2. Make it executable (Unix): `chmod +x claude-workbench-*`
+            3. Run: `./claude-workbench-*`
+
+            See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation.
+          files: release/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
