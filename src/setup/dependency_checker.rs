@@ -172,9 +172,37 @@ fn find_executable_path(name: &str) -> Option<PathBuf> {
     if output.status.success() {
         let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
         if !path_str.is_empty() {
-            return Some(PathBuf::from(path_str));
+            // Handle Fish/Zsh alias output like "claude: aliased to /path/to/claude"
+            if path_str.contains("aliased to ") {
+                if let Some(actual_path) = path_str.split("aliased to ").nth(1) {
+                    let path = PathBuf::from(actual_path.trim());
+                    if path.exists() {
+                        return Some(path);
+                    }
+                }
+            }
+            // Standard path output
+            let path = PathBuf::from(&path_str);
+            if path.exists() && path.is_absolute() {
+                return Some(path);
+            }
         }
     }
+
+    // Fallback: Check common Claude installation locations
+    if name == "claude" {
+        let common_paths = [
+            dirs::home_dir().map(|h| h.join(".claude/local/claude")),
+            Some(PathBuf::from("/usr/local/bin/claude")),
+            dirs::home_dir().map(|h| h.join(".local/bin/claude")),
+        ];
+        for path_opt in common_paths.into_iter().flatten() {
+            if path_opt.exists() {
+                return Some(path_opt);
+            }
+        }
+    }
+
     None
 }
 
