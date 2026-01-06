@@ -199,7 +199,8 @@ impl App {
 
                          match mouse.kind {
                             crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
-                                // Handle About dialog clicks first
+                                // Block all background interaction when any modal is open
+                                // About dialog
                                 if self.about.visible {
                                     if let Some(popup) = self.about.popup_area {
                                         if is_inside(popup, x, y) {
@@ -208,6 +209,47 @@ impl App {
                                             self.about.close();
                                         }
                                     }
+                                    continue;
+                                }
+
+                                // Help popup - click outside closes it
+                                if self.show_help {
+                                    self.show_help = false;
+                                    continue;
+                                }
+
+                                // Settings menu - click outside closes it
+                                if self.settings.visible {
+                                    self.settings.close();
+                                    continue;
+                                }
+
+                                // Dialog (Confirm/Input) - block all background clicks
+                                if self.dialog.is_active() {
+                                    continue;
+                                }
+
+                                // Fuzzy finder - click outside closes it
+                                if self.fuzzy_finder.visible {
+                                    self.fuzzy_finder.close();
+                                    continue;
+                                }
+
+                                // Claude startup dialog - click outside closes and focuses Claude
+                                if self.claude_startup.visible {
+                                    self.claude_startup.close();
+                                    self.active_pane = PaneId::Claude;
+                                    continue;
+                                }
+
+                                // Setup wizard - block all background clicks
+                                if self.wizard.visible {
+                                    continue;
+                                }
+
+                                // Menu popup - click outside closes it
+                                if self.menu.visible {
+                                    self.menu.visible = false;
                                     continue;
                                 }
 
@@ -323,12 +365,24 @@ impl App {
                             }
                             // Handle drag movement
                             crossterm::event::MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
+                                // Block drag when any modal is open
+                                if self.about.visible || self.show_help || self.settings.visible
+                                    || self.dialog.is_active() || self.fuzzy_finder.visible
+                                    || self.claude_startup.visible || self.wizard.visible || self.menu.visible {
+                                    continue;
+                                }
                                 if self.drag_state.dragging {
                                     self.drag_state.update_position(x, y);
                                 }
                             }
                             // Handle drag drop
                             crossterm::event::MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
+                                // Block drop when any modal is open
+                                if self.about.visible || self.show_help || self.settings.visible
+                                    || self.dialog.is_active() || self.fuzzy_finder.visible
+                                    || self.claude_startup.visible || self.wizard.visible || self.menu.visible {
+                                    continue;
+                                }
                                 if self.drag_state.dragging {
                                     // Determine drop target
                                     let drop_target = if is_inside(claude, x, y) {
@@ -351,13 +405,20 @@ impl App {
                                 }
                             }
                             crossterm::event::MouseEventKind::ScrollDown => {
-                                // Handle About dialog scroll first
+                                // Block all background scroll when any modal is open
                                 if self.about.visible {
                                     if let Some(popup) = self.about.popup_area {
                                         if is_inside(popup, x, y) {
                                             self.about.scroll_down();
                                         }
                                     }
+                                    continue;
+                                }
+
+                                // Block scroll for all other modals
+                                if self.show_help || self.settings.visible || self.dialog.is_active()
+                                    || self.fuzzy_finder.visible || self.claude_startup.visible
+                                    || self.wizard.visible || self.menu.visible {
                                     continue;
                                 }
 
@@ -371,13 +432,20 @@ impl App {
                                 else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_down(3); } }
                             }
                             crossterm::event::MouseEventKind::ScrollUp => {
-                                // Handle About dialog scroll first
+                                // Block all background scroll when any modal is open
                                 if self.about.visible {
                                     if let Some(popup) = self.about.popup_area {
                                         if is_inside(popup, x, y) {
                                             self.about.scroll_up();
                                         }
                                     }
+                                    continue;
+                                }
+
+                                // Block scroll for all other modals
+                                if self.show_help || self.settings.visible || self.dialog.is_active()
+                                    || self.fuzzy_finder.visible || self.claude_startup.visible
+                                    || self.wizard.visible || self.menu.visible {
                                     continue;
                                 }
 
@@ -701,6 +769,17 @@ impl App {
                                             match key.code {
                                                 KeyCode::Down | KeyCode::Char('j') => self.preview.scroll_down(),
                                                 KeyCode::Up | KeyCode::Char('k') => self.preview.scroll_up(),
+                                                KeyCode::PageDown => {
+                                                    for _ in 0..10 { self.preview.scroll_down(); }
+                                                }
+                                                KeyCode::PageUp => {
+                                                    for _ in 0..10 { self.preview.scroll_up(); }
+                                                }
+                                                KeyCode::Home => { self.preview.scroll = 0; }
+                                                KeyCode::End => {
+                                                    let max = self.preview.highlighted_lines.len().saturating_sub(1) as u16;
+                                                    self.preview.scroll = max;
+                                                }
                                                 KeyCode::Char('e') | KeyCode::Char('E') => {
                                                     self.preview.enter_edit_mode();
                                                 }
