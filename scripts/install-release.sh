@@ -96,15 +96,23 @@ echo ""
 
 # Show binary info
 BINARY_SIZE=$(ls -lh "$INSTALL_DIR/$BINARY_NAME" | awk '{print $5}')
+
+# Box formatting helper (60 chars inner width)
+print_row() {
+    local content="$1"
+    local padding=$((58 - ${#content}))
+    printf "${BLUE}║${NC}  %s%*s${BLUE}║${NC}\n" "$content" "$padding" ""
+}
+
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║${NC}                    ${GREEN}Installation Complete${NC}                    ${BLUE}║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${BLUE}║${NC}  Binary:    $BINARY_NAME"
-echo -e "${BLUE}║${NC}  Version:   $VERSION"
-echo -e "${BLUE}║${NC}  Size:      $BINARY_SIZE"
-echo -e "${BLUE}║${NC}  Location:  $INSTALL_DIR/$BINARY_NAME"
+print_row "Binary:    $BINARY_NAME"
+print_row "Version:   $VERSION"
+print_row "Size:      $BINARY_SIZE"
+print_row "Location:  $INSTALL_DIR/$BINARY_NAME"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${BLUE}║${NC}  Run with:  ${YELLOW}$BINARY_NAME${NC}"
+printf "${BLUE}║${NC}  Run with:  ${YELLOW}%-45s${NC} ${BLUE}║${NC}\n" "$BINARY_NAME"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 
 # Check if install dir is in PATH
