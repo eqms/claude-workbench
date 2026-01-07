@@ -107,33 +107,36 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &Dialog) {
         }
         DialogType::Confirm { title, message, .. } => {
             let width = 50u16.min(area.width.saturating_sub(4));
-            let height = 6u16;
+            let height = 7u16;  // Slightly taller for better spacing
             let x = area.x + (area.width.saturating_sub(width)) / 2;
             let y = area.y + (area.height.saturating_sub(height)) / 2;
             let popup_area = Rect::new(x, y, width, height);
 
             f.render_widget(Clear, popup_area);
 
+            // Neutral dark background with yellow warning border
             let block = Block::default()
                 .borders(Borders::ALL)
-                .title(format!(" {} ", title))
-                .style(Style::default().bg(Color::Red).fg(Color::White));
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(format!(" ⚠ {} ", title))
+                .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .style(Style::default().bg(Color::DarkGray));
 
             let inner = block.inner(popup_area);
             f.render_widget(block, popup_area);
 
-            // Message
+            // Message with white text on dark background
             let msg = Paragraph::new(message.as_str())
                 .style(Style::default().fg(Color::White));
-            f.render_widget(msg, Rect::new(inner.x, inner.y + 1, inner.width, 1));
+            f.render_widget(msg, Rect::new(inner.x, inner.y + 1, inner.width, 2));
 
-            // Buttons
+            // Buttons with better contrast
             let buttons = Line::from(vec![
-                Span::styled(" [Y] Yes ", Style::default().bg(Color::Green).fg(Color::Black)),
-                Span::raw("  "),
-                Span::styled(" [N] No ", Style::default().bg(Color::Gray).fg(Color::Black)),
+                Span::styled(" [Y] Yes ", Style::default().bg(Color::Cyan).fg(Color::Black)),
+                Span::raw("   "),
+                Span::styled(" [N] No ", Style::default().bg(Color::Gray).fg(Color::White)),
             ]);
-            f.render_widget(Paragraph::new(buttons), Rect::new(inner.x, inner.y + 3, inner.width, 1));
+            f.render_widget(Paragraph::new(buttons), Rect::new(inner.x, inner.y + 4, inner.width, 1));
         }
     }
 }

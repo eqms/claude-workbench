@@ -9,6 +9,34 @@ use std::time::SystemTime;
 
 use crate::types::{EditorMode, PaneId};
 
+/// Action identifiers for footer button clicks
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FooterAction {
+    FocusFiles,      // F1
+    FocusPreview,    // F2
+    Refresh,         // F3
+    FocusClaude,     // F4
+    ToggleGit,       // F5
+    ToggleTerm,      // F6
+    FuzzyFind,       // ^P
+    OpenFile,        // o
+    OpenFinder,      // O
+    Settings,        // ^,
+    About,           // F10
+    Help,            // F12
+    Edit,            // E (Preview mode)
+    StartSelect,     // ^S (starts selection)
+    Save,            // ^S (Edit mode - save)
+    ExitEdit,        // Esc (Edit mode)
+    Undo,            // ^Z
+    Redo,            // ^Y
+    SelectDown,      // j/↓ (selection mode)
+    SelectUp,        // k/↑ (selection mode)
+    SelectCopy,      // Enter/y (selection mode)
+    SelectCancel,    // Esc (selection mode)
+    None,            // No action (non-clickable)
+}
+
 pub struct Footer {
     pub active_pane: PaneId,
     pub editor_mode: EditorMode,
@@ -64,32 +92,82 @@ impl Default for Footer {
     }
 }
 
-// Returns (start_x, end_x, action_index) for each button
-pub fn get_button_positions() -> Vec<(u16, u16, u8)> {
-    let keys = vec![
-        ("F1", "Files"),
-        ("F2", "Preview"),
-        ("F3", "Refresh"),
-        ("F4", "Claude"),
-        ("F5", "Git"),
-        ("F6", "Term"),
-        ("^P", "Find"),
-        ("o", "Open"),
-        ("O", "Finder"),
-        ("^,", "Settings"),
-        ("F10", "Info"),
-        ("F12", "Help"),
-    ];
+/// Returns (start_x, end_x, FooterAction) for each button based on context
+pub fn get_context_button_positions(
+    active_pane: PaneId,
+    editor_mode: EditorMode,
+    selection_mode: bool,
+) -> Vec<(u16, u16, FooterAction)> {
+    // Get the same keys that render() uses
+    let keys: Vec<(&str, &str, FooterAction)> = if selection_mode {
+        vec![
+            ("j/↓", "Down", FooterAction::SelectDown),
+            ("k/↑", "Up", FooterAction::SelectUp),
+            ("Enter", "Copy", FooterAction::SelectCopy),
+            ("y", "Copy", FooterAction::SelectCopy),
+            ("Esc", "Cancel", FooterAction::SelectCancel),
+        ]
+    } else if active_pane == PaneId::Preview && editor_mode == EditorMode::Edit {
+        vec![
+            ("^S", "Save", FooterAction::Save),
+            ("Esc", "Exit", FooterAction::ExitEdit),
+            ("^Z", "Undo", FooterAction::Undo),
+            ("^Y", "Redo", FooterAction::Redo),
+            ("F1", "Files", FooterAction::FocusFiles),
+            ("F4", "Claude", FooterAction::FocusClaude),
+            ("F12", "Help", FooterAction::Help),
+        ]
+    } else if active_pane == PaneId::Preview {
+        vec![
+            ("E", "Edit", FooterAction::Edit),
+            ("^S", "Select", FooterAction::StartSelect),
+            ("F1", "Files", FooterAction::FocusFiles),
+            ("F3", "Refresh", FooterAction::Refresh),
+            ("F4", "Claude", FooterAction::FocusClaude),
+            ("F5", "Git", FooterAction::ToggleGit),
+            ("F6", "Term", FooterAction::ToggleTerm),
+            ("^P", "Find", FooterAction::FuzzyFind),
+            ("F12", "Help", FooterAction::Help),
+        ]
+    } else if matches!(active_pane, PaneId::Claude | PaneId::LazyGit | PaneId::Terminal) {
+        vec![
+            ("^S", "Select", FooterAction::StartSelect),
+            ("F1", "Files", FooterAction::FocusFiles),
+            ("F2", "Preview", FooterAction::FocusPreview),
+            ("F3", "Refresh", FooterAction::Refresh),
+            ("F4", "Claude", FooterAction::FocusClaude),
+            ("F5", "Git", FooterAction::ToggleGit),
+            ("F6", "Term", FooterAction::ToggleTerm),
+            ("^P", "Find", FooterAction::FuzzyFind),
+            ("F12", "Help", FooterAction::Help),
+        ]
+    } else {
+        // Default keys (file browser)
+        vec![
+            ("F1", "Files", FooterAction::FocusFiles),
+            ("F2", "Preview", FooterAction::FocusPreview),
+            ("F3", "Refresh", FooterAction::Refresh),
+            ("F4", "Claude", FooterAction::FocusClaude),
+            ("F5", "Git", FooterAction::ToggleGit),
+            ("F6", "Term", FooterAction::ToggleTerm),
+            ("^P", "Find", FooterAction::FuzzyFind),
+            ("o", "Open", FooterAction::OpenFile),
+            ("O", "Finder", FooterAction::OpenFinder),
+            ("^,", "Settings", FooterAction::Settings),
+            ("F10", "Info", FooterAction::About),
+            ("F12", "Help", FooterAction::Help),
+        ]
+    };
 
     let mut positions = Vec::new();
     let mut x = 0u16;
 
-    for (i, (key, desc)) in keys.iter().enumerate() {
+    for (key, desc, action) in keys {
         let key_width = format!(" {} ", key).len() as u16;
         let desc_width = format!(" {} ", desc).len() as u16;
         let total_width = key_width + desc_width + 1; // +1 for spacer
 
-        positions.push((x, x + total_width, i as u8));
+        positions.push((x, x + total_width, action));
         x += total_width;
     }
 
@@ -120,9 +198,10 @@ impl Widget for Footer {
                 ("F12", "Help"),
             ]
         } else if self.active_pane == PaneId::Preview {
-            // Preview mode - show Edit option
+            // Preview mode - show Edit and Select options
             vec![
                 ("E", "Edit"),
+                ("^S", "Select"),
                 ("F1", "Files"),
                 ("F3", "Refresh"),
                 ("F4", "Claude"),

@@ -209,9 +209,16 @@ impl PreviewState {
     }
 }
 
-pub fn render(f: &mut Frame, area: Rect, state: &PreviewState, is_focused: bool) {
+pub fn render(
+    f: &mut Frame,
+    area: Rect,
+    state: &PreviewState,
+    is_focused: bool,
+    selection_range: Option<(usize, usize)>,
+) {
     let title = build_title(state);
-    let border_style = get_border_style(is_focused, state.mode, state.modified);
+    let selection_active = selection_range.is_some();
+    let border_style = get_border_style(is_focused, state.mode, state.modified, selection_active);
 
     let block = Block::bordered()
         .title(format!(" {} ", title))
@@ -273,8 +280,28 @@ pub fn render(f: &mut Frame, area: Rect, state: &PreviewState, is_focused: bool)
             }
         }
         EditorMode::ReadOnly => {
+            // Apply selection highlighting if active
+            let lines = if let Some((start, end)) = selection_range {
+                state.highlighted_lines.iter().enumerate().map(|(idx, line)| {
+                    if idx >= start && idx <= end {
+                        // Apply DarkGray background to selected lines
+                        let styled_spans: Vec<Span> = line.spans.iter().map(|span| {
+                            Span::styled(
+                                span.content.clone(),
+                                span.style.bg(Color::DarkGray),
+                            )
+                        }).collect();
+                        Line::from(styled_spans)
+                    } else {
+                        line.clone()
+                    }
+                }).collect::<Vec<_>>()
+            } else {
+                state.highlighted_lines.clone()
+            };
+
             // Render highlighted content in read-only mode
-            let paragraph = Paragraph::new(state.highlighted_lines.clone())
+            let paragraph = Paragraph::new(lines)
                 .block(block)
                 .wrap(Wrap { trim: false })
                 .scroll((state.scroll, 0));
@@ -380,7 +407,11 @@ fn build_title(state: &PreviewState) -> String {
     title
 }
 
-fn get_border_style(is_focused: bool, mode: EditorMode, modified: bool) -> Style {
+fn get_border_style(is_focused: bool, mode: EditorMode, modified: bool, selection_active: bool) -> Style {
+    // Selection mode takes priority (yellow border like terminal panes)
+    if selection_active {
+        return Style::default().fg(Color::Yellow);
+    }
     match (mode, modified, is_focused) {
         (EditorMode::Edit, true, _) => Style::default().fg(Color::Yellow), // Edit + modified
         (EditorMode::Edit, false, _) => Style::default().fg(Color::Cyan),  // Edit + saved

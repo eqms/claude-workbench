@@ -15,7 +15,7 @@ fn help_content() -> Vec<Line<'static>> {
     vec![
         // Title
         Line::from(Span::styled(
-            "Claude Workbench v0.14.0 Help",
+            "Claude Workbench v0.15.0 Help",
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
         )),
         Line::from("═".repeat(40)),
@@ -279,10 +279,10 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(""),
 
-        // IMPORTANT: Terminal Selection Mode (highlighted section)
+        // IMPORTANT: Selection Mode (highlighted section)
         Line::from("━".repeat(40)),
         Line::from(Span::styled(
-            "★ Terminal Selection Mode (Ctrl+S) ★",
+            "★ Selection Mode (Ctrl+S / Alt+Click) ★",
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -290,7 +290,7 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from("━".repeat(40)),
         Line::from(""),
         Line::from(Span::styled(
-            "Select terminal output and copy to Claude as code block.",
+            "Select text from Terminal or Preview and copy to Claude.",
             Style::default().fg(Color::White).add_modifier(Modifier::ITALIC),
         )),
         Line::from(""),
@@ -339,13 +339,15 @@ fn help_content() -> Vec<Line<'static>> {
 
         // Mouse Selection
         Line::from(Span::styled(
-            "Mouse Selection (new in v0.14.0)",
+            "Mouse Selection (Alt+Click)",
             Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from("  Click and drag in terminal panes to select text."),
-        Line::from("  Release mouse to enter Selection Mode with"),
-        Line::from("  the selected range, then press Enter to copy."),
+        Line::from("  Alt+Click and drag in Terminal or Preview panes"),
+        Line::from("  to select text. Release to enter Selection Mode,"),
+        Line::from("  then press Enter/y to copy to Claude."),
+        Line::from(""),
+        Line::from("  Note: Regular click only focuses pane (no selection)."),
         Line::from(""),
         Line::from("━".repeat(40)),
         Line::from(""),

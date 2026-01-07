@@ -313,51 +313,68 @@ impl App {
                                         }
                                     }
                                 }
-                                else if is_inside(preview, x, y) { self.active_pane = PaneId::Preview; }
+                                else if is_inside(preview, x, y) {
+                                    // Alt+Click starts selection in Preview (Read-Only mode only)
+                                    if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT)
+                                       && self.preview.mode == crate::types::EditorMode::ReadOnly {
+                                        self.mouse_selection.start(PaneId::Preview, y, preview);
+                                    }
+                                    self.active_pane = PaneId::Preview;
+                                }
                                 else if is_inside(claude, x, y) {
                                     // Show startup dialog if prefixes configured and not yet shown
                                     if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
                                         self.claude_startup.open(self.config.claude.startup_prefixes.clone());
                                     } else {
-                                        // Start mouse text selection
-                                        self.mouse_selection.start(PaneId::Claude, y, claude);
+                                        // Alt+Click starts mouse text selection
+                                        if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT) {
+                                            self.mouse_selection.start(PaneId::Claude, y, claude);
+                                        }
                                         self.active_pane = PaneId::Claude;
                                     }
                                 }
                                 else if is_inside(lazygit, x, y) {
-                                    // Start mouse text selection
-                                    self.mouse_selection.start(PaneId::LazyGit, y, lazygit);
+                                    // Alt+Click starts mouse text selection
+                                    if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT) {
+                                        self.mouse_selection.start(PaneId::LazyGit, y, lazygit);
+                                    }
                                     self.active_pane = PaneId::LazyGit;
                                 }
                                 else if is_inside(term, x, y) {
-                                    // Start mouse text selection
-                                    self.mouse_selection.start(PaneId::Terminal, y, term);
+                                    // Alt+Click starts mouse text selection
+                                    if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT) {
+                                        self.mouse_selection.start(PaneId::Terminal, y, term);
+                                    }
                                     self.active_pane = PaneId::Terminal;
                                 }
                                 else if is_inside(footer_area, x, y) {
-                                    // Use precise button positions
+                                    // Use context-aware button positions
                                     let footer_x = x.saturating_sub(footer_area.x);
-                                    let positions = ui::footer::get_button_positions();
-                                    
-                                    for (start, end, idx) in positions {
+                                    let is_selection_mode = self.terminal_selection.active;
+                                    let positions = ui::footer::get_context_button_positions(
+                                        self.active_pane,
+                                        self.preview.mode,
+                                        is_selection_mode,
+                                    );
+
+                                    for (start, end, action) in positions {
                                         if footer_x >= start && footer_x < end {
-                                            match idx {
-                                                0 => self.active_pane = PaneId::FileBrowser,  // F1 Files
-                                                1 => self.active_pane = PaneId::Preview,       // F2 Preview
-                                                2 => { self.file_browser.refresh(); self.update_preview(); } // F3 Refresh
-                                                3 => {
-                                                    // F4 Claude - show startup dialog if prefixes configured
+                                            use ui::footer::FooterAction;
+                                            match action {
+                                                FooterAction::FocusFiles => self.active_pane = PaneId::FileBrowser,
+                                                FooterAction::FocusPreview => self.active_pane = PaneId::Preview,
+                                                FooterAction::Refresh => { self.file_browser.refresh(); self.update_preview(); }
+                                                FooterAction::FocusClaude => {
                                                     if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
                                                         self.claude_startup.open(self.config.claude.startup_prefixes.clone());
                                                     } else {
                                                         self.active_pane = PaneId::Claude;
                                                     }
                                                 }
-                                                4 => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } } // F5 Git
-                                                5 => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } } // F6 Term
-                                                6 => { self.fuzzy_finder.open(&self.file_browser.current_dir); } // ^P Find
-                                                7 => {
-                                                    // o Open: Open file in browser
+                                                FooterAction::ToggleGit => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } }
+                                                FooterAction::ToggleTerm => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } }
+                                                FooterAction::FuzzyFind => { self.fuzzy_finder.open(&self.file_browser.current_dir); }
+                                                FooterAction::OpenFile => {
                                                     if let Some(path) = self.file_browser.selected_file() {
                                                         if browser::can_preview_in_browser(&path) {
                                                             let preview_path = if browser::is_markdown(&path) {
@@ -369,11 +386,53 @@ impl App {
                                                         }
                                                     }
                                                 }
-                                                8 => { let _ = browser::open_in_file_manager(&self.file_browser.current_dir); } // O Finder
-                                                9 => { let cfg = self.config.clone(); self.settings.open(&cfg); }  // ^, Settings
-                                                10 => self.about.open(),     // F10 Info
-                                                11 => self.help.open(),       // F12 Help
-                                                _ => {}
+                                                FooterAction::OpenFinder => { let _ = browser::open_in_file_manager(&self.file_browser.current_dir); }
+                                                FooterAction::Settings => { let cfg = self.config.clone(); self.settings.open(&cfg); }
+                                                FooterAction::About => self.about.open(),
+                                                FooterAction::Help => self.help.open(),
+                                                FooterAction::Edit => {
+                                                    // Enter edit mode in Preview
+                                                    if self.active_pane == PaneId::Preview {
+                                                        self.preview.mode = crate::types::EditorMode::Edit;
+                                                    }
+                                                }
+                                                FooterAction::StartSelect => {
+                                                    // Start selection mode in current pane
+                                                    if self.active_pane == PaneId::Preview {
+                                                        self.terminal_selection.start(self.preview.scroll as usize, PaneId::Preview);
+                                                    } else if matches!(self.active_pane, PaneId::Claude | PaneId::LazyGit | PaneId::Terminal) {
+                                                        self.terminal_selection.start(0, self.active_pane);
+                                                    }
+                                                }
+                                                FooterAction::Save => {
+                                                    // Save in edit mode
+                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                        let _ = self.preview.save();
+                                                    }
+                                                }
+                                                FooterAction::ExitEdit => {
+                                                    // Exit edit mode
+                                                    if self.active_pane == PaneId::Preview {
+                                                        self.preview.mode = crate::types::EditorMode::ReadOnly;
+                                                    }
+                                                }
+                                                FooterAction::Undo | FooterAction::Redo => {
+                                                    // Undo/Redo handled by keyboard only
+                                                }
+                                                FooterAction::SelectDown | FooterAction::SelectUp => {
+                                                    // Selection navigation not clickable
+                                                }
+                                                FooterAction::SelectCopy => {
+                                                    // Copy selection
+                                                    if self.terminal_selection.active {
+                                                        self.copy_selection_to_claude();
+                                                    }
+                                                }
+                                                FooterAction::SelectCancel => {
+                                                    // Cancel selection
+                                                    self.terminal_selection.active = false;
+                                                }
+                                                FooterAction::None => {}
                                             }
                                             break;
                                         }
@@ -833,25 +892,63 @@ impl App {
                                                 }
                                             }
                                         } else {
-                                            // Read-only mode
-                                            match key.code {
-                                                KeyCode::Down | KeyCode::Char('j') => self.preview.scroll_down(),
-                                                KeyCode::Up | KeyCode::Char('k') => self.preview.scroll_up(),
-                                                KeyCode::PageDown => {
-                                                    for _ in 0..10 { self.preview.scroll_down(); }
+                                            // Read-only mode - check for selection mode first
+                                            if self.terminal_selection.active && self.terminal_selection.source_pane == Some(PaneId::Preview) {
+                                                // Selection mode active in Preview
+                                                match key.code {
+                                                    KeyCode::Up | KeyCode::Char('k') => {
+                                                        if let Some(end) = self.terminal_selection.end_line {
+                                                            self.terminal_selection.extend(end.saturating_sub(1));
+                                                        }
+                                                        continue;
+                                                    }
+                                                    KeyCode::Down | KeyCode::Char('j') => {
+                                                        if let Some(end) = self.terminal_selection.end_line {
+                                                            self.terminal_selection.extend(end + 1);
+                                                        }
+                                                        continue;
+                                                    }
+                                                    KeyCode::Enter | KeyCode::Char('y') => {
+                                                        self.copy_selection_to_claude();
+                                                        self.terminal_selection.clear();
+                                                        continue;
+                                                    }
+                                                    KeyCode::Esc => {
+                                                        self.terminal_selection.clear();
+                                                        continue;
+                                                    }
+                                                    _ => {}
                                                 }
-                                                KeyCode::PageUp => {
-                                                    for _ in 0..10 { self.preview.scroll_up(); }
+                                            } else {
+                                                // Normal read-only mode (no selection)
+                                                // Check for Ctrl+S to start selection mode
+                                                let is_ctrl_s = (key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL))
+                                                    || key.code == KeyCode::Char('\x13');
+                                                if is_ctrl_s {
+                                                    // Start keyboard selection at current scroll position
+                                                    self.terminal_selection.start(self.preview.scroll as usize, PaneId::Preview);
+                                                    continue;
                                                 }
-                                                KeyCode::Home => { self.preview.scroll = 0; }
-                                                KeyCode::End => {
-                                                    let max = self.preview.highlighted_lines.len().saturating_sub(1) as u16;
-                                                    self.preview.scroll = max;
+
+                                                match key.code {
+                                                    KeyCode::Down | KeyCode::Char('j') => self.preview.scroll_down(),
+                                                    KeyCode::Up | KeyCode::Char('k') => self.preview.scroll_up(),
+                                                    KeyCode::PageDown => {
+                                                        for _ in 0..10 { self.preview.scroll_down(); }
+                                                    }
+                                                    KeyCode::PageUp => {
+                                                        for _ in 0..10 { self.preview.scroll_up(); }
+                                                    }
+                                                    KeyCode::Home => { self.preview.scroll = 0; }
+                                                    KeyCode::End => {
+                                                        let max = self.preview.highlighted_lines.len().saturating_sub(1) as u16;
+                                                        self.preview.scroll = max;
+                                                    }
+                                                    KeyCode::Char('e') | KeyCode::Char('E') => {
+                                                        self.preview.enter_edit_mode();
+                                                    }
+                                                    _ => {}
                                                 }
-                                                KeyCode::Char('e') | KeyCode::Char('E') => {
-                                                    self.preview.enter_edit_mode();
-                                                }
-                                                _ => {}
                                             }
                                         }
                                     }
@@ -946,7 +1043,17 @@ impl App {
         resize_pty(&mut self.terminals, PaneId::Terminal, terminal);
 
         ui::file_browser::render(frame, files, &mut self.file_browser, self.active_pane == PaneId::FileBrowser);
-        ui::preview::render(frame, preview, &self.preview, self.active_pane == PaneId::Preview);
+
+        // Calculate Preview selection range (keyboard or mouse selection)
+        let preview_selection_range = if self.terminal_selection.active
+            && self.terminal_selection.source_pane == Some(PaneId::Preview) {
+            self.terminal_selection.line_range()
+        } else if self.mouse_selection.is_selecting_in(PaneId::Preview) {
+            self.mouse_selection.line_range()
+        } else {
+            None
+        };
+        ui::preview::render(frame, preview, &self.preview, self.active_pane == PaneId::Preview, preview_selection_range);
         
         ui::terminal_pane::render(frame, claude, PaneId::Claude, self);
         ui::terminal_pane::render(frame, lazygit, PaneId::LazyGit, self);
@@ -1278,7 +1385,7 @@ impl App {
         }
     }
 
-    /// Copy selected terminal lines to Claude pane as a code block
+    /// Copy selected lines to Claude pane as a code block (from terminal or preview)
     fn copy_selection_to_claude(&mut self) {
         use crate::filter::{filter_lines, FilterOptions};
 
@@ -1290,8 +1397,15 @@ impl App {
             return;
         };
 
-        // Extract lines from source terminal
-        let lines = if let Some(pty) = self.terminals.get(&source_pane) {
+        // Extract lines from source (terminal or preview)
+        let lines = if source_pane == PaneId::Preview {
+            // Extract lines from preview content
+            let content_lines: Vec<String> = self.preview.content.lines().map(String::from).collect();
+            if start > content_lines.len() || end > content_lines.len() {
+                return;
+            }
+            content_lines[start..=end.min(content_lines.len().saturating_sub(1))].to_vec()
+        } else if let Some(pty) = self.terminals.get(&source_pane) {
             pty.extract_lines(start, end)
         } else {
             return;
@@ -1301,19 +1415,26 @@ impl App {
             return;
         }
 
-        // Apply intelligent filtering to remove shell prompts, collapse blanks, detect syntax
-        let filtered = filter_lines(lines, &FilterOptions::default());
-
-        if filtered.lines.is_empty() {
-            return;
-        }
+        // For preview, use syntax from file; for terminal, detect syntax
+        let (formatted_lines, syntax_hint) = if source_pane == PaneId::Preview {
+            // Use file extension for syntax hint
+            let syntax = self.preview.syntax_name.as_deref().unwrap_or("");
+            (lines, Some(syntax.to_lowercase()))
+        } else {
+            // Apply intelligent filtering for terminal output
+            let filtered = filter_lines(lines, &FilterOptions::default());
+            if filtered.lines.is_empty() {
+                return;
+            }
+            (filtered.lines, filtered.syntax_hint)
+        };
 
         // Format for Claude - wrap in markdown code block with syntax hint
-        let syntax = filtered.syntax_hint.as_deref().unwrap_or("");
+        let syntax = syntax_hint.as_deref().unwrap_or("");
         let formatted = format!(
             "```{}\n{}\n```\n",
             syntax,
-            filtered.lines.join("\n")
+            formatted_lines.join("\n")
         );
 
         // Send to Claude PTY
