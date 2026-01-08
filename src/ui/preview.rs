@@ -281,9 +281,14 @@ pub fn render(
         }
         EditorMode::ReadOnly => {
             // Apply selection highlighting if active
+            // NOTE: selection_range is in SCREEN coordinates (0 = first visible line)
+            // We need to adjust by scroll offset to get content line indices
             let lines = if let Some((start, end)) = selection_range {
+                let scroll_offset = state.scroll as usize;
+                let adjusted_start = start + scroll_offset;
+                let adjusted_end = end + scroll_offset;
                 state.highlighted_lines.iter().enumerate().map(|(idx, line)| {
-                    if idx >= start && idx <= end {
+                    if idx >= adjusted_start && idx <= adjusted_end {
                         // Apply DarkGray background to selected lines
                         let styled_spans: Vec<Span> = line.spans.iter().map(|span| {
                             Span::styled(

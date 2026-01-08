@@ -175,6 +175,9 @@ impl App {
 
     pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while !self.should_quit {
+            // Check for exited PTYs and restart them with a shell
+            self.check_and_restart_exited_ptys();
+
             // Auto-refresh file browser
             let refresh_interval = self.config.file_browser.auto_refresh_ms;
             if refresh_interval > 0 {
@@ -184,7 +187,7 @@ impl App {
                     self.last_refresh = std::time::Instant::now();
                 }
             }
-            
+
             terminal.draw(|frame| self.draw(frame))?;
 
             if event::poll(std::time::Duration::from_millis(16))? {
@@ -893,12 +896,32 @@ impl App {
                                                     self.preview.refresh_highlighting(&self.syntax_manager);
                                                 }
                                             } else {
-                                                // Forward to TextArea (handles Ctrl+Z, Ctrl+Y, etc.)
-                                                if let Some(editor) = &mut self.preview.editor {
-                                                    editor.input(Event::Key(key));
-                                                    self.preview.update_modified();
-                                                    // Update syntax highlighting for edit mode
-                                                    self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                // Handle scrolling keys specially (TextArea moves cursor, not view)
+                                                match key.code {
+                                                    KeyCode::PageUp => {
+                                                        if let Some(editor) = &mut self.preview.editor {
+                                                            // Move cursor up by ~20 lines to simulate page scroll
+                                                            for _ in 0..20 {
+                                                                editor.move_cursor(tui_textarea::CursorMove::Up);
+                                                            }
+                                                        }
+                                                    }
+                                                    KeyCode::PageDown => {
+                                                        if let Some(editor) = &mut self.preview.editor {
+                                                            for _ in 0..20 {
+                                                                editor.move_cursor(tui_textarea::CursorMove::Down);
+                                                            }
+                                                        }
+                                                    }
+                                                    _ => {
+                                                        // Forward other keys to TextArea (handles Ctrl+Z, Ctrl+Y, etc.)
+                                                        if let Some(editor) = &mut self.preview.editor {
+                                                            editor.input(Event::Key(key));
+                                                            self.preview.update_modified();
+                                                            // Update syntax highlighting for edit mode
+                                                            self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                        }
+                                                    }
                                                 }
                                             }
                                         } else {
@@ -987,9 +1010,10 @@ impl App {
                                                     self.terminal_selection.clear();
                                                     continue;
                                                 }
-                                                _ => {}
+                                                _ => {
+                                                    // Let other keys (like Ctrl+C) pass through to PTY
+                                                }
                                             }
-                                            continue;
                                         }
 
                                         // Ctrl+S: Start terminal selection mode
@@ -1530,6 +1554,56 @@ impl App {
 
         // Jump to calculated position
         editor.move_cursor(CursorMove::Jump(clamped_row, clamped_col));
+    }
+
+    /// Check for exited PTYs and restart them with a fresh shell
+    fn check_and_restart_exited_ptys(&mut self) {
+        let cwd = self.file_browser.current_dir.clone();
+        let rows = 24;
+        let cols = 80;
+
+        // Check each terminal PTY
+        let panes_to_restart: Vec<PaneId> = self.terminals
+            .iter()
+            .filter(|(_, pty)| pty.has_exited())
+            .map(|(id, _)| *id)
+            .collect();
+
+        for pane_id in panes_to_restart {
+            // Remove the old PTY
+            self.terminals.remove(&pane_id);
+
+            // Determine the command to restart based on pane type
+            let cmd = match pane_id {
+                PaneId::Claude => {
+                    if self.config.pty.claude_command.is_empty() {
+                        let mut cmd = vec![self.config.terminal.shell_path.clone()];
+                        cmd.extend(self.config.terminal.shell_args.clone());
+                        cmd
+                    } else {
+                        self.config.pty.claude_command.clone()
+                    }
+                }
+                PaneId::LazyGit => {
+                    if self.config.pty.lazygit_command.is_empty() {
+                        vec!["lazygit".to_string()]
+                    } else {
+                        self.config.pty.lazygit_command.clone()
+                    }
+                }
+                PaneId::Terminal => {
+                    let mut cmd = vec![self.config.terminal.shell_path.clone()];
+                    cmd.extend(self.config.terminal.shell_args.clone());
+                    cmd
+                }
+                _ => continue, // Skip non-terminal panes
+            };
+
+            // Start a fresh shell/process
+            if let Ok(new_pty) = PseudoTerminal::new(&cmd, rows, cols, &cwd) {
+                self.terminals.insert(pane_id, new_pty);
+            }
+        }
     }
 
     /// Insert file path at cursor in target terminal pane

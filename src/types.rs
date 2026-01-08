@@ -280,7 +280,14 @@ impl MouseSelection {
     /// Update selection during drag
     pub fn update(&mut self, y: u16) {
         if self.selecting {
-            self.current_y = y;
+            // Clamp Y to pane boundaries to prevent selection overflow
+            if let Some(area) = self.pane_area {
+                let min_y = area.y + 1;  // Account for top border
+                let max_y = area.y + area.height.saturating_sub(2);  // Account for bottom border
+                self.current_y = y.clamp(min_y, max_y);
+            } else {
+                self.current_y = y;
+            }
         }
     }
 

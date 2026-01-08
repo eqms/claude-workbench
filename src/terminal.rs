@@ -1,6 +1,7 @@
 use anyhow::Result;
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 use std::io::{Read, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -8,6 +9,8 @@ pub struct PseudoTerminal {
     pub parser: Arc<Mutex<vt100::Parser>>,
     pub writer: Box<dyn Write + Send>,
     pub master: Box<dyn portable_pty::MasterPty + Send>,
+    /// Flag indicating if the PTY process has exited (reader thread got EOF)
+    pub exited: Arc<AtomicBool>,
 }
 
 impl PseudoTerminal {
@@ -21,20 +24,30 @@ impl PseudoTerminal {
         })?;
 
         let parser = Arc::new(Mutex::new(vt100::Parser::new(rows, cols, 1000)));
+        let exited = Arc::new(AtomicBool::new(false));
         let mut reader = pair.master.try_clone_reader()?;
         let parser_clone = parser.clone();
+        let exited_clone = exited.clone();
 
         // Spawn a background thread to read from PTY and update the parser
         thread::spawn(move || {
             let mut buffer = [0u8; 4096];
             loop {
                 match reader.read(&mut buffer) {
-                    Ok(0) => break, // EOF
+                    Ok(0) => {
+                        // EOF - process has exited
+                        exited_clone.store(true, Ordering::SeqCst);
+                        break;
+                    }
                     Ok(n) => {
                         let mut parser = parser_clone.lock().unwrap();
                         parser.process(&buffer[..n]);
                     }
-                    Err(_) => break, // Error
+                    Err(_) => {
+                        // Error - process probably exited
+                        exited_clone.store(true, Ordering::SeqCst);
+                        break;
+                    }
                 }
             }
         });
@@ -70,6 +83,7 @@ impl PseudoTerminal {
             parser,
             writer,
             master: pair.master,
+            exited,
         })
     }
 
@@ -163,5 +177,10 @@ impl PseudoTerminal {
     pub fn scrollback(&self) -> usize {
         let parser = self.parser.lock().unwrap();
         parser.screen().scrollback()
+    }
+
+    /// Check if the PTY process has exited
+    pub fn has_exited(&self) -> bool {
+        self.exited.load(Ordering::SeqCst)
     }
 }
