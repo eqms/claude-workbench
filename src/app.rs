@@ -1062,6 +1062,17 @@ impl App {
                                             continue;
                                         }
 
+                                        if let Some(pty) = self.terminals.get(&self.active_pane) {
+                                            // Check if PTY has exited and auto_restart is disabled
+                                            if pty.has_exited() && !self.config.pty.auto_restart {
+                                                // Manual restart on Enter
+                                                if key.code == KeyCode::Enter {
+                                                    self.restart_single_pty(self.active_pane);
+                                                }
+                                                continue;
+                                            }
+                                        }
+
                                         if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
                                             // Scroll Handling
                                             if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
@@ -1645,6 +1656,47 @@ impl App {
             if let Ok(new_pty) = PseudoTerminal::new(&cmd, rows, cols, &cwd) {
                 self.terminals.insert(pane_id, new_pty);
             }
+        }
+    }
+
+    /// Restart a single PTY (manual restart when auto_restart is disabled)
+    fn restart_single_pty(&mut self, pane_id: PaneId) {
+        let cwd = self.file_browser.current_dir.clone();
+        let rows = 24;
+        let cols = 80;
+
+        // Remove the old PTY
+        self.terminals.remove(&pane_id);
+
+        // Determine the command to restart based on pane type
+        let cmd = match pane_id {
+            PaneId::Claude => {
+                if self.config.pty.claude_command.is_empty() {
+                    let mut cmd = vec![self.config.terminal.shell_path.clone()];
+                    cmd.extend(self.config.terminal.shell_args.clone());
+                    cmd
+                } else {
+                    self.config.pty.claude_command.clone()
+                }
+            }
+            PaneId::LazyGit => {
+                if self.config.pty.lazygit_command.is_empty() {
+                    vec!["lazygit".to_string()]
+                } else {
+                    self.config.pty.lazygit_command.clone()
+                }
+            }
+            PaneId::Terminal => {
+                let mut cmd = vec![self.config.terminal.shell_path.clone()];
+                cmd.extend(self.config.terminal.shell_args.clone());
+                cmd
+            }
+            _ => return, // Skip non-terminal panes
+        };
+
+        // Start a fresh shell/process
+        if let Ok(new_pty) = PseudoTerminal::new(&cmd, rows, cols, &cwd) {
+            self.terminals.insert(pane_id, new_pty);
         }
     }
 

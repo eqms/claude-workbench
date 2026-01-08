@@ -71,6 +71,29 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
     }
 
     if let Some(pty) = app.terminals.get(&pane_id) {
+        // Check if PTY process has exited
+        if pty.has_exited() && !app.config.pty.auto_restart {
+            // Show "exited" message with restart hint
+            let exit_lines: Vec<Line> = vec![
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("⚠ ", Style::default().fg(Color::Yellow)),
+                    Span::styled("Process exited", Style::default().fg(Color::Gray)),
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Press ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Enter", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::styled(" to restart", Style::default().fg(Color::DarkGray)),
+                ]),
+            ];
+            let exit_paragraph = Paragraph::new(exit_lines)
+                .style(Style::default())
+                .wrap(Wrap { trim: false });
+            f.render_widget(exit_paragraph, inner_area);
+            return;
+        }
+
         let parser = pty.parser.lock().unwrap();
         let screen = parser.screen();
 
