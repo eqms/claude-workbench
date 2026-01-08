@@ -1595,6 +1595,11 @@ impl App {
 
     /// Check for exited PTYs and restart them with a fresh shell
     fn check_and_restart_exited_ptys(&mut self) {
+        // Skip if auto-restart is disabled
+        if !self.config.pty.auto_restart {
+            return;
+        }
+
         let cwd = self.file_browser.current_dir.clone();
         let rows = 24;
         let cols = 80;

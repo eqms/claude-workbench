@@ -28,7 +28,12 @@ pub struct PtyConfig {
     pub claude_command: Vec<String>,
     pub lazygit_command: Vec<String>,
     pub scrollback_lines: usize,
+    /// Auto-restart PTY processes when they exit (default: true)
+    #[serde(default = "default_true")]
+    pub auto_restart: bool,
 }
+
+fn default_true() -> bool { true }
 
 impl Default for PtyConfig {
     fn default() -> Self {
@@ -37,6 +42,7 @@ impl Default for PtyConfig {
             claude_command: vec![],
             lazygit_command: vec!["lazygit".to_string()],
             scrollback_lines: 1000,
+            auto_restart: true,
         }
     }
 }

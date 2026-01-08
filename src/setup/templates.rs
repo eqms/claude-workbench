@@ -106,6 +106,7 @@ pub fn get_builtin_templates() -> Vec<Template> {
                 claude_command: vec!["claude".to_string()],
                 lazygit_command: vec!["lazygit".to_string()],
                 scrollback_lines: 2000,
+                auto_restart: true,
             }),
         },
         Template {
@@ -131,6 +132,7 @@ pub fn get_builtin_templates() -> Vec<Template> {
                     "echo 'lazygit not installed - using shell'; exec bash".to_string(),
                 ],
                 scrollback_lines: 1000,
+                auto_restart: true,
             }),
         },
     ]

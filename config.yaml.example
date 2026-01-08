@@ -19,3 +19,9 @@ file_browser:
   show_file_info: true
   date_format: "%d.%m.%Y %H:%M:%S"
   auto_refresh_ms: 2000  # 0 = disabled, 2000 = every 2 seconds
+
+pty:
+  claude_command: []  # Empty = use shell_path from terminal config
+  lazygit_command: [lazygit]
+  scrollback_lines: 1000
+  auto_restart: true  # false = PTY does not restart after exit
