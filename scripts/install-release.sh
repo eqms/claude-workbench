@@ -105,14 +105,14 @@ print_row() {
 }
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}                    ${GREEN}Installation Complete${NC}                    ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}                    ${GREEN}Installation Complete${NC}                   ${BLUE}║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
 print_row "Binary:    $BINARY_NAME"
 print_row "Version:   $VERSION"
 print_row "Size:      $BINARY_SIZE"
 print_row "Location:  $INSTALL_DIR/$BINARY_NAME"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
-printf "${BLUE}║${NC}  Run with:  ${YELLOW}%-45s${NC} ${BLUE}║${NC}\n" "$BINARY_NAME"
+printf "${BLUE}║${NC}  Run with:  ${YELLOW}%-45s${NC} ${BLUE} ║${NC}\n" "$BINARY_NAME"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 
 # Check if install dir is in PATH

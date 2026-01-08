@@ -234,8 +234,23 @@ impl App {
                                     continue;
                                 }
 
-                                // Dialog (Confirm/Input) - block all background clicks
+                                // Dialog (Confirm/Input) - handle button clicks
                                 if self.dialog.is_active() {
+                                    // Check if Yes or No button was clicked
+                                    if let Some(result) = self.dialog.check_button_click(x, y) {
+                                        match result {
+                                            ui::dialog::ConfirmResult::Yes => {
+                                                if let Some(action) = self.dialog.get_action() {
+                                                    self.dialog.close();
+                                                    self.execute_dialog_action(action, None);
+                                                }
+                                            }
+                                            ui::dialog::ConfirmResult::No => {
+                                                self.dialog.close();
+                                            }
+                                        }
+                                    }
+                                    // Block all other clicks when dialog is active
                                     continue;
                                 }
 
@@ -1164,7 +1179,7 @@ impl App {
         }
 
         if self.dialog.is_active() {
-            ui::dialog::render(frame, area, &self.dialog);
+            ui::dialog::render(frame, area, &mut self.dialog);
         }
         
         if self.fuzzy_finder.visible {
