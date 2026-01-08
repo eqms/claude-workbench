@@ -63,7 +63,7 @@ impl App {
         let rows = 24; 
         let cols = 80;
 
-        let file_browser = FileBrowserState::new();
+        let file_browser = FileBrowserState::new(config.file_browser.show_hidden);
         let cwd = file_browser.current_dir.clone();
 
         let mut terminals = HashMap::new();
@@ -318,6 +318,10 @@ impl App {
                                     if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT)
                                        && self.preview.mode == crate::types::EditorMode::ReadOnly {
                                         self.mouse_selection.start(PaneId::Preview, y, preview);
+                                    }
+                                    // Click-to-position cursor in Edit mode
+                                    else if self.preview.mode == crate::types::EditorMode::Edit {
+                                        self.position_preview_cursor(preview, x, y);
                                     }
                                     self.active_pane = PaneId::Preview;
                                 }
@@ -853,6 +857,12 @@ impl App {
                                             KeyCode::Char('q') => {
                                                  self.should_quit = true;
                                             }
+                                            // Toggle hidden files visibility
+                                            KeyCode::Char('.') => {
+                                                self.file_browser.show_hidden = !self.file_browser.show_hidden;
+                                                self.file_browser.refresh();
+                                                self.update_preview();
+                                            }
                                             _ => {}
                                         }
                                     }
@@ -1014,6 +1024,34 @@ impl App {
                         }
                     }
                 } // End Key
+                // Handle paste events from clipboard (VipeCoding, etc.)
+                // Use bracketed paste mode to signal terminal that this is pasted text
+                // This prevents shells from interpreting newlines as immediate commands
+                Event::Paste(text) => {
+                    match self.active_pane {
+                        PaneId::Claude | PaneId::LazyGit | PaneId::Terminal => {
+                            if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
+                                // Wrap in bracketed paste escape sequences
+                                // \x1b[200~ = start paste, \x1b[201~ = end paste
+                                let bracketed = format!("\x1b[200~{}\x1b[201~", text);
+                                let _ = pty.write_input(bracketed.as_bytes());
+                            }
+                        }
+                        PaneId::Preview => {
+                            // Forward paste to editor in edit mode
+                            if self.preview.mode == EditorMode::Edit {
+                                if let Some(editor) = &mut self.preview.editor {
+                                    editor.insert_str(&text);
+                                    self.preview.update_modified();
+                                    self.preview.update_edit_highlighting(&self.syntax_manager);
+                                }
+                            }
+                        }
+                        PaneId::FileBrowser => {
+                            // Ignore paste in file browser
+                        }
+                    }
+                }
                 _ => {}
             } // End Match
             }
@@ -1441,6 +1479,57 @@ impl App {
         if let Some(claude_pty) = self.terminals.get_mut(&PaneId::Claude) {
             let _ = claude_pty.write_input(formatted.as_bytes());
         }
+    }
+
+    /// Position preview editor cursor based on mouse click coordinates
+    fn position_preview_cursor(&mut self, area: Rect, click_x: u16, click_y: u16) {
+        use tui_textarea::CursorMove;
+
+        let Some(editor) = &mut self.preview.editor else { return };
+
+        // Account for block border (1px on each side)
+        let inner_x = area.x + 1;
+        let inner_y = area.y + 1;
+        let inner_width = area.width.saturating_sub(2);
+        let inner_height = area.height.saturating_sub(2);
+
+        // Check if click is within inner content area
+        if click_x < inner_x || click_x >= inner_x + inner_width {
+            return;
+        }
+        if click_y < inner_y || click_y >= inner_y + inner_height {
+            return;
+        }
+
+        // Calculate relative position within content area
+        let rel_x = (click_x - inner_x) as usize;
+        let rel_y = (click_y - inner_y) as usize;
+
+        // Calculate scroll offset based on current cursor position
+        let (cursor_row, _) = editor.cursor();
+        let visible_height = inner_height as usize;
+        let scroll_offset = if cursor_row >= visible_height {
+            cursor_row.saturating_sub(visible_height / 2)
+        } else {
+            0
+        };
+
+        // Calculate target row (accounting for scroll)
+        let target_row = (rel_y + scroll_offset) as u16;
+        let target_col = rel_x as u16;
+
+        // Clamp to valid range
+        let max_row = editor.lines().len().saturating_sub(1) as u16;
+        let clamped_row = target_row.min(max_row);
+
+        let line_len = editor.lines()
+            .get(clamped_row as usize)
+            .map(|l| l.len())
+            .unwrap_or(0) as u16;
+        let clamped_col = target_col.min(line_len);
+
+        // Jump to calculated position
+        editor.move_cursor(CursorMove::Jump(clamped_row, clamped_col));
     }
 
     /// Insert file path at cursor in target terminal pane

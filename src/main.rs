@@ -34,8 +34,12 @@ async fn main() -> Result<()> {
     let session = load_session();
     
     let terminal = ratatui::init();
-    crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
-    
+    crossterm::execute!(
+        std::io::stdout(),
+        crossterm::event::EnableMouseCapture,
+        crossterm::event::EnableBracketedPaste
+    )?;
+
     let app = App::new(config, session);
     
     // Initialize PTYs (async or sync) logic could go here or inside App::new
@@ -43,7 +47,11 @@ async fn main() -> Result<()> {
     
     let app_result = app.run(terminal); 
     
-    crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+    crossterm::execute!(
+        std::io::stdout(),
+        crossterm::event::DisableMouseCapture,
+        crossterm::event::DisableBracketedPaste
+    )?;
     ratatui::restore();
     
     app_result

@@ -55,10 +55,11 @@ pub struct FileBrowserState {
     pub repo_root: Option<PathBuf>,
     pub git_info: Option<GitRepoInfo>,
     git_statuses: HashMap<PathBuf, GitFileStatus>,
+    pub show_hidden: bool,
 }
 
 impl FileBrowserState {
-    pub fn new() -> Self {
+    pub fn new(show_hidden: bool) -> Self {
         let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let repo_root = git::find_repo_root(&current_dir);
         let mut s = Self {
@@ -68,6 +69,7 @@ impl FileBrowserState {
             repo_root,
             git_info: None,
             git_statuses: HashMap::new(),
+            show_hidden,
         };
         s.load_directory();
         s
@@ -103,8 +105,8 @@ impl FileBrowserState {
                 let is_dir = path.is_dir();
                 let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
 
-                // Simple ignore filter (should be configurable)
-                if name.starts_with('.') {
+                // Filter hidden files based on config
+                if !self.show_hidden && name.starts_with('.') {
                     continue;
                 }
 

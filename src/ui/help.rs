@@ -135,6 +135,10 @@ fn help_content() -> Vec<Line<'static>> {
             Span::styled("  O (Shift+O)  ", Style::default().fg(Color::Cyan)),
             Span::raw("Open directory in Finder"),
         ]),
+        Line::from(vec![
+            Span::styled("  .            ", Style::default().fg(Color::Cyan)),
+            Span::raw("Toggle hidden files"),
+        ]),
         Line::from(""),
         Line::from(Span::styled("  Status bar shows:", Style::default().fg(Color::DarkGray))),
         Line::from("  - File size and modification date"),
