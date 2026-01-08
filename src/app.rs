@@ -530,7 +530,18 @@ impl App {
                                     self.file_browser.down();
                                     self.update_preview();
                                 }
-                                else if is_inside(preview, x, y) { self.preview.scroll_down(); }
+                                else if is_inside(preview, x, y) {
+                                    // In Edit mode, move TextArea cursor; in ReadOnly mode, scroll
+                                    if self.preview.mode == crate::types::EditorMode::Edit {
+                                        if let Some(editor) = &mut self.preview.editor {
+                                            for _ in 0..3 {
+                                                editor.move_cursor(tui_textarea::CursorMove::Down);
+                                            }
+                                        }
+                                    } else {
+                                        self.preview.scroll_down();
+                                    }
+                                }
                                 else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_down(3); } }
                                 else if is_inside(lazygit, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) { pty.scroll_down(3); } }
                                 else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_down(3); } }
@@ -565,7 +576,18 @@ impl App {
                                     self.file_browser.up();
                                     self.update_preview();
                                 }
-                                else if is_inside(preview, x, y) { self.preview.scroll_up(); }
+                                else if is_inside(preview, x, y) {
+                                    // In Edit mode, move TextArea cursor; in ReadOnly mode, scroll
+                                    if self.preview.mode == crate::types::EditorMode::Edit {
+                                        if let Some(editor) = &mut self.preview.editor {
+                                            for _ in 0..3 {
+                                                editor.move_cursor(tui_textarea::CursorMove::Up);
+                                            }
+                                        }
+                                    } else {
+                                        self.preview.scroll_up();
+                                    }
+                                }
                                 else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_up(3); } }
                                 else if is_inside(lazygit, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) { pty.scroll_up(3); } }
                                 else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_up(3); } }
