@@ -1159,7 +1159,14 @@ impl App {
                 // This prevents shells from interpreting newlines as immediate commands
                 Event::Paste(text) => {
                     match self.active_pane {
-                        PaneId::Claude | PaneId::LazyGit | PaneId::Terminal => {
+                        PaneId::Claude => {
+                            // Claude CLI doesn't understand bracketed paste sequences
+                            // Send text directly - for multiline, user must use \ continuation
+                            if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
+                                let _ = pty.write_input(text.as_bytes());
+                            }
+                        }
+                        PaneId::LazyGit | PaneId::Terminal => {
                             if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
                                 // Wrap in bracketed paste escape sequences
                                 // \x1b[200~ = start paste, \x1b[201~ = end paste
