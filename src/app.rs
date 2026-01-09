@@ -908,6 +908,55 @@ impl App {
                                     }
 
                                     PaneId::Preview => {
+                                        // Search mode handling (priority over other modes)
+                                        if self.preview.search.active {
+                                            match key.code {
+                                                KeyCode::Esc => {
+                                                    self.preview.search.close();
+                                                    continue;
+                                                }
+                                                KeyCode::Enter => {
+                                                    // Confirm search and close
+                                                    self.preview.jump_to_current_match();
+                                                    self.preview.search.active = false; // Keep query for n/N navigation
+                                                    continue;
+                                                }
+                                                KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                                    self.preview.search.next_match();
+                                                    self.preview.jump_to_current_match();
+                                                    continue;
+                                                }
+                                                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                                    self.preview.search.prev_match();
+                                                    self.preview.jump_to_current_match();
+                                                    continue;
+                                                }
+                                                KeyCode::Backspace => {
+                                                    self.preview.search.query.pop();
+                                                    self.preview.perform_search();
+                                                    self.preview.jump_to_current_match();
+                                                    continue;
+                                                }
+                                                KeyCode::Char(c) => {
+                                                    self.preview.search.query.push(c);
+                                                    self.preview.perform_search();
+                                                    self.preview.jump_to_current_match();
+                                                    continue;
+                                                }
+                                                _ => { continue; }
+                                            }
+                                        }
+
+                                        // Check for search trigger (/ in read-only, Ctrl+F in any mode)
+                                        let is_ctrl_f = (key.code == KeyCode::Char('f') && key.modifiers.contains(KeyModifiers::CONTROL))
+                                            || key.code == KeyCode::Char('\x06'); // Ctrl+F as control char
+                                        let is_slash = key.code == KeyCode::Char('/') && self.preview.mode == EditorMode::ReadOnly;
+
+                                        if is_ctrl_f || is_slash {
+                                            self.preview.search.open();
+                                            continue;
+                                        }
+
                                         // Edit mode handling
                                         if self.preview.mode == EditorMode::Edit {
                                             // Check for Ctrl+S (save) - handle both modifier and control char
@@ -1016,6 +1065,15 @@ impl App {
                                                     }
                                                     KeyCode::Char('e') | KeyCode::Char('E') => {
                                                         self.preview.enter_edit_mode();
+                                                    }
+                                                    // Search navigation: n = next match, N = previous match
+                                                    KeyCode::Char('n') if !self.preview.search.matches.is_empty() => {
+                                                        self.preview.search.next_match();
+                                                        self.preview.jump_to_current_match();
+                                                    }
+                                                    KeyCode::Char('N') if !self.preview.search.matches.is_empty() => {
+                                                        self.preview.search.prev_match();
+                                                        self.preview.jump_to_current_match();
                                                     }
                                                     _ => {}
                                                 }

@@ -343,3 +343,73 @@ impl MouseSelection {
         self.selecting && self.source_pane == Some(pane)
     }
 }
+
+/// Search state for Preview/Edit mode
+#[derive(Debug, Clone, Default)]
+pub struct SearchState {
+    /// Whether search mode is active
+    pub active: bool,
+    /// Current search query
+    pub query: String,
+    /// Found matches: (line_index, start_col, end_col)
+    pub matches: Vec<(usize, usize, usize)>,
+    /// Index of currently highlighted match
+    pub current_match: usize,
+    /// Case-sensitive search
+    pub case_sensitive: bool,
+}
+
+impl SearchState {
+    /// Open search mode
+    pub fn open(&mut self) {
+        self.active = true;
+        self.query.clear();
+        self.matches.clear();
+        self.current_match = 0;
+    }
+
+    /// Close search mode and clear state
+    pub fn close(&mut self) {
+        self.active = false;
+        self.query.clear();
+        self.matches.clear();
+        self.current_match = 0;
+    }
+
+    /// Move to next match (wraps around)
+    pub fn next_match(&mut self) {
+        if !self.matches.is_empty() {
+            self.current_match = (self.current_match + 1) % self.matches.len();
+        }
+    }
+
+    /// Move to previous match (wraps around)
+    pub fn prev_match(&mut self) {
+        if !self.matches.is_empty() {
+            self.current_match = self
+                .current_match
+                .checked_sub(1)
+                .unwrap_or(self.matches.len() - 1);
+        }
+    }
+
+    /// Get the line number of the current match
+    pub fn current_match_line(&self) -> Option<usize> {
+        self.matches.get(self.current_match).map(|(line, _, _)| *line)
+    }
+
+    /// Check if a position is a match (for highlighting)
+    pub fn is_match(&self, line: usize, col: usize) -> bool {
+        self.matches
+            .iter()
+            .any(|(l, start, end)| *l == line && col >= *start && col < *end)
+    }
+
+    /// Check if a match at (line, start_col) is the current match
+    pub fn is_current_match(&self, line: usize, start_col: usize) -> bool {
+        self.matches
+            .get(self.current_match)
+            .map(|(l, s, _)| *l == line && *s == start_col)
+            .unwrap_or(false)
+    }
+}

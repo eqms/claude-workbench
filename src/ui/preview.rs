@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tui_textarea::TextArea;
 
-use crate::types::EditorMode;
+use crate::types::{EditorMode, SearchState};
 use crate::ui::syntax::SyntaxManager;
 
 /// Check if a file is a Markdown file based on extension
@@ -42,6 +42,9 @@ pub struct PreviewState {
 
     // Markdown rendering flag
     pub is_markdown: bool,
+
+    // Search state
+    pub search: SearchState,
 }
 
 impl Default for PreviewState {
@@ -58,6 +61,7 @@ impl Default for PreviewState {
             syntax_name: None,
             edit_highlighted_lines: Vec::new(),
             is_markdown: false,
+            search: SearchState::default(),
         }
     }
 }
@@ -207,6 +211,57 @@ impl PreviewState {
             self.edit_highlighted_lines = syntax_manager.highlight(&content, path);
         }
     }
+
+    /// Perform incremental search on content
+    pub fn perform_search(&mut self) {
+        self.search.matches.clear();
+
+        if self.search.query.is_empty() {
+            return;
+        }
+
+        // Get content to search (from editor in edit mode, otherwise from content)
+        let content = if let Some(editor) = &self.editor {
+            editor.lines().join("\n")
+        } else {
+            self.content.clone()
+        };
+
+        let query = if self.search.case_sensitive {
+            self.search.query.clone()
+        } else {
+            self.search.query.to_lowercase()
+        };
+
+        for (line_idx, line) in content.lines().enumerate() {
+            let search_line = if self.search.case_sensitive {
+                line.to_string()
+            } else {
+                line.to_lowercase()
+            };
+
+            let mut start = 0;
+            while let Some(pos) = search_line[start..].find(&query) {
+                let abs_pos = start + pos;
+                self.search
+                    .matches
+                    .push((line_idx, abs_pos, abs_pos + query.len()));
+                start = abs_pos + 1;
+            }
+        }
+
+        // Reset to first match if current is out of bounds
+        if self.search.current_match >= self.search.matches.len() {
+            self.search.current_match = 0;
+        }
+    }
+
+    /// Jump scroll position to current match
+    pub fn jump_to_current_match(&mut self) {
+        if let Some(line) = self.search.current_match_line() {
+            self.scroll = line as u16;
+        }
+    }
 }
 
 pub fn render(
@@ -327,6 +382,52 @@ pub fn render(
             }
         }
     }
+
+    // Render search bar at bottom if search is active
+    if state.search.active {
+        render_search_bar(f, area, state);
+    }
+}
+
+/// Render the search bar at the bottom of the preview area
+fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
+    // Position search bar at the bottom of the preview area (inside borders)
+    let search_area = Rect {
+        x: area.x + 1,
+        y: area.y + area.height.saturating_sub(2),
+        width: area.width.saturating_sub(2),
+        height: 1,
+    };
+
+    // Build search bar text with match count
+    let match_info = if state.search.matches.is_empty() {
+        if state.search.query.is_empty() {
+            String::new()
+        } else {
+            " [No matches]".to_string()
+        }
+    } else {
+        format!(
+            " [{}/{}]",
+            state.search.current_match + 1,
+            state.search.matches.len()
+        )
+    };
+
+    let search_text = format!("/{}{}", state.search.query, match_info);
+
+    // Style: dark gray background, white text, with cursor indicator
+    let cursor_indicator = "█";
+    let display_text = format!("{}{}", search_text, cursor_indicator);
+
+    let search_widget = Paragraph::new(display_text).style(
+        Style::default()
+            .fg(Color::White)
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    f.render_widget(search_widget, search_area);
 }
 
 /// Insert a cursor (reversed style) into a line at the given column

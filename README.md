@@ -29,6 +29,7 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 - Built-in text editor with undo/redo support (via tui-textarea)
 - Scrollable preview with keyboard and mouse navigation
 - PageUp/PageDown, Home/End for quick navigation
+- **Incremental Search (v0.17+)**: `/` or `Ctrl+F` to search, `n`/`N` to navigate matches
 
 #### Browser Preview (o key)
 - **HTML/HTM**: Direct browser opening
@@ -47,6 +48,7 @@ All terminal panes support:
 - Scrollback history (1000 lines by default)
 - Mouse wheel scrolling
 - Keyboard scrolling (Shift+PgUp/PgDn, Shift+Up/Down)
+- **Multi-line input (v0.17+)**: Use `\` + Enter in Claude Code pane for newlines
 
 #### Terminal Selection Mode (Ctrl+S or Mouse)
 Select and copy terminal output to Claude as a code block:
@@ -180,13 +182,16 @@ claude:
 | Ctrl+S | Save |
 | Ctrl+Z | Undo |
 | Ctrl+Y | Redo |
+| / or Ctrl+F | Search (incremental) |
+| n / N | Next / Previous match |
 | PageUp/Down | Scroll 10 lines |
 | Home/End | Jump to start/end |
-| Esc | Exit editor |
+| Esc | Exit editor / Close search |
 
 #### Terminal Panes
 | Key | Action |
 |-----|--------|
+| \\ + Enter | Insert newline in Claude Code (F4) |
 | Ctrl+S | Start selection |
 | Shift+PgUp/PgDn | Scroll 10 lines |
 | Shift+Up/Down | Scroll 1 line |
@@ -235,6 +240,7 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer, entwickelt für KI
 - Integrierter Texteditor mit Undo/Redo-Unterstützung (via tui-textarea)
 - Scrollbare Vorschau mit Tastatur- und Mausnavigation
 - PageUp/PageDown, Home/End für schnelle Navigation
+- **Inkrementelle Suche (v0.17+)**: `/` oder `Ctrl+F` zum Suchen, `n`/`N` zum Navigieren
 
 #### Browser-Vorschau (o-Taste)
 - **HTML/HTM**: Direkte Browser-Öffnung
@@ -253,6 +259,7 @@ Alle Terminal-Bereiche unterstützen:
 - Scrollback-Verlauf (standardmäßig 1000 Zeilen)
 - Mausrad-Scrolling
 - Tastatur-Scrolling (Shift+PgUp/PgDn, Shift+Up/Down)
+- **Mehrzeilige Eingabe (v0.17+)**: `\` + Enter für Zeilenumbruch im Claude Code Pane
 
 #### Terminal-Auswahlmodus (Ctrl+S oder Maus)
 Terminal-Ausgabe auswählen und als Code-Block an Claude kopieren:
@@ -386,13 +393,16 @@ claude:
 | Ctrl+S | Speichern |
 | Ctrl+Z | Rückgängig |
 | Ctrl+Y | Wiederholen |
+| / oder Ctrl+F | Suche (inkrementell) |
+| n / N | Nächster / Vorheriger Treffer |
 | PageUp/Down | 10 Zeilen scrollen |
 | Home/End | An Anfang/Ende springen |
-| Esc | Editor verlassen |
+| Esc | Editor verlassen / Suche schließen |
 
 #### Terminal-Bereiche
 | Taste | Aktion |
 |-------|--------|
+| \\ + Enter | Zeilenumbruch im Claude Code Pane (F4) |
 | Ctrl+S | Auswahl starten |
 | Shift+PgUp/PgDn | 10 Zeilen scrollen |
 | Shift+Up/Down | 1 Zeile scrollen |

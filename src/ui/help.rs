@@ -15,7 +15,7 @@ fn help_content() -> Vec<Line<'static>> {
     vec![
         // Title
         Line::from(Span::styled(
-            "Claude Workbench v0.15.0 Help",
+            "Claude Workbench v0.17.0 Help",
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
         )),
         Line::from("═".repeat(40)),
@@ -229,6 +229,31 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Jump to start/end"),
         ]),
         Line::from(""),
+        Line::from(Span::styled(
+            "  Search (incremental):",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(vec![
+            Span::styled("  / or Ctrl+F  ", Style::default().fg(Color::Green)),
+            Span::raw("Start search"),
+        ]),
+        Line::from(vec![
+            Span::styled("  n / N        ", Style::default().fg(Color::Green)),
+            Span::raw("Next / Previous match"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+N/P     ", Style::default().fg(Color::Green)),
+            Span::raw("Navigate while typing"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Enter        ", Style::default().fg(Color::Green)),
+            Span::raw("Confirm search"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Esc          ", Style::default().fg(Color::Green)),
+            Span::raw("Cancel search"),
+        ]),
+        Line::from(""),
 
         // Editor Mode
         Line::from(Span::styled(
@@ -265,6 +290,10 @@ fn help_content() -> Vec<Line<'static>> {
         )),
         Line::from(""),
         Line::from("  All keys map to PTY (shell input)."),
+        Line::from(vec![
+            Span::styled("  \\ + Enter   ", Style::default().fg(Color::Cyan)),
+            Span::raw("Insert newline in Claude Code (F4)"),
+        ]),
         Line::from(vec![
             Span::styled("  Shift+PgUp   ", Style::default().fg(Color::Cyan)),
             Span::raw("Scroll 10 lines up"),
