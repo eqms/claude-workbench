@@ -344,6 +344,14 @@ impl MouseSelection {
     }
 }
 
+/// Search mode: Search only vs. Search & Replace (MC Edit style)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SearchMode {
+    #[default]
+    Search,
+    Replace,
+}
+
 /// Search state for Preview/Edit mode
 #[derive(Debug, Clone, Default)]
 pub struct SearchState {
@@ -357,6 +365,12 @@ pub struct SearchState {
     pub current_match: usize,
     /// Case-sensitive search
     pub case_sensitive: bool,
+    /// Search mode: Search only or Search & Replace
+    pub mode: SearchMode,
+    /// Replacement text (for Replace mode)
+    pub replace_text: String,
+    /// Which field has focus: false = search, true = replace
+    pub focus_on_replace: bool,
 }
 
 impl SearchState {
@@ -366,6 +380,9 @@ impl SearchState {
         self.query.clear();
         self.matches.clear();
         self.current_match = 0;
+        self.mode = SearchMode::Search;
+        self.replace_text.clear();
+        self.focus_on_replace = false;
     }
 
     /// Close search mode and clear state
@@ -374,6 +391,30 @@ impl SearchState {
         self.query.clear();
         self.matches.clear();
         self.current_match = 0;
+        self.mode = SearchMode::Search;
+        self.replace_text.clear();
+        self.focus_on_replace = false;
+    }
+
+    /// Toggle between Search and Replace mode
+    pub fn toggle_replace_mode(&mut self) {
+        match self.mode {
+            SearchMode::Search => {
+                self.mode = SearchMode::Replace;
+                self.focus_on_replace = false;
+            }
+            SearchMode::Replace => {
+                self.mode = SearchMode::Search;
+                self.focus_on_replace = false;
+            }
+        }
+    }
+
+    /// Switch focus between search and replace fields (Tab key)
+    pub fn toggle_field_focus(&mut self) {
+        if self.mode == SearchMode::Replace {
+            self.focus_on_replace = !self.focus_on_replace;
+        }
     }
 
     /// Move to next match (wraps around)
@@ -396,6 +437,11 @@ impl SearchState {
     /// Get the line number of the current match
     pub fn current_match_line(&self) -> Option<usize> {
         self.matches.get(self.current_match).map(|(line, _, _)| *line)
+    }
+
+    /// Get current match position: (line, start_col, end_col)
+    pub fn get_current_match(&self) -> Option<(usize, usize, usize)> {
+        self.matches.get(self.current_match).copied()
     }
 
     /// Check if a position is a match (for highlighting)

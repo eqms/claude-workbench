@@ -237,12 +237,20 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "  Search (incremental):",
+            "  Search & Replace (MC Edit style):",
             Style::default().fg(Color::DarkGray),
         )),
         Line::from(vec![
             Span::styled("  / or Ctrl+F  ", Style::default().fg(Color::Green)),
             Span::raw("Start search"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F4           ", Style::default().fg(Color::Green)),
+            Span::raw("Search (Edit mode) / Toggle Replace mode"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Tab          ", Style::default().fg(Color::Green)),
+            Span::raw("Switch Find/Replace fields"),
         ]),
         Line::from(vec![
             Span::styled("  n / N        ", Style::default().fg(Color::Green)),
@@ -253,8 +261,16 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Navigate while typing"),
         ]),
         Line::from(vec![
+            Span::styled("  Ctrl+I       ", Style::default().fg(Color::Green)),
+            Span::raw("Toggle case sensitivity"),
+        ]),
+        Line::from(vec![
             Span::styled("  Enter        ", Style::default().fg(Color::Green)),
-            Span::raw("Confirm search"),
+            Span::raw("Confirm / Replace current"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F6           ", Style::default().fg(Color::Green)),
+            Span::raw("Replace all matches"),
         ]),
         Line::from(vec![
             Span::styled("  Esc          ", Style::default().fg(Color::Green)),

@@ -11,30 +11,24 @@ use std::time::SystemTime;
 use crate::types::{GitFileStatus, GitRepoInfo};
 use crate::git;
 
-/// Format file modification date for display
-fn format_file_date(secs: u64) -> String {
-    let days = secs / 86400;
-    let time_secs = secs % 86400;
-    let hours = time_secs / 3600;
-    let minutes = (time_secs % 3600) / 60;
+/// Format file modification date for display using local timezone
+fn format_file_date(utc_secs: u64) -> String {
+    // Use libc localtime_r for proper timezone conversion
+    let time_t = utc_secs as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
 
-    let (year, month, day) = days_to_date(days as i64);
+    unsafe {
+        libc::localtime_r(&time_t, &mut tm);
+    }
+
+    // tm_year is years since 1900, tm_mon is 0-11
+    let year = tm.tm_year + 1900;
+    let month = tm.tm_mon + 1;
+    let day = tm.tm_mday;
+    let hours = tm.tm_hour;
+    let minutes = tm.tm_min;
+
     format!("{:02}.{:02}.{} {:02}:{:02}", day, month, year, hours, minutes)
-}
-
-/// Convert days since Unix epoch to (year, month, day)
-fn days_to_date(days: i64) -> (i32, u32, u32) {
-    let remaining = days + 719468;
-    let era = if remaining >= 0 { remaining / 146097 } else { (remaining - 146096) / 146097 };
-    let doe = (remaining - era * 146097) as u32;
-    let yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365*yoe + yoe/4 - yoe/100);
-    let mp = (5*doy + 2) / 153;
-    let d = doy - (153*mp + 2)/5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    (y as i32, m, d)
 }
 
 #[derive(Debug, Clone)]

@@ -1,4 +1,5 @@
 use ratatui::{
+    layout::{Constraint, Layout},
     prelude::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -9,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tui_textarea::TextArea;
 
-use crate::types::{EditorMode, SearchState};
+use crate::types::{EditorMode, SearchMode, SearchState};
 use crate::ui::syntax::SyntaxManager;
 
 /// Check if a file is a Markdown file based on extension
@@ -326,6 +327,138 @@ impl PreviewState {
     }
 
     // ============================================================
+    // Search & Replace Operations (MC Edit Style)
+    // ============================================================
+
+    /// Replace the current match with replacement text
+    /// Returns true if replacement was made
+    pub fn replace_current(&mut self) -> bool {
+        if self.mode != EditorMode::Edit {
+            return false;
+        }
+
+        let Some((line_idx, start_col, end_col)) = self.search.get_current_match() else {
+            return false;
+        };
+
+        let Some(editor) = &mut self.editor else {
+            return false;
+        };
+
+        // Get the line content
+        let lines = editor.lines();
+        if line_idx >= lines.len() {
+            return false;
+        }
+
+        let line = &lines[line_idx];
+        let chars: Vec<char> = line.chars().collect();
+
+        // Validate bounds
+        if start_col > chars.len() || end_col > chars.len() {
+            return false;
+        }
+
+        // Build new line content
+        let before: String = chars[..start_col].iter().collect();
+        let after: String = chars[end_col..].iter().collect();
+        let new_line = format!("{}{}{}", before, self.search.replace_text, after);
+
+        // Get all lines and rebuild with the modified line
+        let mut all_lines: Vec<String> = editor.lines().iter().cloned().collect();
+        all_lines[line_idx] = new_line;
+
+        // Rebuild the editor with modified content
+        let cursor_pos = (line_idx, start_col + self.search.replace_text.len());
+        let new_editor = tui_textarea::TextArea::new(all_lines);
+        self.editor = Some(new_editor);
+
+        // Move cursor to after the replacement
+        if let Some(editor) = &mut self.editor {
+            editor.move_cursor(tui_textarea::CursorMove::Jump(
+                cursor_pos.0 as u16,
+                cursor_pos.1 as u16,
+            ));
+        }
+
+        self.modified = true;
+        true
+    }
+
+    /// Replace current match and move to next
+    pub fn replace_and_next(&mut self, syntax_manager: &SyntaxManager) {
+        if self.replace_current() {
+            // Update syntax highlighting
+            self.update_edit_highlighting(syntax_manager);
+
+            // Re-run search to update matches
+            self.perform_search();
+
+            // Jump to current match (index stays same but points to next occurrence)
+            self.jump_to_current_match();
+        }
+    }
+
+    /// Replace all matches
+    /// Returns number of replacements made
+    pub fn replace_all(&mut self, syntax_manager: &SyntaxManager) -> usize {
+        if self.mode != EditorMode::Edit || self.search.matches.is_empty() {
+            return 0;
+        }
+
+        let Some(editor) = &self.editor else {
+            return 0;
+        };
+
+        let query = &self.search.query;
+        let replacement = &self.search.replace_text;
+
+        if query.is_empty() {
+            return 0;
+        }
+
+        // Get all lines and perform replacement
+        let mut lines: Vec<String> = editor.lines().iter().cloned().collect();
+        let mut total_replacements = 0;
+
+        for line in lines.iter_mut() {
+            if self.search.case_sensitive {
+                let count = line.matches(query.as_str()).count();
+                *line = line.replace(query.as_str(), replacement.as_str());
+                total_replacements += count;
+            } else {
+                // Case-insensitive replacement
+                let lower_query = query.to_lowercase();
+                let mut new_line = String::new();
+                let mut last_end = 0;
+                let lower_line = line.to_lowercase();
+
+                while let Some(start) = lower_line[last_end..].find(&lower_query) {
+                    let abs_start = last_end + start;
+                    new_line.push_str(&line[last_end..abs_start]);
+                    new_line.push_str(replacement);
+                    last_end = abs_start + query.len();
+                    total_replacements += 1;
+                }
+                new_line.push_str(&line[last_end..]);
+                *line = new_line;
+            }
+        }
+
+        // Rebuild the editor with modified content
+        let new_editor = tui_textarea::TextArea::new(lines);
+        self.editor = Some(new_editor);
+
+        // Clear matches and update state
+        self.search.matches.clear();
+        self.search.current_match = 0;
+        self.modified = true;
+        self.update_edit_highlighting(syntax_manager);
+
+        total_replacements
+    }
+
+    // ============================================================
     // MC Edit Style Block Operations
     // ============================================================
 
@@ -430,6 +563,70 @@ impl PreviewState {
     }
 }
 
+/// Calculate the width needed for line number gutter based on total line count
+/// Returns total gutter width including separator: " 123 │"
+fn calculate_gutter_width(total_lines: usize) -> u16 {
+    if total_lines == 0 {
+        return 4; // Minimum: " 1 │"
+    }
+    let digits = ((total_lines as f64).log10().floor() as u16) + 1;
+    digits + 3 // " " + digits + " │"
+}
+
+/// Render line numbers gutter
+fn render_gutter(
+    f: &mut Frame,
+    gutter_area: Rect,
+    total_lines: usize,
+    scroll_offset: usize,
+    current_line: Option<usize>,
+    visible_height: usize,
+) {
+    let width = gutter_area.width.saturating_sub(2) as usize; // Space for separator "│"
+
+    let mut gutter_lines: Vec<Line<'static>> = Vec::new();
+
+    for visible_row in 0..visible_height {
+        let line_number = scroll_offset + visible_row + 1; // 1-based line numbers
+
+        if line_number > total_lines {
+            // Empty line beyond content (show tilde like vim)
+            let line = Line::from(vec![
+                Span::styled(
+                    format!("{:>width$} ", "~", width = width),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("│", Style::default().fg(Color::DarkGray)),
+            ]);
+            gutter_lines.push(line);
+        } else {
+            let is_current = current_line.map_or(false, |cl| cl + 1 == line_number);
+
+            let number_style = if is_current {
+                // Current line: highlighted (yellow/bold)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                // Regular line numbers: dimmed
+                Style::default().fg(Color::DarkGray)
+            };
+
+            let line = Line::from(vec![
+                Span::styled(
+                    format!("{:>width$} ", line_number, width = width),
+                    number_style,
+                ),
+                Span::styled("│", Style::default().fg(Color::DarkGray)),
+            ]);
+            gutter_lines.push(line);
+        }
+    }
+
+    let gutter_paragraph = Paragraph::new(gutter_lines);
+    f.render_widget(gutter_paragraph, gutter_area);
+}
+
 pub fn render(
     f: &mut Frame,
     area: Rect,
@@ -466,21 +663,46 @@ pub fn render(
             if let Some(editor) = &state.editor {
                 let inner = block.inner(editor_area);
                 let (cursor_row, cursor_col) = editor.cursor();
+                let editor_lines = editor.lines();
+                let total_lines = editor_lines.len();
+
+                // Calculate gutter width and split inner area
+                let gutter_width = calculate_gutter_width(total_lines);
+                let chunks = Layout::horizontal([
+                    Constraint::Length(gutter_width),
+                    Constraint::Min(1),
+                ])
+                .split(inner);
+
+                let gutter_area = chunks[0];
+                let content_area = chunks[1];
 
                 // Calculate scroll to keep cursor visible
-                let visible_height = inner.height.saturating_sub(1) as usize;
+                let visible_height = content_area.height as usize;
                 let scroll_offset = if cursor_row >= visible_height {
                     cursor_row.saturating_sub(visible_height / 2)
                 } else {
                     0
                 };
 
+                // Render the block (border) first
+                f.render_widget(block, editor_area);
+
+                // Render line numbers gutter
+                render_gutter(
+                    f,
+                    gutter_area,
+                    total_lines,
+                    scroll_offset,
+                    Some(cursor_row),
+                    visible_height,
+                );
+
                 // Get selection range for visualization
                 let selection = state.get_selection_range();
 
                 // Build lines with cursor and selection highlighting
                 let mut lines_with_cursor: Vec<Line<'static>> = Vec::new();
-                let editor_lines = editor.lines();
 
                 for (idx, line_content) in editor_lines.iter().enumerate() {
                     // Get the highlighted line if available, otherwise use plain text
@@ -505,20 +727,19 @@ pub fn render(
                     }
                 }
 
+                // Render content without block (block already rendered)
                 let paragraph = Paragraph::new(lines_with_cursor)
-                    .block(block)
                     .scroll((scroll_offset as u16, 0));
 
-                f.render_widget(paragraph, editor_area);
+                f.render_widget(paragraph, content_area);
 
                 // Scrollbar
-                let content_length = editor_lines.len();
-                if content_length > 0 {
+                if total_lines > 0 {
                     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                         .begin_symbol(Some("▲"))
                         .end_symbol(Some("▼"));
 
-                    let mut scrollbar_state = ScrollbarState::new(content_length)
+                    let mut scrollbar_state = ScrollbarState::new(total_lines)
                         .position(scroll_offset);
 
                     f.render_stateful_widget(scrollbar, editor_area, &mut scrollbar_state);
@@ -529,11 +750,39 @@ pub fn render(
             render_edit_shortcuts(f, shortcut_area, state.block_marking);
         }
         EditorMode::ReadOnly => {
+            let total_lines = state.highlighted_lines.len();
+            let scroll_offset = state.scroll as usize;
+
+            // Render block first
+            f.render_widget(block.clone(), area);
+
+            // Calculate inner area and split for gutter
+            let inner = block.inner(area);
+            let gutter_width = calculate_gutter_width(total_lines);
+            let chunks = Layout::horizontal([
+                Constraint::Length(gutter_width),
+                Constraint::Min(1),
+            ])
+            .split(inner);
+
+            let gutter_area = chunks[0];
+            let content_area = chunks[1];
+            let visible_height = content_area.height as usize;
+
+            // Render line numbers gutter (no current line in ReadOnly)
+            render_gutter(
+                f,
+                gutter_area,
+                total_lines,
+                scroll_offset,
+                None, // No current line highlighting in ReadOnly mode
+                visible_height,
+            );
+
             // Apply selection highlighting if active
             // NOTE: selection_range is in SCREEN coordinates (0 = first visible line)
             // We need to adjust by scroll offset to get content line indices
             let lines = if let Some((start, end)) = selection_range {
-                let scroll_offset = state.scroll as usize;
                 let adjusted_start = start + scroll_offset;
                 let adjusted_end = end + scroll_offset;
                 state.highlighted_lines.iter().enumerate().map(|(idx, line)| {
@@ -554,23 +803,21 @@ pub fn render(
                 state.highlighted_lines.clone()
             };
 
-            // Render highlighted content in read-only mode
+            // Render highlighted content in read-only mode (without block, already rendered)
             let paragraph = Paragraph::new(lines)
-                .block(block)
                 .wrap(Wrap { trim: false })
                 .scroll((state.scroll, 0));
 
-            f.render_widget(paragraph, area);
+            f.render_widget(paragraph, content_area);
 
             // Scrollbar for read-only mode
-            let content_length = state.highlighted_lines.len();
-            if content_length > 0 {
+            if total_lines > 0 {
                 let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("▲"))
                     .end_symbol(Some("▼"));
 
-                let mut scrollbar_state = ScrollbarState::new(content_length)
-                    .position(state.scroll as usize);
+                let mut scrollbar_state = ScrollbarState::new(total_lines)
+                    .position(scroll_offset);
 
                 f.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
             }
@@ -583,17 +830,24 @@ pub fn render(
     }
 }
 
-/// Render the search bar at the bottom of the preview area
+/// Render the search/replace bar at the bottom of the preview area
 fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
-    // Position search bar at the bottom of the preview area (inside borders)
-    let search_area = Rect {
+    let is_replace_mode = state.search.mode == SearchMode::Replace;
+    let bar_height: u16 = if is_replace_mode { 3 } else { 1 };
+
+    // Position bar at the bottom of the preview area (inside borders)
+    let bar_area = Rect {
         x: area.x + 1,
-        y: area.y + area.height.saturating_sub(2),
+        y: area.y + area.height.saturating_sub(bar_height + 1),
         width: area.width.saturating_sub(2),
-        height: 1,
+        height: bar_height,
     };
 
-    // Build search bar text with match count
+    // Clear background for the entire bar area
+    let clear_bg = Paragraph::new("").style(Style::default().bg(Color::DarkGray));
+    f.render_widget(clear_bg, bar_area);
+
+    // Build match count info
     let match_info = if state.search.matches.is_empty() {
         if state.search.query.is_empty() {
             String::new()
@@ -608,20 +862,89 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
         )
     };
 
-    let search_text = format!("/{}{}", state.search.query, match_info);
+    // Case sensitivity indicator
+    let case_indicator = if state.search.case_sensitive { "[Aa]" } else { "[aa]" };
 
-    // Style: dark gray background, white text, with cursor indicator
-    let cursor_indicator = "█";
-    let display_text = format!("{}{}", search_text, cursor_indicator);
+    // Search line
+    let search_line_area = Rect {
+        x: bar_area.x,
+        y: bar_area.y,
+        width: bar_area.width,
+        height: 1,
+    };
 
-    let search_widget = Paragraph::new(display_text).style(
-        Style::default()
-            .fg(Color::White)
-            .bg(Color::DarkGray)
-            .add_modifier(Modifier::BOLD),
-    );
+    let search_focused = !state.search.focus_on_replace;
+    let search_cursor = if search_focused { "█" } else { "" };
+    let search_label = if is_replace_mode { "Find: " } else { "/" };
 
-    f.render_widget(search_widget, search_area);
+    let search_style = if search_focused {
+        Style::default().fg(Color::Yellow).bg(Color::DarkGray)
+    } else {
+        Style::default().fg(Color::White).bg(Color::DarkGray)
+    };
+
+    let search_line = Line::from(vec![
+        Span::styled(search_label, Style::default().fg(Color::Cyan).bg(Color::DarkGray)),
+        Span::styled(state.search.query.clone(), search_style),
+        Span::styled(search_cursor, Style::default().fg(Color::White).bg(Color::DarkGray)),
+        Span::styled(match_info, Style::default().fg(Color::Gray).bg(Color::DarkGray)),
+        Span::styled(format!(" {}", case_indicator), Style::default().fg(Color::DarkGray).bg(Color::DarkGray)),
+    ]);
+
+    f.render_widget(Paragraph::new(search_line), search_line_area);
+
+    // Replace line and hints (only in Replace mode)
+    if is_replace_mode {
+        let replace_line_area = Rect {
+            x: bar_area.x,
+            y: bar_area.y + 1,
+            width: bar_area.width,
+            height: 1,
+        };
+
+        let replace_focused = state.search.focus_on_replace;
+        let replace_cursor = if replace_focused { "█" } else { "" };
+
+        let replace_style = if replace_focused {
+            Style::default().fg(Color::Yellow).bg(Color::DarkGray)
+        } else {
+            Style::default().fg(Color::White).bg(Color::DarkGray)
+        };
+
+        let replace_line = Line::from(vec![
+            Span::styled("Repl: ", Style::default().fg(Color::Cyan).bg(Color::DarkGray)),
+            Span::styled(state.search.replace_text.clone(), replace_style),
+            Span::styled(replace_cursor, Style::default().fg(Color::White).bg(Color::DarkGray)),
+        ]);
+
+        f.render_widget(Paragraph::new(replace_line), replace_line_area);
+
+        // Shortcut hints line
+        let hints_area = Rect {
+            x: bar_area.x,
+            y: bar_area.y + 2,
+            width: bar_area.width,
+            height: 1,
+        };
+
+        let edit_mode_available = state.mode == EditorMode::Edit;
+        let hint_style = if edit_mode_available {
+            Style::default().fg(Color::Gray).bg(Color::DarkGray)
+        } else {
+            Style::default().fg(Color::Red).bg(Color::DarkGray)
+        };
+
+        let hints = if edit_mode_available {
+            "Tab:Field  Enter:Replace  F6:All  n:Next  N:Prev  ^I:Case  Esc:Close"
+        } else {
+            "[Read-only - press E to edit]  n:Next  N:Prev  Esc:Close"
+        };
+
+        f.render_widget(
+            Paragraph::new(hints).style(hint_style),
+            hints_area,
+        );
+    }
 }
 
 /// Insert a cursor (reversed style) into a line at the given column

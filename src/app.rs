@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::config::Config;
 use crate::session::SessionState;
 use crate::ui;
-use crate::types::{EditorMode, PaneId, TerminalSelection, DragState, HelpState, MouseSelection, GitRemoteState, GitRemoteCheckResult};
+use crate::types::{EditorMode, PaneId, TerminalSelection, DragState, HelpState, MouseSelection, GitRemoteState, GitRemoteCheckResult, SearchMode};
 use crate::terminal::PseudoTerminal;
 use std::borrow::Cow;
 use std::path::Path;
@@ -956,19 +956,67 @@ impl App {
                                     }
 
                                     PaneId::Preview => {
-                                        // Search mode handling (priority over other modes)
+                                        // Search/Replace mode handling (priority over other modes)
                                         if self.preview.search.active {
                                             match key.code {
                                                 KeyCode::Esc => {
                                                     self.preview.search.close();
                                                     continue;
                                                 }
-                                                KeyCode::Enter => {
-                                                    // Confirm search and close
-                                                    self.preview.jump_to_current_match();
-                                                    self.preview.search.active = false; // Keep query for n/N navigation
+                                                // F4: Toggle between Search and Replace mode
+                                                KeyCode::F(4) => {
+                                                    self.preview.search.toggle_replace_mode();
                                                     continue;
                                                 }
+                                                // Tab: Switch between search/replace fields (only in Replace mode)
+                                                KeyCode::Tab => {
+                                                    self.preview.search.toggle_field_focus();
+                                                    continue;
+                                                }
+                                                // Ctrl+I: Toggle case sensitivity
+                                                KeyCode::Char('i') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                                    self.preview.search.case_sensitive = !self.preview.search.case_sensitive;
+                                                    self.preview.perform_search();
+                                                    continue;
+                                                }
+                                                KeyCode::Char('\x09') => {
+                                                    // Ctrl+I as control char
+                                                    self.preview.search.case_sensitive = !self.preview.search.case_sensitive;
+                                                    self.preview.perform_search();
+                                                    continue;
+                                                }
+                                                // Enter: In Search mode = confirm and close
+                                                //        In Replace mode = replace current and move to next
+                                                KeyCode::Enter => {
+                                                    if self.preview.search.mode == SearchMode::Replace && self.preview.mode == EditorMode::Edit {
+                                                        self.preview.replace_and_next(&self.syntax_manager);
+                                                    } else {
+                                                        self.preview.jump_to_current_match();
+                                                        self.preview.search.active = false; // Keep query for n/N navigation
+                                                    }
+                                                    continue;
+                                                }
+                                                // F6: Replace all (only in Replace mode)
+                                                KeyCode::F(6) if self.preview.search.mode == SearchMode::Replace => {
+                                                    if self.preview.mode == EditorMode::Edit {
+                                                        let _count = self.preview.replace_all(&self.syntax_manager);
+                                                        // Could show count in status
+                                                    }
+                                                    continue;
+                                                }
+                                                // n: Next match (when not focused on replace field)
+                                                KeyCode::Char('n') if !self.preview.search.focus_on_replace && !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                                    self.preview.search.next_match();
+                                                    self.preview.jump_to_current_match();
+                                                    continue;
+                                                }
+                                                // N: Previous match (when not focused on replace field)
+                                                KeyCode::Char('N') if !self.preview.search.focus_on_replace => {
+                                                    self.preview.search.prev_match();
+                                                    self.preview.jump_to_current_match();
+                                                    continue;
+                                                }
+                                                // Ctrl+N: Next match while typing
                                                 KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                                                     self.preview.search.next_match();
                                                     self.preview.jump_to_current_match();
@@ -979,28 +1027,45 @@ impl App {
                                                     self.preview.jump_to_current_match();
                                                     continue;
                                                 }
+                                                // Backspace: Delete from active field
                                                 KeyCode::Backspace => {
-                                                    self.preview.search.query.pop();
-                                                    self.preview.perform_search();
-                                                    self.preview.jump_to_current_match();
+                                                    if self.preview.search.focus_on_replace {
+                                                        self.preview.search.replace_text.pop();
+                                                    } else {
+                                                        self.preview.search.query.pop();
+                                                        self.preview.perform_search();
+                                                        self.preview.jump_to_current_match();
+                                                    }
                                                     continue;
                                                 }
+                                                // Character input to active field
                                                 KeyCode::Char(c) => {
-                                                    self.preview.search.query.push(c);
-                                                    self.preview.perform_search();
-                                                    self.preview.jump_to_current_match();
+                                                    if self.preview.search.focus_on_replace {
+                                                        self.preview.search.replace_text.push(c);
+                                                    } else {
+                                                        self.preview.search.query.push(c);
+                                                        self.preview.perform_search();
+                                                        self.preview.jump_to_current_match();
+                                                    }
                                                     continue;
                                                 }
                                                 _ => { continue; }
                                             }
                                         }
 
-                                        // Check for search trigger (/ in read-only, Ctrl+F in any mode)
+                                        // Check for search trigger (/ in read-only, Ctrl+F in any mode, F4 in Edit mode)
                                         let is_ctrl_f = (key.code == KeyCode::Char('f') && key.modifiers.contains(KeyModifiers::CONTROL))
                                             || key.code == KeyCode::Char('\x06'); // Ctrl+F as control char
                                         let is_slash = key.code == KeyCode::Char('/') && self.preview.mode == EditorMode::ReadOnly;
+                                        let is_f4_in_edit = key.code == KeyCode::F(4) && self.preview.mode == EditorMode::Edit;
 
                                         if is_ctrl_f || is_slash {
+                                            self.preview.search.open();
+                                            continue;
+                                        }
+
+                                        // F4 in Edit mode: Open search (can toggle to Replace with F4 again)
+                                        if is_f4_in_edit {
                                             self.preview.search.open();
                                             continue;
                                         }

@@ -194,7 +194,7 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
             let buttons = Line::from(vec![
                 Span::styled(" [Y] Yes ", Style::default().bg(Color::Cyan).fg(Color::Black)),
                 Span::raw("   "),
-                Span::styled(" [N] No ", Style::default().bg(Color::Gray).fg(Color::White)),
+                Span::styled(" [N] No ", Style::default().bg(Color::Red).fg(Color::White)),
             ]);
             f.render_widget(Paragraph::new(buttons), Rect::new(inner.x, button_y, inner.width, 1));
         }
