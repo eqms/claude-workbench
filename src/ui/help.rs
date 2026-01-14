@@ -15,7 +15,7 @@ fn help_content() -> Vec<Line<'static>> {
     vec![
         // Title
         Line::from(Span::styled(
-            "Claude Workbench v0.17.0 Help",
+            "Claude Workbench v0.18.0 Help",
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
         )),
         Line::from("═".repeat(40)),
@@ -171,6 +171,13 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw(": Conflict (!)"),
         ]),
         Line::from(""),
+        Line::from(Span::styled(
+            "  Git Remote (new in v0.18):",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from("  - Auto-checks for remote changes on repo switch"),
+        Line::from("  - Prompts to pull if remote is ahead"),
+        Line::from(""),
 
         // Browser Preview
         Line::from(Span::styled(
@@ -274,12 +281,37 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Undo"),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+Y       ", Style::default().fg(Color::Cyan)),
-            Span::raw("Redo"),
-        ]),
-        Line::from(vec![
             Span::styled("  Esc          ", Style::default().fg(Color::Cyan)),
             Span::raw("Exit (confirm if modified)"),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  MC Edit Style Selection:",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(vec![
+            Span::styled("  Shift+↑/↓/←/→", Style::default().fg(Color::Green)),
+            Span::raw("Select text with cursor"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F3           ", Style::default().fg(Color::Green)),
+            Span::raw("Toggle block marking mode"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F5           ", Style::default().fg(Color::Green)),
+            Span::raw("Copy selected block"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F6           ", Style::default().fg(Color::Green)),
+            Span::raw("Move (cut) selected block"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F8           ", Style::default().fg(Color::Green)),
+            Span::raw("Delete selected block"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+Y       ", Style::default().fg(Color::Green)),
+            Span::raw("Delete current line"),
         ]),
         Line::from(""),
 
@@ -309,6 +341,23 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled("  Ctrl+S       ", Style::default().fg(Color::Cyan)),
             Span::raw("Start Selection Mode"),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  CLI Navigation (new in v0.18):",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(vec![
+            Span::styled("  Alt+← / Alt+→", Style::default().fg(Color::Green)),
+            Span::raw("Word navigation (back/forward)"),
+        ]),
+        Line::from(vec![
+            Span::styled("  PageUp       ", Style::default().fg(Color::Green)),
+            Span::raw("Jump to line start (Home)"),
+        ]),
+        Line::from(vec![
+            Span::styled("  PageDown     ", Style::default().fg(Color::Green)),
+            Span::raw("Jump to line end (End)"),
         ]),
         Line::from(""),
 

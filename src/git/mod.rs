@@ -3,10 +3,11 @@
 //! Provides git status information for files and directories.
 //! Uses git CLI for maximum compatibility.
 
-use crate::types::{GitFileStatus, GitRepoInfo};
+use crate::types::{GitFileStatus, GitRemoteCheckResult, GitRepoInfo};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::mpsc;
 
 /// Find the git repository root for a given path
 pub fn find_repo_root(path: &Path) -> Option<PathBuf> {
@@ -142,6 +143,114 @@ pub fn aggregate_directory_status(
     }
 
     highest_priority
+}
+
+// ============================================================
+// Git Remote Operations (for pull detection)
+// ============================================================
+
+/// Check how many commits the remote is ahead of local
+/// Returns None if no upstream configured or on error
+fn get_commits_behind(repo_root: &Path, branch: &str) -> Option<usize> {
+    // Get the upstream tracking branch
+    let output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", &format!("{}@{{upstream}}", branch)])
+        .current_dir(repo_root)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None; // No upstream configured
+    }
+
+    let upstream = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    // Count commits: local..remote (how many commits remote is ahead)
+    let output = Command::new("git")
+        .args(["rev-list", "--count", &format!("{}..{}", branch, upstream)])
+        .current_dir(repo_root)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse()
+            .ok()
+    } else {
+        None
+    }
+}
+
+/// Check for remote changes asynchronously (fetch + count commits behind)
+/// Returns a receiver that will receive the result when ready
+pub fn check_remote_changes_async(
+    repo_root: &Path,
+    branch: &str,
+) -> mpsc::Receiver<GitRemoteCheckResult> {
+    let repo = repo_root.to_path_buf();
+    let branch = branch.to_string();
+    let (tx, rx) = mpsc::channel();
+
+    std::thread::spawn(move || {
+        // Step 1: Fetch from remote (quiet mode, don't merge)
+        let fetch_result = Command::new("git")
+            .args(["fetch", "--quiet"])
+            .current_dir(&repo)
+            .output();
+
+        if let Err(e) = fetch_result {
+            let _ = tx.send(GitRemoteCheckResult::Error(e.to_string()));
+            return;
+        }
+
+        let fetch_output = fetch_result.unwrap();
+        if !fetch_output.status.success() {
+            // Fetch failed - might be no network or no remote
+            let stderr = String::from_utf8_lossy(&fetch_output.stderr).to_string();
+            if stderr.contains("Could not resolve") || stderr.contains("No remote") {
+                // No remote configured or no network - treat as up to date
+                let _ = tx.send(GitRemoteCheckResult::UpToDate);
+            } else {
+                let _ = tx.send(GitRemoteCheckResult::Error(stderr));
+            }
+            return;
+        }
+
+        // Step 2: Check how many commits behind we are
+        match get_commits_behind(&repo, &branch) {
+            Some(0) => {
+                let _ = tx.send(GitRemoteCheckResult::UpToDate);
+            }
+            Some(n) => {
+                let _ = tx.send(GitRemoteCheckResult::RemoteAhead {
+                    commits_ahead: n,
+                    branch: branch.clone(),
+                });
+            }
+            None => {
+                // No upstream configured - treat as up to date
+                let _ = tx.send(GitRemoteCheckResult::UpToDate);
+            }
+        }
+    });
+
+    rx
+}
+
+/// Execute git pull (blocking operation)
+pub fn pull(repo_root: &Path) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(["pull"])
+        .current_dir(repo_root)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
 }
 
 #[cfg(test)]

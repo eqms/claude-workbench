@@ -45,6 +45,9 @@ pub struct PreviewState {
 
     // Search state
     pub search: SearchState,
+
+    // MC Edit style block marking mode
+    pub block_marking: bool,
 }
 
 impl Default for PreviewState {
@@ -62,6 +65,7 @@ impl Default for PreviewState {
             edit_highlighted_lines: Vec::new(),
             is_markdown: false,
             search: SearchState::default(),
+            block_marking: false,
         }
     }
 }
@@ -261,6 +265,85 @@ impl PreviewState {
         if let Some(line) = self.search.current_match_line() {
             self.scroll = line as u16;
         }
+    }
+
+    // ============================================================
+    // MC Edit Style Block Operations
+    // ============================================================
+
+    /// Toggle block marking mode (MC F3)
+    pub fn toggle_block_marking(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            if self.block_marking {
+                // End marking - keep selection visible
+                self.block_marking = false;
+            } else {
+                // Start marking - begin selection at cursor
+                editor.start_selection();
+                self.block_marking = true;
+            }
+        }
+    }
+
+    /// Copy selection to clipboard (MC F5)
+    pub fn copy_block(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            editor.copy();
+            // Don't cancel selection after copy - user might want to see what was copied
+        }
+    }
+
+    /// Move (cut) selection (MC F6)
+    /// User should position cursor and paste (Ctrl+V) to complete move
+    pub fn move_block(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            editor.cut();
+            self.block_marking = false;
+        }
+    }
+
+    /// Delete selection (MC F8)
+    pub fn delete_block(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            // Cut deletes selected text and stores in yank buffer
+            editor.cut();
+            editor.cancel_selection();
+            self.block_marking = false;
+        }
+    }
+
+    /// Delete current line (Ctrl+Y in MC)
+    pub fn delete_line(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            use tui_textarea::CursorMove;
+            // Move to beginning of line
+            editor.move_cursor(CursorMove::Head);
+            // Delete entire line including newline
+            editor.delete_line_by_end();
+            // Delete the newline character to merge with next line
+            editor.delete_char();
+        }
+    }
+
+    /// Extend selection with Shift+Arrow keys
+    pub fn extend_selection(&mut self, direction: tui_textarea::CursorMove) {
+        if let Some(editor) = &mut self.editor {
+            // Start selection if not already marking
+            if !self.block_marking {
+                editor.start_selection();
+                self.block_marking = true;
+            }
+            // Move cursor to extend selection
+            editor.move_cursor(direction);
+        }
+    }
+
+    /// Cancel selection and exit block marking mode
+    pub fn cancel_selection(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            editor.cancel_selection();
+        }
+        self.block_marking = false;
     }
 }
 
@@ -508,6 +591,10 @@ fn build_title(state: &PreviewState) -> String {
     // Add mode indicator
     if state.mode == EditorMode::Edit {
         title.push_str(" EDIT");
+        // Add block marking indicator (MC style)
+        if state.block_marking {
+            title.push_str(" [BLOCK]");
+        }
     }
 
     title

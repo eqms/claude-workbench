@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::config::Config;
 use crate::session::SessionState;
 use crate::ui;
-use crate::types::{EditorMode, PaneId, TerminalSelection, DragState, HelpState, MouseSelection};
+use crate::types::{EditorMode, PaneId, TerminalSelection, DragState, HelpState, MouseSelection, GitRemoteState, GitRemoteCheckResult};
 use crate::terminal::PseudoTerminal;
 use std::borrow::Cow;
 use std::path::Path;
@@ -22,6 +22,7 @@ use crate::ui::settings::SettingsState;
 use crate::ui::about::AboutState;
 use crate::setup::wizard::WizardState;
 use crate::browser;
+use crate::git;
 
 pub struct App {
     pub config: Config,
@@ -56,6 +57,10 @@ pub struct App {
     pub drag_state: DragState,
     // Mouse-based text selection in terminal panes
     pub mouse_selection: MouseSelection,
+    // Git remote change detection state
+    pub git_remote: GitRemoteState,
+    // Receiver for async git remote check results
+    pub git_check_receiver: Option<std::sync::mpsc::Receiver<GitRemoteCheckResult>>,
 }
 
 impl App {
@@ -144,6 +149,8 @@ impl App {
             terminal_selection: TerminalSelection::default(),
             drag_state: DragState::default(),
             mouse_selection: MouseSelection::default(),
+            git_remote: GitRemoteState::default(),
+            git_check_receiver: None,
         };
 
         // Open wizard on first run
@@ -187,6 +194,9 @@ impl App {
                     self.last_refresh = std::time::Instant::now();
                 }
             }
+
+            // Poll for async git remote check results
+            self.poll_git_check();
 
             terminal.draw(|frame| self.draw(frame))?;
 
@@ -314,6 +324,7 @@ impl App {
                                                     self.file_browser.enter_selected();
                                                     self.update_preview();
                                                     self.sync_terminals();
+                                                    self.check_repo_change();
                                                 }
                                             }
                                         } else {
@@ -869,12 +880,14 @@ impl App {
                                                 } else {
                                                     self.update_preview();
                                                     self.sync_terminals();
+                                                    self.check_repo_change();
                                                 }
                                             }
                                             KeyCode::Backspace | KeyCode::Left | KeyCode::Char('h') => {
                                                 self.file_browser.go_parent();
                                                 self.update_preview();
                                                 self.sync_terminals();
+                                                self.check_repo_change();
                                             }
                                             // Open file in browser/external viewer
                                             KeyCode::Char('o') => {
@@ -962,9 +975,15 @@ impl App {
                                             // Check for Ctrl+S (save) - handle both modifier and control char
                                             let is_ctrl_s = (key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL))
                                                 || key.code == KeyCode::Char('\x13'); // Ctrl+S as control char
+                                            // Check for Ctrl+Y (delete line - MC Edit style)
+                                            let is_ctrl_y = (key.code == KeyCode::Char('y') && key.modifiers.contains(KeyModifiers::CONTROL))
+                                                || key.code == KeyCode::Char('\x19'); // Ctrl+Y as control char
 
                                             if key.code == KeyCode::Esc {
-                                                if self.preview.is_modified() {
+                                                // Cancel selection first if active, then exit
+                                                if self.preview.block_marking {
+                                                    self.preview.cancel_selection();
+                                                } else if self.preview.is_modified() {
                                                     // Show discard dialog
                                                     self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
                                                         title: "Unsaved Changes".to_string(),
@@ -980,6 +999,58 @@ impl App {
                                                 } else {
                                                     // Refresh highlighting after save
                                                     self.preview.refresh_highlighting(&self.syntax_manager);
+                                                }
+                                            }
+                                            // MC Edit style: Ctrl+Y = delete line
+                                            else if is_ctrl_y {
+                                                self.preview.delete_line();
+                                                self.preview.update_modified();
+                                                self.preview.update_edit_highlighting(&self.syntax_manager);
+                                            }
+                                            // MC Edit style: F3 = toggle block marking
+                                            else if key.code == KeyCode::F(3) {
+                                                self.preview.toggle_block_marking();
+                                            }
+                                            // MC Edit style: F5 = copy block
+                                            else if key.code == KeyCode::F(5) {
+                                                self.preview.copy_block();
+                                            }
+                                            // MC Edit style: F6 = move (cut) block
+                                            else if key.code == KeyCode::F(6) {
+                                                self.preview.move_block();
+                                                self.preview.update_modified();
+                                                self.preview.update_edit_highlighting(&self.syntax_manager);
+                                            }
+                                            // MC Edit style: F8 = delete block
+                                            else if key.code == KeyCode::F(8) {
+                                                self.preview.delete_block();
+                                                self.preview.update_modified();
+                                                self.preview.update_edit_highlighting(&self.syntax_manager);
+                                            }
+                                            // MC Edit style: Shift+Arrow = extend selection
+                                            else if key.modifiers.contains(KeyModifiers::SHIFT) {
+                                                use tui_textarea::CursorMove;
+                                                match key.code {
+                                                    KeyCode::Up => {
+                                                        self.preview.extend_selection(CursorMove::Up);
+                                                    }
+                                                    KeyCode::Down => {
+                                                        self.preview.extend_selection(CursorMove::Down);
+                                                    }
+                                                    KeyCode::Left => {
+                                                        self.preview.extend_selection(CursorMove::Back);
+                                                    }
+                                                    KeyCode::Right => {
+                                                        self.preview.extend_selection(CursorMove::Forward);
+                                                    }
+                                                    _ => {
+                                                        // Forward other Shift+key combos to TextArea
+                                                        if let Some(editor) = &mut self.preview.editor {
+                                                            editor.input(Event::Key(key));
+                                                            self.preview.update_modified();
+                                                            self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                        }
+                                                    }
                                                 }
                                             } else {
                                                 // Handle scrolling keys specially (TextArea moves cursor, not view)
@@ -1000,7 +1071,7 @@ impl App {
                                                         }
                                                     }
                                                     _ => {
-                                                        // Forward other keys to TextArea (handles Ctrl+Z, Ctrl+Y, etc.)
+                                                        // Forward other keys to TextArea (handles Ctrl+Z undo, etc.)
                                                         if let Some(editor) = &mut self.preview.editor {
                                                             editor.input(Event::Key(key));
                                                             self.preview.update_modified();
@@ -1302,6 +1373,72 @@ impl App {
         }
     }
 
+    /// Check if we've entered a different Git repository and start async remote check
+    fn check_repo_change(&mut self) {
+        // Find current repo root
+        let current_repo = git::find_repo_root(&self.file_browser.current_dir);
+
+        // Check if repo changed
+        let repo_changed = match (&current_repo, &self.git_remote.last_repo_root) {
+            (Some(curr), Some(last)) => curr != last,
+            (Some(_), None) => true,  // Entered a repo
+            (None, Some(_)) => false, // Left a repo, don't check
+            (None, None) => false,    // Still no repo
+        };
+
+        if repo_changed && !self.git_remote.checking {
+            if let Some(repo_root) = &current_repo {
+                // Get current branch
+                if let Some(branch) = git::get_current_branch(repo_root) {
+                    // Start async check
+                    self.git_remote.checking = true;
+                    self.git_check_receiver = Some(git::check_remote_changes_async(repo_root, &branch));
+                }
+            }
+        }
+
+        // Update last repo
+        self.git_remote.last_repo_root = current_repo;
+    }
+
+    /// Poll for git remote check results and show dialog if needed
+    fn poll_git_check(&mut self) {
+        if let Some(ref receiver) = self.git_check_receiver {
+            // Non-blocking check for result
+            if let Ok(result) = receiver.try_recv() {
+                self.git_remote.checking = false;
+
+                match result {
+                    GitRemoteCheckResult::RemoteAhead { commits_ahead, branch } => {
+                        // Show pull confirmation dialog
+                        if let Some(repo_root) = self.git_remote.last_repo_root.clone() {
+                            use ui::dialog::{DialogType, DialogAction};
+                            self.dialog.dialog_type = DialogType::Confirm {
+                                title: "Git Pull".to_string(),
+                                message: format!(
+                                    "Branch '{}' is {} commit{} behind remote. Pull now?",
+                                    branch,
+                                    commits_ahead,
+                                    if commits_ahead == 1 { "" } else { "s" }
+                                ),
+                                action: DialogAction::GitPull { repo_root },
+                            };
+                        }
+                    }
+                    GitRemoteCheckResult::UpToDate => {
+                        // No action needed
+                    }
+                    GitRemoteCheckResult::Error(_err) => {
+                        // Silently ignore errors (no network, no remote, etc.)
+                    }
+                }
+
+                // Clear receiver
+                self.git_check_receiver = None;
+            }
+        }
+    }
+
     fn handle_menu_action(&mut self, action: ui::menu::MenuAction) {
         use ui::menu::MenuAction;
         use ui::dialog::{DialogType, DialogAction};
@@ -1411,6 +1548,20 @@ impl App {
                 self.file_browser.enter_selected();
                 self.update_preview();
                 self.sync_terminals();
+                self.check_repo_change();
+            }
+            DialogAction::GitPull { repo_root } => {
+                // Execute git pull
+                match git::pull(&repo_root) {
+                    Ok(_output) => {
+                        // Refresh file browser to show any new/changed files
+                        self.file_browser.refresh();
+                    }
+                    Err(_err) => {
+                        // Pull failed - could show error dialog, but for now just ignore
+                        // The user will see the error in their terminal if they run git manually
+                    }
+                }
             }
         }
     }

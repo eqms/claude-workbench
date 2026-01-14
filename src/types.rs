@@ -413,3 +413,23 @@ impl SearchState {
             .unwrap_or(false)
     }
 }
+
+/// Result of checking for remote changes
+#[derive(Debug, Clone)]
+pub enum GitRemoteCheckResult {
+    /// No changes detected - local is up to date
+    UpToDate,
+    /// Remote has commits ahead of local
+    RemoteAhead { commits_ahead: usize, branch: String },
+    /// Check failed (network error, no remote configured, etc.)
+    Error(String),
+}
+
+/// State for tracking background git remote operations
+#[derive(Debug, Clone, Default)]
+pub struct GitRemoteState {
+    /// Last checked repo root (to detect when user enters different repo)
+    pub last_repo_root: Option<std::path::PathBuf>,
+    /// Whether a check is currently in progress
+    pub checking: bool,
+}
