@@ -112,7 +112,7 @@ pub struct FileBrowserConfig {
 impl Default for FileBrowserConfig {
     fn default() -> Self {
         Self {
-            show_hidden: false,
+            show_hidden: true,  // Show hidden files by default (toggle with '.')
             show_file_info: true,
             date_format: "%d.%m.%Y %H:%M:%S".to_string(),
             auto_refresh_ms: 2000, // 2 seconds

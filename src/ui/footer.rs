@@ -34,6 +34,11 @@ pub enum FooterAction {
     SelectUp,        // k/↑ (selection mode)
     SelectCopy,      // Enter/y (selection mode)
     SelectCancel,    // Esc (selection mode)
+    ToggleHidden,    // . (toggle hidden files)
+    ToggleBlock,     // F3 (MC Edit: toggle block marking)
+    CopyBlock,       // F5 (MC Edit: copy block)
+    MoveBlock,       // F6 (MC Edit: cut block)
+    DeleteBlock,     // F8 (MC Edit: delete block)
     None,            // No action (non-clickable)
 }
 
@@ -111,10 +116,11 @@ pub fn get_context_button_positions(
         vec![
             ("^S", "Save", FooterAction::Save),
             ("Esc", "Exit", FooterAction::ExitEdit),
-            ("^Z", "Undo", FooterAction::Undo),
-            ("^Y", "Redo", FooterAction::Redo),
-            ("F1", "Files", FooterAction::FocusFiles),
-            ("F4", "Claude", FooterAction::FocusClaude),
+            ("F3", "Block", FooterAction::ToggleBlock),
+            ("F5", "Copy", FooterAction::CopyBlock),
+            ("F6", "Move", FooterAction::MoveBlock),
+            ("F8", "Del", FooterAction::DeleteBlock),
+            ("^Y", "DelLn", FooterAction::Redo),  // Actually delete line in MC style
             ("F12", "Help", FooterAction::Help),
         ]
     } else if active_pane == PaneId::Preview {
@@ -151,10 +157,10 @@ pub fn get_context_button_positions(
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
             ("^P", "Find", FooterAction::FuzzyFind),
+            (".", "Hidden", FooterAction::ToggleHidden),
             ("o", "Open", FooterAction::OpenFile),
             ("O", "Finder", FooterAction::OpenFinder),
             ("^,", "Settings", FooterAction::Settings),
-            ("F10", "Info", FooterAction::About),
             ("F12", "Help", FooterAction::Help),
         ]
     };
@@ -187,14 +193,15 @@ impl Widget for Footer {
                 ("Esc", "Cancel"),
             ]
         } else if self.active_pane == PaneId::Preview && self.editor_mode == EditorMode::Edit {
-            // Edit mode keys
+            // Edit mode keys (MC Edit style)
             vec![
                 ("^S", "Save"),
                 ("Esc", "Exit"),
-                ("^Z", "Undo"),
-                ("^Y", "Redo"),
-                ("F1", "Files"),
-                ("F4", "Claude"),
+                ("F3", "Block"),
+                ("F5", "Copy"),
+                ("F6", "Move"),
+                ("F8", "Del"),
+                ("^Y", "DelLn"),
                 ("F12", "Help"),
             ]
         } else if self.active_pane == PaneId::Preview {
@@ -233,10 +240,10 @@ impl Widget for Footer {
                 ("F5", "Git"),
                 ("F6", "Term"),
                 ("^P", "Find"),
+                (".", "Hidden"),
                 ("o", "Open"),
                 ("O", "Finder"),
                 ("^,", "Settings"),
-                ("F10", "Info"),
                 ("F12", "Help"),
             ]
         };

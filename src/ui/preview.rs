@@ -48,6 +48,11 @@ pub struct PreviewState {
 
     // MC Edit style block marking mode
     pub block_marking: bool,
+    // Selection start position (row, col) for visualization
+    pub selection_start: Option<(usize, usize)>,
+
+    // File modification tracking for auto-refresh
+    pub last_modified: Option<std::time::SystemTime>,
 }
 
 impl Default for PreviewState {
@@ -66,6 +71,8 @@ impl Default for PreviewState {
             is_markdown: false,
             search: SearchState::default(),
             block_marking: false,
+            selection_start: None,
+            last_modified: None,
         }
     }
 }
@@ -95,6 +102,11 @@ impl PreviewState {
         if let Ok(content) = fs::read_to_string(&path) {
             self.content = content.clone();
             self.original_content = content.clone();
+
+            // Store file modification time for auto-refresh
+            self.last_modified = fs::metadata(&path)
+                .and_then(|m| m.modified())
+                .ok();
 
             // Use tui-markdown for markdown files, syntect for others
             if self.is_markdown {
@@ -132,6 +144,52 @@ impl PreviewState {
 
     pub fn scroll_up(&mut self) {
         self.scroll = self.scroll.saturating_sub(1);
+    }
+
+    /// Check if the currently displayed file has been modified externally
+    /// Returns true if the file needs to be reloaded
+    pub fn check_file_changed(&self) -> bool {
+        // Don't check if in edit mode (user might have unsaved changes)
+        if self.mode == EditorMode::Edit {
+            return false;
+        }
+
+        let Some(path) = &self.current_file else {
+            return false;
+        };
+
+        let Some(last_mod) = self.last_modified else {
+            return false;
+        };
+
+        // Check current modification time
+        if let Ok(metadata) = fs::metadata(path) {
+            if let Ok(current_mod) = metadata.modified() {
+                return current_mod > last_mod;
+            }
+        }
+
+        false
+    }
+
+    /// Reload the file if it has been modified externally
+    /// Returns true if the file was reloaded
+    pub fn reload_if_changed(&mut self, syntax_manager: &SyntaxManager) -> bool {
+        if !self.check_file_changed() {
+            return false;
+        }
+
+        // Reload the file
+        if let Some(path) = self.current_file.clone() {
+            let current_scroll = self.scroll;
+            self.load_file(path, syntax_manager);
+            // Restore scroll position (clamped to new content length)
+            let max_scroll = self.highlighted_lines.len().saturating_sub(1) as u16;
+            self.scroll = current_scroll.min(max_scroll);
+            return true;
+        }
+
+        false
     }
 
     /// Enter edit mode - only for readable files
@@ -279,6 +337,8 @@ impl PreviewState {
                 self.block_marking = false;
             } else {
                 // Start marking - begin selection at cursor
+                let cursor = editor.cursor();
+                self.selection_start = Some(cursor);
                 editor.start_selection();
                 self.block_marking = true;
             }
@@ -299,6 +359,7 @@ impl PreviewState {
         if let Some(editor) = &mut self.editor {
             editor.cut();
             self.block_marking = false;
+            self.selection_start = None;
         }
     }
 
@@ -309,6 +370,7 @@ impl PreviewState {
             editor.cut();
             editor.cancel_selection();
             self.block_marking = false;
+            self.selection_start = None;
         }
     }
 
@@ -330,6 +392,8 @@ impl PreviewState {
         if let Some(editor) = &mut self.editor {
             // Start selection if not already marking
             if !self.block_marking {
+                let cursor = editor.cursor();
+                self.selection_start = Some(cursor);
                 editor.start_selection();
                 self.block_marking = true;
             }
@@ -344,6 +408,25 @@ impl PreviewState {
             editor.cancel_selection();
         }
         self.block_marking = false;
+        self.selection_start = None;
+    }
+
+    /// Get current selection range for visualization: (start_row, start_col, end_row, end_col)
+    /// Returns None if no selection is active
+    pub fn get_selection_range(&self) -> Option<(usize, usize, usize, usize)> {
+        if !self.block_marking {
+            return None;
+        }
+        let start = self.selection_start?;
+        let editor = self.editor.as_ref()?;
+        let end = editor.cursor();
+
+        // Normalize: start should be before end
+        if start.0 < end.0 || (start.0 == end.0 && start.1 <= end.1) {
+            Some((start.0, start.1, end.0, end.1))
+        } else {
+            Some((end.0, end.1, start.0, start.1))
+        }
     }
 }
 
@@ -364,9 +447,24 @@ pub fn render(
 
     match state.mode {
         EditorMode::Edit => {
+            // Split area: editor content + shortcut bar at bottom
+            let shortcut_bar_height = 1;
+            let editor_area = Rect::new(
+                area.x,
+                area.y,
+                area.width,
+                area.height.saturating_sub(shortcut_bar_height),
+            );
+            let shortcut_area = Rect::new(
+                area.x,
+                area.y + editor_area.height,
+                area.width,
+                shortcut_bar_height,
+            );
+
             // Render highlighted content with cursor overlay in edit mode
             if let Some(editor) = &state.editor {
-                let inner = block.inner(area);
+                let inner = block.inner(editor_area);
                 let (cursor_row, cursor_col) = editor.cursor();
 
                 // Calculate scroll to keep cursor visible
@@ -377,7 +475,10 @@ pub fn render(
                     0
                 };
 
-                // Build lines with cursor
+                // Get selection range for visualization
+                let selection = state.get_selection_range();
+
+                // Build lines with cursor and selection highlighting
                 let mut lines_with_cursor: Vec<Line<'static>> = Vec::new();
                 let editor_lines = editor.lines();
 
@@ -388,12 +489,19 @@ pub fn render(
                         .cloned()
                         .unwrap_or_else(|| Line::from(line_content.clone()));
 
+                    // Apply selection highlighting if this line is in selection range
+                    let line_with_selection = if let Some((start_row, start_col, end_row, end_col)) = selection {
+                        apply_selection_to_line(&base_line, line_content, idx, start_row, start_col, end_row, end_col)
+                    } else {
+                        base_line
+                    };
+
                     if idx == cursor_row {
                         // Insert cursor into this line
-                        let line_with_cursor = insert_cursor_into_line(&base_line, cursor_col, line_content);
+                        let line_with_cursor = insert_cursor_into_line(&line_with_selection, cursor_col, line_content);
                         lines_with_cursor.push(line_with_cursor);
                     } else {
-                        lines_with_cursor.push(base_line);
+                        lines_with_cursor.push(line_with_selection);
                     }
                 }
 
@@ -401,7 +509,7 @@ pub fn render(
                     .block(block)
                     .scroll((scroll_offset as u16, 0));
 
-                f.render_widget(paragraph, area);
+                f.render_widget(paragraph, editor_area);
 
                 // Scrollbar
                 let content_length = editor_lines.len();
@@ -413,9 +521,12 @@ pub fn render(
                     let mut scrollbar_state = ScrollbarState::new(content_length)
                         .position(scroll_offset);
 
-                    f.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+                    f.render_stateful_widget(scrollbar, editor_area, &mut scrollbar_state);
                 }
             }
+
+            // Render MC Edit style shortcut bar
+            render_edit_shortcuts(f, shortcut_area, state.block_marking);
         }
         EditorMode::ReadOnly => {
             // Apply selection highlighting if active
@@ -514,6 +625,100 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
 }
 
 /// Insert a cursor (reversed style) into a line at the given column
+/// Apply selection highlighting to a line
+/// Selection is defined by (start_row, start_col, end_row, end_col)
+fn apply_selection_to_line(
+    line: &Line<'static>,
+    raw_text: &str,
+    line_idx: usize,
+    start_row: usize,
+    start_col: usize,
+    end_row: usize,
+    end_col: usize,
+) -> Line<'static> {
+    // Check if this line is within selection range
+    if line_idx < start_row || line_idx > end_row {
+        return line.clone();
+    }
+
+    let selection_style = Style::default().bg(Color::DarkGray);
+    let line_len = raw_text.chars().count();
+
+    // Determine selection range for this line
+    let (sel_start, sel_end) = if start_row == end_row {
+        // Single line selection
+        (start_col, end_col)
+    } else if line_idx == start_row {
+        // First line of multi-line selection
+        (start_col, line_len)
+    } else if line_idx == end_row {
+        // Last line of multi-line selection
+        (0, end_col)
+    } else {
+        // Middle line - entire line selected
+        (0, line_len)
+    };
+
+    // If nothing to select on this line, return as-is
+    if sel_start >= sel_end && line_idx != end_row {
+        return line.clone();
+    }
+
+    // Build new spans with selection highlighting
+    let mut result_spans: Vec<Span<'static>> = Vec::new();
+    let mut current_col = 0;
+
+    for span in line.spans.iter() {
+        let span_text = span.content.as_ref();
+        let span_chars: Vec<char> = span_text.chars().collect();
+        let span_len = span_chars.len();
+        let span_end = current_col + span_len;
+
+        // Check overlap with selection
+        let overlap_start = sel_start.max(current_col);
+        let overlap_end = sel_end.min(span_end);
+
+        if overlap_start < overlap_end {
+            // This span has some overlap with selection
+
+            // Part before selection (if any)
+            if current_col < overlap_start {
+                let before_len = overlap_start - current_col;
+                let before: String = span_chars[..before_len].iter().collect();
+                result_spans.push(Span::styled(before, span.style));
+            }
+
+            // Selected part
+            let sel_start_in_span = overlap_start.saturating_sub(current_col);
+            let sel_end_in_span = (overlap_end - current_col).min(span_len);
+            let selected: String = span_chars[sel_start_in_span..sel_end_in_span].iter().collect();
+            // Combine existing style with selection background
+            let combined_style = span.style.bg(Color::DarkGray);
+            result_spans.push(Span::styled(selected, combined_style));
+
+            // Part after selection (if any)
+            if overlap_end < span_end {
+                let after_start = overlap_end - current_col;
+                let after: String = span_chars[after_start..].iter().collect();
+                result_spans.push(Span::styled(after, span.style));
+            }
+        } else {
+            // No overlap - keep span as-is
+            result_spans.push(span.clone());
+        }
+
+        current_col = span_end;
+    }
+
+    // If selection extends beyond line content (e.g., trailing newline area)
+    if sel_end > current_col && line_idx < end_row {
+        // Add visual indicator for selected newline
+        result_spans.push(Span::styled(" ", selection_style));
+    }
+
+    Line::from(result_spans)
+}
+
 fn insert_cursor_into_line(line: &Line<'static>, col: usize, raw_text: &str) -> Line<'static> {
     // Use REVERSED + SLOW_BLINK for maximum visibility
     let cursor_style = Style::default()
@@ -568,6 +773,36 @@ fn insert_cursor_into_line(line: &Line<'static>, col: usize, raw_text: &str) -> 
     }
 
     Line::from(result_spans)
+}
+
+/// Render MC Edit style shortcut bar at bottom of editor
+fn render_edit_shortcuts(f: &mut Frame, area: Rect, block_marking: bool) {
+    let shortcuts = vec![
+        ("Sh+←→↑↓", "Mark"),
+        ("F3", if block_marking { "EndBlk" } else { "Block" }),
+        ("F5", "Copy"),
+        ("F6", "Move"),
+        ("F8", "Del"),
+        ("^Y", "DelLn"),
+        ("^S", "Save"),
+        ("Esc", "Exit"),
+    ];
+
+    let mut spans = Vec::new();
+    for (key, desc) in shortcuts {
+        spans.push(Span::styled(
+            format!(" {} ", key),
+            Style::default().bg(Color::Cyan).fg(Color::Black),
+        ));
+        spans.push(Span::styled(
+            format!("{} ", desc),
+            Style::default().bg(Color::Blue).fg(Color::White),
+        ));
+    }
+
+    let paragraph = Paragraph::new(Line::from(spans))
+        .style(Style::default().bg(Color::Blue));
+    f.render_widget(paragraph, area);
 }
 
 fn build_title(state: &PreviewState) -> String {

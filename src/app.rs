@@ -191,6 +191,8 @@ impl App {
                 let elapsed = self.last_refresh.elapsed().as_millis() as u64;
                 if elapsed >= refresh_interval {
                     self.file_browser.refresh();
+                    // Also check if preview file was modified externally
+                    self.preview.reload_if_changed(&self.syntax_manager);
                     self.last_refresh = std::time::Instant::now();
                 }
             }
@@ -420,6 +422,11 @@ impl App {
                                                     }
                                                 }
                                                 FooterAction::OpenFinder => { let _ = browser::open_in_file_manager(&self.file_browser.current_dir); }
+                                                FooterAction::ToggleHidden => {
+                                                    self.file_browser.show_hidden = !self.file_browser.show_hidden;
+                                                    self.file_browser.refresh();
+                                                    self.update_preview();
+                                                }
                                                 FooterAction::Settings => { let cfg = self.config.clone(); self.settings.open(&cfg); }
                                                 FooterAction::About => self.about.open(),
                                                 FooterAction::Help => self.help.open(),
@@ -464,6 +471,34 @@ impl App {
                                                 FooterAction::SelectCancel => {
                                                     // Cancel selection
                                                     self.terminal_selection.active = false;
+                                                }
+                                                FooterAction::ToggleBlock => {
+                                                    // MC Edit: Toggle block marking (F3)
+                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                        self.preview.toggle_block_marking();
+                                                    }
+                                                }
+                                                FooterAction::CopyBlock => {
+                                                    // MC Edit: Copy block (F5)
+                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                        self.preview.copy_block();
+                                                    }
+                                                }
+                                                FooterAction::MoveBlock => {
+                                                    // MC Edit: Move/cut block (F6)
+                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                        self.preview.move_block();
+                                                        self.preview.update_modified();
+                                                        self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                    }
+                                                }
+                                                FooterAction::DeleteBlock => {
+                                                    // MC Edit: Delete block (F8)
+                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                        self.preview.delete_block();
+                                                        self.preview.update_modified();
+                                                        self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                    }
                                                 }
                                                 FooterAction::None => {}
                                             }

@@ -119,7 +119,7 @@ impl Default for SettingsState {
             input_buffer: String::new(),
             shell_path: "/bin/bash".to_string(),
             scrollback_lines: 1000,
-            show_hidden_files: false,
+            show_hidden_files: true,  // Show hidden files by default
             auto_refresh_ms: 2000,
             file_browser_width: 20,
             preview_width: 50,
