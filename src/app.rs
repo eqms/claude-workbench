@@ -500,6 +500,19 @@ impl App {
                                                         self.preview.update_edit_highlighting(&self.syntax_manager);
                                                     }
                                                 }
+                                                FooterAction::Search => {
+                                                    // Open search (/ or Ctrl+F)
+                                                    if self.active_pane == PaneId::Preview {
+                                                        self.preview.search.open();
+                                                    }
+                                                }
+                                                FooterAction::SearchReplace => {
+                                                    // Open search & replace (Ctrl+H) - only in Edit mode
+                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                        self.preview.search.open();
+                                                        self.preview.search.mode = crate::types::SearchMode::Replace;
+                                                    }
+                                                }
                                                 FooterAction::None => {}
                                             }
                                             break;
@@ -963,9 +976,11 @@ impl App {
                                                     self.preview.search.close();
                                                     continue;
                                                 }
-                                                // F4: Toggle between Search and Replace mode
-                                                KeyCode::F(4) => {
-                                                    self.preview.search.toggle_replace_mode();
+                                                // Ctrl+H: Toggle between Search and Replace mode (when search is open)
+                                                KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                                    if self.preview.mode == EditorMode::Edit {
+                                                        self.preview.search.toggle_replace_mode();
+                                                    }
                                                     continue;
                                                 }
                                                 // Tab: Switch between search/replace fields (only in Replace mode)
@@ -996,8 +1011,8 @@ impl App {
                                                     }
                                                     continue;
                                                 }
-                                                // F6: Replace all (only in Replace mode)
-                                                KeyCode::F(6) if self.preview.search.mode == SearchMode::Replace => {
+                                                // Ctrl+R: Replace all (only in Replace mode)
+                                                KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) && self.preview.search.mode == SearchMode::Replace => {
                                                     if self.preview.mode == EditorMode::Edit {
                                                         let _count = self.preview.replace_all(&self.syntax_manager);
                                                         // Could show count in status
@@ -1053,20 +1068,23 @@ impl App {
                                             }
                                         }
 
-                                        // Check for search trigger (/ in read-only, Ctrl+F in any mode, F4 in Edit mode)
+                                        // Check for search trigger (/ in read-only, Ctrl+F in any mode)
                                         let is_ctrl_f = (key.code == KeyCode::Char('f') && key.modifiers.contains(KeyModifiers::CONTROL))
                                             || key.code == KeyCode::Char('\x06'); // Ctrl+F as control char
                                         let is_slash = key.code == KeyCode::Char('/') && self.preview.mode == EditorMode::ReadOnly;
-                                        let is_f4_in_edit = key.code == KeyCode::F(4) && self.preview.mode == EditorMode::Edit;
+                                        // Ctrl+H opens Search & Replace directly
+                                        let is_ctrl_h = (key.code == KeyCode::Char('h') && key.modifiers.contains(KeyModifiers::CONTROL))
+                                            || key.code == KeyCode::Char('\x08'); // Ctrl+H as control char (backspace, but with CONTROL modifier)
 
                                         if is_ctrl_f || is_slash {
                                             self.preview.search.open();
                                             continue;
                                         }
 
-                                        // F4 in Edit mode: Open search (can toggle to Replace with F4 again)
-                                        if is_f4_in_edit {
+                                        // Ctrl+H: Open search in Replace mode directly
+                                        if is_ctrl_h && self.preview.mode == EditorMode::Edit {
                                             self.preview.search.open();
+                                            self.preview.search.mode = SearchMode::Replace;
                                             continue;
                                         }
 
@@ -1107,22 +1125,22 @@ impl App {
                                                 self.preview.update_modified();
                                                 self.preview.update_edit_highlighting(&self.syntax_manager);
                                             }
-                                            // MC Edit style: F3 = toggle block marking
-                                            else if key.code == KeyCode::F(3) {
+                                            // MC Edit style: Ctrl+F3 = toggle block marking
+                                            else if key.code == KeyCode::F(3) && key.modifiers.contains(KeyModifiers::CONTROL) {
                                                 self.preview.toggle_block_marking();
                                             }
-                                            // MC Edit style: F5 = copy block
-                                            else if key.code == KeyCode::F(5) {
+                                            // MC Edit style: Ctrl+F5 = copy block
+                                            else if key.code == KeyCode::F(5) && key.modifiers.contains(KeyModifiers::CONTROL) {
                                                 self.preview.copy_block();
                                             }
-                                            // MC Edit style: F6 = move (cut) block
-                                            else if key.code == KeyCode::F(6) {
+                                            // MC Edit style: Ctrl+F6 = move (cut) block
+                                            else if key.code == KeyCode::F(6) && key.modifiers.contains(KeyModifiers::CONTROL) {
                                                 self.preview.move_block();
                                                 self.preview.update_modified();
                                                 self.preview.update_edit_highlighting(&self.syntax_manager);
                                             }
-                                            // MC Edit style: F8 = delete block
-                                            else if key.code == KeyCode::F(8) {
+                                            // MC Edit style: Ctrl+F8 = delete block
+                                            else if key.code == KeyCode::F(8) && key.modifiers.contains(KeyModifiers::CONTROL) {
                                                 self.preview.delete_block();
                                                 self.preview.update_modified();
                                                 self.preview.update_edit_highlighting(&self.syntax_manager);

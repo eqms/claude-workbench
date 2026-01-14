@@ -245,8 +245,8 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Start search"),
         ]),
         Line::from(vec![
-            Span::styled("  F4           ", Style::default().fg(Color::Green)),
-            Span::raw("Search (Edit mode) / Toggle Replace mode"),
+            Span::styled("  Ctrl+H       ", Style::default().fg(Color::Green)),
+            Span::raw("Search & Replace (Edit mode) / Toggle mode"),
         ]),
         Line::from(vec![
             Span::styled("  Tab          ", Style::default().fg(Color::Green)),
@@ -269,7 +269,7 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Confirm / Replace current"),
         ]),
         Line::from(vec![
-            Span::styled("  F6           ", Style::default().fg(Color::Green)),
+            Span::styled("  Ctrl+R       ", Style::default().fg(Color::Green)),
             Span::raw("Replace all matches"),
         ]),
         Line::from(vec![
@@ -310,19 +310,19 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Select text with cursor"),
         ]),
         Line::from(vec![
-            Span::styled("  F3           ", Style::default().fg(Color::Green)),
+            Span::styled("  Ctrl+F3      ", Style::default().fg(Color::Green)),
             Span::raw("Toggle block marking mode"),
         ]),
         Line::from(vec![
-            Span::styled("  F5           ", Style::default().fg(Color::Green)),
+            Span::styled("  Ctrl+F5      ", Style::default().fg(Color::Green)),
             Span::raw("Copy selected block"),
         ]),
         Line::from(vec![
-            Span::styled("  F6           ", Style::default().fg(Color::Green)),
+            Span::styled("  Ctrl+F6      ", Style::default().fg(Color::Green)),
             Span::raw("Move (cut) selected block"),
         ]),
         Line::from(vec![
-            Span::styled("  F8           ", Style::default().fg(Color::Green)),
+            Span::styled("  Ctrl+F8      ", Style::default().fg(Color::Green)),
             Span::raw("Delete selected block"),
         ]),
         Line::from(vec![

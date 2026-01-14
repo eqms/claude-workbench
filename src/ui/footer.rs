@@ -35,10 +35,12 @@ pub enum FooterAction {
     SelectCopy,      // Enter/y (selection mode)
     SelectCancel,    // Esc (selection mode)
     ToggleHidden,    // . (toggle hidden files)
-    ToggleBlock,     // F3 (MC Edit: toggle block marking)
-    CopyBlock,       // F5 (MC Edit: copy block)
-    MoveBlock,       // F6 (MC Edit: cut block)
-    DeleteBlock,     // F8 (MC Edit: delete block)
+    ToggleBlock,     // ^F3 (MC Edit: toggle block marking)
+    CopyBlock,       // ^F5 (MC Edit: copy block)
+    MoveBlock,       // ^F6 (MC Edit: cut block)
+    DeleteBlock,     // ^F8 (MC Edit: delete block)
+    Search,          // / or ^F (Search)
+    SearchReplace,   // ^H (Search & Replace in Edit mode)
     None,            // No action (non-clickable)
 }
 
@@ -115,17 +117,19 @@ pub fn get_context_button_positions(
     } else if active_pane == PaneId::Preview && editor_mode == EditorMode::Edit {
         vec![
             ("^S", "Save", FooterAction::Save),
+            ("^F", "Search", FooterAction::Search),
+            ("^H", "S&R", FooterAction::SearchReplace),
+            ("^F3", "Block", FooterAction::ToggleBlock),
+            ("^F5", "Copy", FooterAction::CopyBlock),
+            ("^F6", "Move", FooterAction::MoveBlock),
+            ("^F8", "Del", FooterAction::DeleteBlock),
             ("Esc", "Exit", FooterAction::ExitEdit),
-            ("F3", "Block", FooterAction::ToggleBlock),
-            ("F5", "Copy", FooterAction::CopyBlock),
-            ("F6", "Move", FooterAction::MoveBlock),
-            ("F8", "Del", FooterAction::DeleteBlock),
-            ("^Y", "DelLn", FooterAction::Redo),  // Actually delete line in MC style
             ("F12", "Help", FooterAction::Help),
         ]
     } else if active_pane == PaneId::Preview {
         vec![
             ("E", "Edit", FooterAction::Edit),
+            ("/", "Search", FooterAction::Search),
             ("^S", "Select", FooterAction::StartSelect),
             ("F1", "Files", FooterAction::FocusFiles),
             ("F3", "Refresh", FooterAction::Refresh),
@@ -193,21 +197,23 @@ impl Widget for Footer {
                 ("Esc", "Cancel"),
             ]
         } else if self.active_pane == PaneId::Preview && self.editor_mode == EditorMode::Edit {
-            // Edit mode keys (MC Edit style)
+            // Edit mode keys (MC Edit style with Ctrl+F combinations)
             vec![
                 ("^S", "Save"),
+                ("^F", "Search"),
+                ("^H", "S&R"),
+                ("^F3", "Block"),
+                ("^F5", "Copy"),
+                ("^F6", "Move"),
+                ("^F8", "Del"),
                 ("Esc", "Exit"),
-                ("F3", "Block"),
-                ("F5", "Copy"),
-                ("F6", "Move"),
-                ("F8", "Del"),
-                ("^Y", "DelLn"),
                 ("F12", "Help"),
             ]
         } else if self.active_pane == PaneId::Preview {
-            // Preview mode - show Edit and Select options
+            // Preview mode - show Edit, Search and Select options
             vec![
                 ("E", "Edit"),
+                ("/", "Search"),
                 ("^S", "Select"),
                 ("F1", "Files"),
                 ("F3", "Refresh"),
