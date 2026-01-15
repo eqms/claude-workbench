@@ -21,7 +21,9 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
   - Red: Conflict (!)
 - Status bar shows file size, modification date, and git branch info
 - Double-click to open files or enter directories
-- Context menu (F9) for file operations: New, Rename, Delete, Copy Path
+- Toggle hidden files with `.` key
+- Refresh with F3
+- Context menu (F9) for file operations: New File, New Directory, Rename, Duplicate, Copy to, Move to, Delete, Copy Path
 
 #### Preview Pane (F2)
 - Syntax highlighting for 500+ languages (via syntect)
@@ -29,7 +31,17 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 - Built-in text editor with undo/redo support (via tui-textarea)
 - Scrollable preview with keyboard and mouse navigation
 - PageUp/PageDown, Home/End for quick navigation
-- **Incremental Search (v0.17+)**: `/` or `Ctrl+F` to search, `n`/`N` to navigate matches
+- Line numbers with current line highlighting in edit mode
+
+#### Search & Replace (MC Edit Style)
+- `/` or `Ctrl+F` to start search
+- `Ctrl+H` to open Search & Replace directly
+- `Tab` to switch between Find/Replace fields
+- `n`/`N` or `Ctrl+N`/`Ctrl+P` to navigate matches
+- `Ctrl+I` to toggle case sensitivity
+- `Enter` to replace current match
+- `Ctrl+R` to replace all matches
+- `Esc` to close search
 
 #### Browser Preview (o key)
 - **HTML/HTM**: Direct browser opening
@@ -48,9 +60,11 @@ All terminal panes support:
 - Scrollback history (1000 lines by default)
 - Mouse wheel scrolling
 - Keyboard scrolling (Shift+PgUp/PgDn, Shift+Up/Down)
-- **Multi-line input (v0.17+)**: Use `\` + Enter in Claude Code pane for newlines
+- Multi-line input: Use `\` + Enter in Claude Code pane for newlines
+- Word navigation: Alt+Left/Right to move by word
+- PageUp/PageDown remapped to Home/End for line navigation
 
-#### Terminal Selection Mode (Ctrl+S or Mouse)
+#### Terminal Selection Mode (Ctrl+S or Alt+Click)
 Select and copy terminal output to Claude as a code block:
 
 **Keyboard Selection (Ctrl+S):**
@@ -61,13 +75,14 @@ Select and copy terminal output to Claude as a code block:
 - Enter or y to copy to Claude
 - Esc to cancel
 
-**Mouse Selection (v0.14+):**
-- Click and drag to select lines in terminal panes
-- Release to confirm selection
+**Mouse Selection:**
+- Alt+Click and drag to select lines in terminal panes
+- Release to enter selection mode
 - Enter or y to copy to Claude
 - Highlighted in yellow during selection
+- Note: Regular click only focuses pane (no selection)
 
-**Intelligent Filtering (v0.14+):**
+**Intelligent Filtering:**
 When copying to Claude, the output is automatically filtered:
 - Shell prompts removed (user@host$, >, >>>, etc.)
 - Error messages and stack traces preserved
@@ -80,13 +95,18 @@ When copying to Claude, the output is automatically filtered:
 - Automatically quotes paths with spaces
 - Insert file paths directly into Claude or Terminal
 
+#### Git Integration
+- Auto-checks for remote changes when entering a different repository
+- Prompts to pull if remote is ahead
+- Color-coded file status in file browser
+
 #### Additional Features
 - **Fuzzy Finder (Ctrl+P)**: Quick file search and navigation
 - **Settings Menu (Ctrl+,)**: Configure shell, layout, and more
 - **Setup Wizard (Ctrl+Shift+W)**: First-run configuration assistant
 - **About Dialog (F10)**: License info and open source components
 - **Help (F12)**: Scrollable keyboard shortcuts and usage guide (j/k, arrows, PgUp/PgDn, g/G)
-- **Context Menu (F9)**: File operations (New File, New Directory, Rename, Duplicate, Copy to, Move to, Delete, Copy Path)
+- **Context Menu (F9)**: File operations with full cursor-based input editing
 
 ### Installation
 
@@ -155,10 +175,16 @@ claude:
 | Ctrl+P | Fuzzy Finder |
 | Ctrl+, | Settings |
 | Ctrl+Shift+W | Setup Wizard |
-| F1-F6 | Switch panes |
-| F9 | Context Menu |
+| F1 | File Browser |
+| F2 | Preview Pane |
+| F3 | Refresh File Browser |
+| F4 | Claude Code |
+| F5 | LazyGit |
+| F6 | User Terminal |
+| F9 | File Menu |
 | F10 | About |
 | F12 | Help |
+| Esc | Close Dialogs/Help |
 
 #### Context-specific (FileBrowser/Preview only)
 | Key | Action |
@@ -172,21 +198,38 @@ claude:
 | j/k, Up/Down | Navigate |
 | Enter | Open/Enter |
 | Backspace/Left | Parent directory |
+| . | Toggle hidden files |
 | o | Open in browser |
 | O | Open in Finder |
 
-#### Editor (Preview Pane)
+#### Preview Pane (Read-Only)
 | Key | Action |
 |-----|--------|
-| E | Enter edit mode |
-| Ctrl+S | Save |
-| Ctrl+Z | Undo |
-| / or Ctrl+F | Search (incremental) |
-| Ctrl+H | Search & Replace |
-| n / N | Next / Previous match |
+| j/k, Up/Down | Scroll 1 line |
 | PageUp/Down | Scroll 10 lines |
 | Home/End | Jump to start/end |
-| Esc | Exit editor / Close search |
+| E | Enter edit mode |
+| Ctrl+S | Enter selection mode |
+
+#### Search & Replace
+| Key | Action |
+|-----|--------|
+| / or Ctrl+F | Start search |
+| Ctrl+H | Search & Replace (Edit mode) |
+| Tab | Switch Find/Replace fields |
+| n / N | Next / Previous match |
+| Ctrl+N / Ctrl+P | Navigate while typing |
+| Ctrl+I | Toggle case sensitivity |
+| Enter | Confirm / Replace current |
+| Ctrl+R | Replace all matches |
+| Esc | Close search |
+
+#### Editor (Edit Mode)
+| Key | Action |
+|-----|--------|
+| Ctrl+S | Save |
+| Ctrl+Z | Undo |
+| Esc | Exit (confirm if modified) |
 
 **MC Edit Style Block Operations:**
 | Key | Action |
@@ -205,6 +248,28 @@ claude:
 | Ctrl+S | Start selection |
 | Shift+PgUp/PgDn | Scroll 10 lines |
 | Shift+Up/Down | Scroll 1 line |
+| Alt+Left/Right | Word navigation |
+| PageUp | Jump to line start (Home) |
+| PageDown | Jump to line end (End) |
+
+#### Selection Mode (Ctrl+S in Terminal/Preview)
+| Key | Action |
+|-----|--------|
+| j/k, Up/Down | Adjust selection |
+| Shift+Up/Down | Adjust by 5 lines |
+| g / G | Jump to buffer start/end |
+| Enter / y | Copy to Claude |
+| Esc | Cancel |
+
+#### Dialog Input Fields
+| Key | Action |
+|-----|--------|
+| Left/Right | Move cursor |
+| Home/End | Jump to start/end |
+| Backspace | Delete before cursor |
+| Delete | Delete at cursor |
+| Enter | Confirm |
+| Esc | Cancel |
 
 ### Tech Stack
 
@@ -242,6 +307,8 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer, entwickelt für KI
   - Rot: Konflikt (!)
 - Statusleiste zeigt Dateigröße, Änderungsdatum und Git-Branch-Info
 - Doppelklick zum Öffnen von Dateien oder Betreten von Verzeichnissen
+- Versteckte Dateien mit `.` umschalten
+- Aktualisieren mit F3
 - Kontextmenü (F9) für Dateioperationen: Neue Datei, Neues Verzeichnis, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren
 
 #### Vorschau-Bereich (F2)
@@ -250,7 +317,17 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer, entwickelt für KI
 - Integrierter Texteditor mit Undo/Redo-Unterstützung (via tui-textarea)
 - Scrollbare Vorschau mit Tastatur- und Mausnavigation
 - PageUp/PageDown, Home/End für schnelle Navigation
-- **Inkrementelle Suche (v0.17+)**: `/` oder `Ctrl+F` zum Suchen, `n`/`N` zum Navigieren
+- Zeilennummern mit Hervorhebung der aktuellen Zeile im Bearbeitungsmodus
+
+#### Suchen & Ersetzen (MC Edit Stil)
+- `/` oder `Ctrl+F` zum Starten der Suche
+- `Ctrl+H` zum direkten Öffnen von Suchen & Ersetzen
+- `Tab` zum Wechseln zwischen Such-/Ersetzungsfeld
+- `n`/`N` oder `Ctrl+N`/`Ctrl+P` zum Navigieren der Treffer
+- `Ctrl+I` zum Umschalten der Groß-/Kleinschreibung
+- `Enter` zum Ersetzen des aktuellen Treffers
+- `Ctrl+R` zum Ersetzen aller Treffer
+- `Esc` zum Schließen der Suche
 
 #### Browser-Vorschau (o-Taste)
 - **HTML/HTM**: Direkte Browser-Öffnung
@@ -269,9 +346,11 @@ Alle Terminal-Bereiche unterstützen:
 - Scrollback-Verlauf (standardmäßig 1000 Zeilen)
 - Mausrad-Scrolling
 - Tastatur-Scrolling (Shift+PgUp/PgDn, Shift+Up/Down)
-- **Mehrzeilige Eingabe (v0.17+)**: `\` + Enter für Zeilenumbruch im Claude Code Pane
+- Mehrzeilige Eingabe: `\` + Enter für Zeilenumbruch im Claude Code Pane
+- Wort-Navigation: Alt+Links/Rechts zum Springen zwischen Wörtern
+- PageUp/PageDown umgemappt auf Home/End für Zeilen-Navigation
 
-#### Terminal-Auswahlmodus (Ctrl+S oder Maus)
+#### Terminal-Auswahlmodus (Ctrl+S oder Alt+Klick)
 Terminal-Ausgabe auswählen und als Code-Block an Claude kopieren:
 
 **Tastatur-Auswahl (Ctrl+S):**
@@ -282,13 +361,14 @@ Terminal-Ausgabe auswählen und als Code-Block an Claude kopieren:
 - Enter oder y zum Kopieren an Claude
 - Esc zum Abbrechen
 
-**Maus-Auswahl (v0.14+):**
-- Klicken und Ziehen um Zeilen in Terminal-Bereichen auszuwählen
-- Loslassen zur Bestätigung der Auswahl
+**Maus-Auswahl:**
+- Alt+Klicken und Ziehen um Zeilen in Terminal-Bereichen auszuwählen
+- Loslassen zum Betreten des Auswahlmodus
 - Enter oder y zum Kopieren an Claude
 - Gelb hervorgehoben während der Auswahl
+- Hinweis: Normaler Klick fokussiert nur den Bereich (keine Auswahl)
 
-**Intelligentes Filtering (v0.14+):**
+**Intelligentes Filtering:**
 Beim Kopieren zu Claude wird die Ausgabe automatisch gefiltert:
 - Shell-Prompts entfernt (user@host$, >, >>>, etc.)
 - Fehlermeldungen und Stack-Traces bleiben erhalten
@@ -301,13 +381,18 @@ Beim Kopieren zu Claude wird die Ausgabe automatisch gefiltert:
 - Pfade mit Leerzeichen werden automatisch quotiert
 - Dateipfade direkt in Claude oder Terminal einfügen
 
+#### Git-Integration
+- Automatische Prüfung auf Remote-Änderungen beim Wechsel in ein anderes Repository
+- Aufforderung zum Pullen wenn Remote voraus ist
+- Farbcodierte Dateistatus im Dateibrowser
+
 #### Zusätzliche Funktionen
 - **Fuzzy-Finder (Ctrl+P)**: Schnelle Dateisuche und Navigation
 - **Einstellungsmenü (Ctrl+,)**: Shell, Layout und mehr konfigurieren
 - **Setup-Assistent (Ctrl+Shift+W)**: Erstkonfigurationsassistent
 - **Über-Dialog (F10)**: Lizenzinfo und Open-Source-Komponenten
 - **Hilfe (F12)**: Scrollbare Tastenkürzel und Bedienungsanleitung (j/k, Pfeile, PgUp/PgDn, g/G)
-- **Kontextmenü (F9)**: Dateioperationen (Neue Datei, Neues Verzeichnis, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren)
+- **Kontextmenü (F9)**: Dateioperationen mit voller Cursor-basierter Eingabebearbeitung
 
 ### Installation
 
@@ -376,10 +461,16 @@ claude:
 | Ctrl+P | Fuzzy-Finder |
 | Ctrl+, | Einstellungen |
 | Ctrl+Shift+W | Setup-Assistent |
-| F1-F6 | Bereiche wechseln |
-| F9 | Kontextmenü |
+| F1 | Dateibrowser |
+| F2 | Vorschau-Bereich |
+| F3 | Dateibrowser aktualisieren |
+| F4 | Claude Code |
+| F5 | LazyGit |
+| F6 | Benutzer-Terminal |
+| F9 | Datei-Menü |
 | F10 | Über |
 | F12 | Hilfe |
+| Esc | Dialoge/Hilfe schließen |
 
 #### Kontext-spezifisch (nur FileBrowser/Preview)
 | Taste | Aktion |
@@ -393,21 +484,38 @@ claude:
 | j/k, Up/Down | Navigieren |
 | Enter | Öffnen/Betreten |
 | Backspace/Left | Übergeordnetes Verzeichnis |
+| . | Versteckte Dateien umschalten |
 | o | Im Browser öffnen |
 | O | Im Finder öffnen |
 
-#### Editor (Vorschau-Bereich)
+#### Vorschau-Bereich (Nur-Lesen)
 | Taste | Aktion |
 |-------|--------|
-| E | Bearbeitungsmodus starten |
-| Ctrl+S | Speichern |
-| Ctrl+Z | Rückgängig |
-| / oder Ctrl+F | Suche (inkrementell) |
-| Ctrl+H | Suchen & Ersetzen |
-| n / N | Nächster / Vorheriger Treffer |
+| j/k, Up/Down | 1 Zeile scrollen |
 | PageUp/Down | 10 Zeilen scrollen |
 | Home/End | An Anfang/Ende springen |
-| Esc | Editor verlassen / Suche schließen |
+| E | Bearbeitungsmodus starten |
+| Ctrl+S | Auswahlmodus starten |
+
+#### Suchen & Ersetzen
+| Taste | Aktion |
+|-------|--------|
+| / oder Ctrl+F | Suche starten |
+| Ctrl+H | Suchen & Ersetzen (Bearbeitungsmodus) |
+| Tab | Such-/Ersetzungsfeld wechseln |
+| n / N | Nächster / Vorheriger Treffer |
+| Ctrl+N / Ctrl+P | Während der Eingabe navigieren |
+| Ctrl+I | Groß-/Kleinschreibung umschalten |
+| Enter | Bestätigen / Aktuellen ersetzen |
+| Ctrl+R | Alle Treffer ersetzen |
+| Esc | Suche schließen |
+
+#### Editor (Bearbeitungsmodus)
+| Taste | Aktion |
+|-------|--------|
+| Ctrl+S | Speichern |
+| Ctrl+Z | Rückgängig |
+| Esc | Beenden (Bestätigung wenn geändert) |
 
 **MC Edit Block-Operationen:**
 | Taste | Aktion |
@@ -422,10 +530,32 @@ claude:
 #### Terminal-Bereiche
 | Taste | Aktion |
 |-------|--------|
-| \\ + Enter | Zeilenumbruch im Claude Code Pane (F4) |
+| \\ + Enter | Zeilenumbruch im Claude Code (F4) |
 | Ctrl+S | Auswahl starten |
 | Shift+PgUp/PgDn | 10 Zeilen scrollen |
 | Shift+Up/Down | 1 Zeile scrollen |
+| Alt+Links/Rechts | Wort-Navigation |
+| PageUp | An Zeilenanfang springen (Home) |
+| PageDown | An Zeilenende springen (End) |
+
+#### Auswahlmodus (Ctrl+S in Terminal/Vorschau)
+| Taste | Aktion |
+|-------|--------|
+| j/k, Up/Down | Auswahl anpassen |
+| Shift+Up/Down | Um 5 Zeilen anpassen |
+| g / G | An Buffer-Anfang/-Ende springen |
+| Enter / y | An Claude kopieren |
+| Esc | Abbrechen |
+
+#### Dialog-Eingabefelder
+| Taste | Aktion |
+|-------|--------|
+| Links/Rechts | Cursor bewegen |
+| Home/End | An Anfang/Ende springen |
+| Backspace | Vor Cursor löschen |
+| Delete | An Cursor löschen |
+| Enter | Bestätigen |
+| Esc | Abbrechen |
 
 ### Technologie-Stack
 
