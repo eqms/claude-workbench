@@ -13,7 +13,7 @@ use crate::types::{EditorMode, PaneId};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FooterAction {
     FocusFiles,      // F1
-    FocusPreview,    // F2
+    TogglePreview,   // F2
     Refresh,         // F3
     FocusClaude,     // F4
     ToggleGit,       // F5
@@ -146,7 +146,7 @@ pub fn get_context_button_positions(
         vec![
             ("^S", "Select", FooterAction::StartSelect),
             ("F1", "Files", FooterAction::FocusFiles),
-            ("F2", "Preview", FooterAction::FocusPreview),
+            ("F2", "Preview", FooterAction::TogglePreview),
             ("F3", "Refresh", FooterAction::Refresh),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
@@ -158,7 +158,7 @@ pub fn get_context_button_positions(
         // Default keys (file browser)
         vec![
             ("F1", "Files", FooterAction::FocusFiles),
-            ("F2", "Preview", FooterAction::FocusPreview),
+            ("F2", "Preview", FooterAction::TogglePreview),
             ("F3", "Refresh", FooterAction::Refresh),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),

@@ -35,6 +35,7 @@ pub struct App {
     pub help: HelpState,
     pub show_terminal: bool,
     pub show_lazygit: bool,
+    pub show_preview: bool,
     pub last_refresh: std::time::Instant,
     pub menu: MenuBar,
     pub dialog: Dialog,
@@ -133,6 +134,7 @@ impl App {
             help: HelpState::default(),
             show_terminal: false,
             show_lazygit: false,
+            show_preview: true,
             last_refresh: std::time::Instant::now(),
             menu: MenuBar::default(),
             dialog: Dialog::default(),
@@ -207,7 +209,7 @@ impl App {
                     Event::Mouse(mouse) => {
                          let size = terminal.size()?;
                          let area = Rect::new(0, 0, size.width, size.height);
-                         let (files, preview, claude, lazygit, term, footer_area) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit);
+                         let (files, preview, claude, lazygit, term, footer_area) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit, self.show_preview);
                          
                          let x = mouse.column;
                          let y = mouse.row;
@@ -397,7 +399,14 @@ impl App {
                                             use ui::footer::FooterAction;
                                             match action {
                                                 FooterAction::FocusFiles => self.active_pane = PaneId::FileBrowser,
-                                                FooterAction::FocusPreview => self.active_pane = PaneId::Preview,
+                                                FooterAction::TogglePreview => {
+                                                    self.show_preview = !self.show_preview;
+                                                    if self.show_preview {
+                                                        self.active_pane = PaneId::Preview;
+                                                    } else if self.active_pane == PaneId::Preview {
+                                                        self.active_pane = PaneId::FileBrowser;
+                                                    }
+                                                }
                                                 FooterAction::Refresh => { self.file_browser.refresh(); self.update_preview(); }
                                                 FooterAction::FocusClaude => {
                                                     if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
@@ -894,7 +903,14 @@ impl App {
                         // Global Focus Switching
                         match key.code {
                             KeyCode::F(1) => self.active_pane = PaneId::FileBrowser,
-                            KeyCode::F(2) => self.active_pane = PaneId::Preview,
+                            KeyCode::F(2) => {
+                                self.show_preview = !self.show_preview;
+                                if self.show_preview {
+                                    self.active_pane = PaneId::Preview;
+                                } else if self.active_pane == PaneId::Preview {
+                                    self.active_pane = PaneId::FileBrowser;
+                                }
+                            }
                             KeyCode::F(3) => { self.file_browser.refresh(); self.update_preview(); }
                             KeyCode::F(4) => {
                                 // Show startup dialog if prefixes configured and not yet shown
@@ -1402,7 +1418,7 @@ impl App {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
-        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit);
+        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit, self.show_preview);
 
         // Helper to resize PTY
         // We need to account for borders (1px each side => -2)
@@ -1432,8 +1448,10 @@ impl App {
         } else {
             None
         };
-        ui::preview::render(frame, preview, &self.preview, self.active_pane == PaneId::Preview, preview_selection_range);
-        
+        if self.show_preview {
+            ui::preview::render(frame, preview, &self.preview, self.active_pane == PaneId::Preview, preview_selection_range);
+        }
+
         ui::terminal_pane::render(frame, claude, PaneId::Claude, self);
         ui::terminal_pane::render(frame, lazygit, PaneId::LazyGit, self);
         ui::terminal_pane::render(frame, terminal, PaneId::Terminal, self);
