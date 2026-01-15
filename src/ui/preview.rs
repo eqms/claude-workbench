@@ -843,9 +843,16 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
         height: bar_height,
     };
 
-    // Clear background for the entire bar area
-    let clear_bg = Paragraph::new("").style(Style::default().bg(Color::DarkGray));
-    f.render_widget(clear_bg, bar_area);
+    // Clear background for the entire bar area with solid fill
+    use ratatui::widgets::Clear;
+    f.render_widget(Clear, bar_area);
+    let bg_fill = " ".repeat(bar_area.width as usize);
+    let mut bg_lines = Vec::new();
+    for _ in 0..bar_height {
+        bg_lines.push(Line::from(bg_fill.clone()));
+    }
+    let solid_bg = Paragraph::new(bg_lines).style(Style::default().bg(Color::DarkGray));
+    f.render_widget(solid_bg, bar_area);
 
     // Build match count info
     let match_info = if state.search.matches.is_empty() {
@@ -1102,11 +1109,12 @@ fn insert_cursor_into_line(line: &Line<'static>, col: usize, raw_text: &str) -> 
 fn render_edit_shortcuts(f: &mut Frame, area: Rect, block_marking: bool) {
     let shortcuts = vec![
         ("Sh+←→↑↓", "Mark"),
-        ("F3", if block_marking { "EndBlk" } else { "Block" }),
-        ("F5", "Copy"),
-        ("F6", "Move"),
-        ("F8", "Del"),
+        ("^F3", if block_marking { "EndBlk" } else { "Block" }),
+        ("^F5", "Copy"),
+        ("^F6", "Move"),
+        ("^F8", "Del"),
         ("^Y", "DelLn"),
+        ("^H", "S&R"),
         ("^S", "Save"),
         ("Esc", "Exit"),
     ];

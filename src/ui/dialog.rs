@@ -18,6 +18,10 @@ pub enum DialogAction {
     NewFile,
     RenameFile { old_path: std::path::PathBuf },
     DeleteFile { path: std::path::PathBuf },
+    /// Copy file to destination (value is destination path)
+    CopyFileTo { source: std::path::PathBuf },
+    /// Move file to destination (value is destination path)
+    MoveFileTo { source: std::path::PathBuf },
     DiscardEditorChanges,
     SwitchFile { target_idx: usize },
     EnterDirectory { target_idx: usize },

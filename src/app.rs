@@ -513,6 +513,12 @@ impl App {
                                                         self.preview.search.mode = crate::types::SearchMode::Replace;
                                                     }
                                                 }
+                                                FooterAction::FileMenu => {
+                                                    // Open file menu (F9)
+                                                    if self.active_pane == PaneId::FileBrowser {
+                                                        self.menu.visible = true;
+                                                    }
+                                                }
                                                 FooterAction::None => {}
                                             }
                                             break;
@@ -766,6 +772,9 @@ impl App {
                                 }
                                 KeyCode::Char('n') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::NewFile); }
                                 KeyCode::Char('r') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::RenameFile); }
+                                KeyCode::Char('u') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::DuplicateFile); }
+                                KeyCode::Char('c') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyFileTo); }
+                                KeyCode::Char('m') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::MoveFileTo); }
                                 KeyCode::Char('d') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::DeleteFile); }
                                 KeyCode::Char('y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyAbsolutePath); }
                                 KeyCode::Char('Y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyRelativePath); }
@@ -1581,6 +1590,60 @@ impl App {
                     };
                 }
             }
+            MenuAction::DuplicateFile => {
+                if let Some(selected) = self.file_browser.selected_file() {
+                    if selected.is_file() {
+                        // Generate duplicate name with counter
+                        let parent = selected.parent().unwrap_or(&self.file_browser.current_dir);
+                        let stem = selected.file_stem()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        let ext = selected.extension()
+                            .map(|e| format!(".{}", e.to_string_lossy()))
+                            .unwrap_or_default();
+
+                        let mut counter = 1;
+                        let mut new_path;
+                        loop {
+                            let new_name = format!("{} - Duplikat {}{}", stem, counter, ext);
+                            new_path = parent.join(&new_name);
+                            if !new_path.exists() {
+                                break;
+                            }
+                            counter += 1;
+                        }
+
+                        if let Err(e) = std::fs::copy(&selected, &new_path) {
+                            eprintln!("Failed to duplicate file: {}", e);
+                        } else {
+                            self.file_browser.refresh();
+                            self.update_preview();
+                        }
+                    }
+                }
+            }
+            MenuAction::CopyFileTo => {
+                if let Some(selected) = self.file_browser.selected_file() {
+                    if selected.is_file() {
+                        self.dialog.dialog_type = DialogType::Input {
+                            title: "Copy to".to_string(),
+                            value: self.file_browser.current_dir.to_string_lossy().to_string(),
+                            action: DialogAction::CopyFileTo { source: selected },
+                        };
+                    }
+                }
+            }
+            MenuAction::MoveFileTo => {
+                if let Some(selected) = self.file_browser.selected_file() {
+                    if selected.is_file() {
+                        self.dialog.dialog_type = DialogType::Input {
+                            title: "Move to".to_string(),
+                            value: self.file_browser.current_dir.to_string_lossy().to_string(),
+                            action: DialogAction::MoveFileTo { source: selected },
+                        };
+                    }
+                }
+            }
             MenuAction::DeleteFile => {
                 if let Some(selected) = self.file_browser.selected_file() {
                     if selected.file_name().map(|n| n.to_string_lossy()) != Some("..".into()) {
@@ -1646,6 +1709,40 @@ impl App {
                     let _ = std::fs::remove_dir_all(&path);
                 }
                 self.file_browser.refresh();
+            }
+            DialogAction::CopyFileTo { source } => {
+                if let Some(dest_dir) = value {
+                    if !dest_dir.is_empty() {
+                        let dest_path = std::path::Path::new(&dest_dir);
+                        if dest_path.is_dir() {
+                            if let Some(filename) = source.file_name() {
+                                let target = dest_path.join(filename);
+                                if let Err(e) = std::fs::copy(&source, &target) {
+                                    eprintln!("Failed to copy file: {}", e);
+                                } else {
+                                    self.file_browser.refresh();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            DialogAction::MoveFileTo { source } => {
+                if let Some(dest_dir) = value {
+                    if !dest_dir.is_empty() {
+                        let dest_path = std::path::Path::new(&dest_dir);
+                        if dest_path.is_dir() {
+                            if let Some(filename) = source.file_name() {
+                                let target = dest_path.join(filename);
+                                if let Err(e) = std::fs::rename(&source, &target) {
+                                    eprintln!("Failed to move file: {}", e);
+                                } else {
+                                    self.file_browser.refresh();
+                                }
+                            }
+                        }
+                    }
+                }
             }
             DialogAction::DiscardEditorChanges => {
                 self.preview.exit_edit_mode(true); // true = discard changes

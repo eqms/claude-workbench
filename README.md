@@ -86,7 +86,7 @@ When copying to Claude, the output is automatically filtered:
 - **Setup Wizard (Ctrl+Shift+W)**: First-run configuration assistant
 - **About Dialog (F10)**: License info and open source components
 - **Help (F12)**: Scrollable keyboard shortcuts and usage guide (j/k, arrows, PgUp/PgDn, g/G)
-- **Context Menu (F9)**: File operations (New, Rename, Delete, Copy Path)
+- **Context Menu (F9)**: File operations (New, Rename, Duplicate, Copy to, Move to, Delete, Copy Path)
 
 ### Installation
 
@@ -181,12 +181,22 @@ claude:
 | E | Enter edit mode |
 | Ctrl+S | Save |
 | Ctrl+Z | Undo |
-| Ctrl+Y | Redo |
 | / or Ctrl+F | Search (incremental) |
+| Ctrl+H | Search & Replace |
 | n / N | Next / Previous match |
 | PageUp/Down | Scroll 10 lines |
 | Home/End | Jump to start/end |
 | Esc | Exit editor / Close search |
+
+**MC Edit Style Block Operations:**
+| Key | Action |
+|-----|--------|
+| Shift+↑/↓/←/→ | Select text |
+| Ctrl+F3 | Toggle block marking |
+| Ctrl+F5 | Copy block |
+| Ctrl+F6 | Move (cut) block |
+| Ctrl+F8 | Delete block |
+| Ctrl+Y | Delete current line |
 
 #### Terminal Panes
 | Key | Action |
@@ -232,7 +242,7 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer, entwickelt für KI
   - Rot: Konflikt (!)
 - Statusleiste zeigt Dateigröße, Änderungsdatum und Git-Branch-Info
 - Doppelklick zum Öffnen von Dateien oder Betreten von Verzeichnissen
-- Kontextmenü (F9) für Dateioperationen: Neu, Umbenennen, Löschen, Pfad kopieren
+- Kontextmenü (F9) für Dateioperationen: Neu, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren
 
 #### Vorschau-Bereich (F2)
 - Syntax-Hervorhebung für über 500 Sprachen (via syntect)
@@ -297,7 +307,7 @@ Beim Kopieren zu Claude wird die Ausgabe automatisch gefiltert:
 - **Setup-Assistent (Ctrl+Shift+W)**: Erstkonfigurationsassistent
 - **Über-Dialog (F10)**: Lizenzinfo und Open-Source-Komponenten
 - **Hilfe (F12)**: Scrollbare Tastenkürzel und Bedienungsanleitung (j/k, Pfeile, PgUp/PgDn, g/G)
-- **Kontextmenü (F9)**: Dateioperationen (Neu, Umbenennen, Löschen, Pfad kopieren)
+- **Kontextmenü (F9)**: Dateioperationen (Neu, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren)
 
 ### Installation
 
@@ -392,12 +402,22 @@ claude:
 | E | Bearbeitungsmodus starten |
 | Ctrl+S | Speichern |
 | Ctrl+Z | Rückgängig |
-| Ctrl+Y | Wiederholen |
 | / oder Ctrl+F | Suche (inkrementell) |
+| Ctrl+H | Suchen & Ersetzen |
 | n / N | Nächster / Vorheriger Treffer |
 | PageUp/Down | 10 Zeilen scrollen |
 | Home/End | An Anfang/Ende springen |
 | Esc | Editor verlassen / Suche schließen |
+
+**MC Edit Block-Operationen:**
+| Taste | Aktion |
+|-------|--------|
+| Shift+↑/↓/←/→ | Text auswählen |
+| Ctrl+F3 | Block-Markierung umschalten |
+| Ctrl+F5 | Block kopieren |
+| Ctrl+F6 | Block verschieben (ausschneiden) |
+| Ctrl+F8 | Block löschen |
+| Ctrl+Y | Aktuelle Zeile löschen |
 
 #### Terminal-Bereiche
 | Taste | Aktion |

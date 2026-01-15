@@ -15,7 +15,7 @@ fn help_content() -> Vec<Line<'static>> {
     vec![
         // Title
         Line::from(Span::styled(
-            "Claude Workbench v0.18.0 Help",
+            "Claude Workbench Help",
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
         )),
         Line::from("═".repeat(40)),
@@ -46,6 +46,14 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
             Span::raw("Refresh File Browser"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F9           ", Style::default().fg(Color::Cyan)),
+            Span::raw("File Menu (n:New, r:Rename, u:Duplicate,"),
+        ]),
+        Line::from(vec![
+            Span::styled("               ", Style::default().fg(Color::Cyan)),
+            Span::raw("c:Copy to, m:Move to, d:Delete, y/Y:Path)"),
         ]),
         Line::from(vec![
             Span::styled("  F10          ", Style::default().fg(Color::Cyan)),
@@ -139,6 +147,14 @@ fn help_content() -> Vec<Line<'static>> {
             Span::styled("  .            ", Style::default().fg(Color::Cyan)),
             Span::raw("Toggle hidden files"),
         ]),
+        Line::from(vec![
+            Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
+            Span::raw("Refresh file list"),
+        ]),
+        Line::from(vec![
+            Span::styled("  F9           ", Style::default().fg(Color::Cyan)),
+            Span::raw("File Menu (New, Rename, Duplicate, etc.)"),
+        ]),
         Line::from(""),
         Line::from(Span::styled("  Status bar shows:", Style::default().fg(Color::DarkGray))),
         Line::from("  - File size and modification date"),
@@ -172,7 +188,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "  Git Remote (new in v0.18):",
+            "  Git Remote:",
             Style::default().fg(Color::DarkGray),
         )),
         Line::from("  - Auto-checks for remote changes on repo switch"),
@@ -360,7 +376,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "  CLI Navigation (new in v0.18):",
+            "  CLI Navigation:",
             Style::default().fg(Color::DarkGray),
         )),
         Line::from(vec![

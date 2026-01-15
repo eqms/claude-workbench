@@ -11,6 +11,9 @@ pub enum MenuAction {
     None,
     NewFile,
     RenameFile,
+    DuplicateFile,
+    CopyFileTo,
+    MoveFileTo,
     DeleteFile,
     CopyAbsolutePath,
     CopyRelativePath,
@@ -37,12 +40,12 @@ impl MenuBar {
     }
 
     pub fn next(&mut self) {
-        self.selected = (self.selected + 1) % 5;
+        self.selected = (self.selected + 1) % 8;
     }
 
     pub fn prev(&mut self) {
         if self.selected == 0 {
-            self.selected = 4;
+            self.selected = 7;
         } else {
             self.selected -= 1;
         }
@@ -52,9 +55,12 @@ impl MenuBar {
         match self.selected {
             0 => MenuAction::NewFile,
             1 => MenuAction::RenameFile,
-            2 => MenuAction::DeleteFile,
-            3 => MenuAction::CopyAbsolutePath,
-            4 => MenuAction::CopyRelativePath,
+            2 => MenuAction::DuplicateFile,
+            3 => MenuAction::CopyFileTo,
+            4 => MenuAction::MoveFileTo,
+            5 => MenuAction::DeleteFile,
+            6 => MenuAction::CopyAbsolutePath,
+            7 => MenuAction::CopyRelativePath,
             _ => MenuAction::None,
         }
     }
@@ -68,6 +74,9 @@ pub fn render(f: &mut Frame, area: Rect, menu: &MenuBar) {
     let items = vec![
         ("n", "New File"),
         ("r", "Rename"),
+        ("u", "Duplicate"),
+        ("c", "Copy to..."),
+        ("m", "Move to..."),
         ("d", "Delete"),
         ("y", "Copy Abs Path"),
         ("Y", "Copy Rel Path"),

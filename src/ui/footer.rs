@@ -18,6 +18,7 @@ pub enum FooterAction {
     FocusClaude,     // F4
     ToggleGit,       // F5
     ToggleTerm,      // F6
+    FileMenu,        // F9
     FuzzyFind,       // ^P
     OpenFile,        // o
     OpenFinder,      // O
@@ -115,14 +116,16 @@ pub fn get_context_button_positions(
             ("Esc", "Cancel", FooterAction::SelectCancel),
         ]
     } else if active_pane == PaneId::Preview && editor_mode == EditorMode::Edit {
+        // Edit mode - consistent F-key pane shortcuts + edit-specific actions
+        // Block operations (^F3/^F5/^F6/^F8) are shown in editor shortcut bar
         vec![
             ("^S", "Save", FooterAction::Save),
-            ("^F", "Search", FooterAction::Search),
             ("^H", "S&R", FooterAction::SearchReplace),
-            ("^F3", "Block", FooterAction::ToggleBlock),
-            ("^F5", "Copy", FooterAction::CopyBlock),
-            ("^F6", "Move", FooterAction::MoveBlock),
-            ("^F8", "Del", FooterAction::DeleteBlock),
+            ("F1", "Files", FooterAction::FocusFiles),
+            ("F3", "Refresh", FooterAction::Refresh),
+            ("F4", "Claude", FooterAction::FocusClaude),
+            ("F5", "Git", FooterAction::ToggleGit),
+            ("F6", "Term", FooterAction::ToggleTerm),
             ("Esc", "Exit", FooterAction::ExitEdit),
             ("F12", "Help", FooterAction::Help),
         ]
@@ -160,11 +163,11 @@ pub fn get_context_button_positions(
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
+            ("F9", "Menu", FooterAction::FileMenu),
             ("^P", "Find", FooterAction::FuzzyFind),
             (".", "Hidden", FooterAction::ToggleHidden),
             ("o", "Open", FooterAction::OpenFile),
             ("O", "Finder", FooterAction::OpenFinder),
-            ("^,", "Settings", FooterAction::Settings),
             ("F12", "Help", FooterAction::Help),
         ]
     };
@@ -197,15 +200,16 @@ impl Widget for Footer {
                 ("Esc", "Cancel"),
             ]
         } else if self.active_pane == PaneId::Preview && self.editor_mode == EditorMode::Edit {
-            // Edit mode keys (MC Edit style with Ctrl+F combinations)
+            // Edit mode keys - consistent F-key pane shortcuts + edit-specific actions
+            // Block operations (Ctrl+F3/F5/F6/F8) are documented in Help (F12)
             vec![
                 ("^S", "Save"),
-                ("^F", "Search"),
                 ("^H", "S&R"),
-                ("^F3", "Block"),
-                ("^F5", "Copy"),
-                ("^F6", "Move"),
-                ("^F8", "Del"),
+                ("F1", "Files"),
+                ("F3", "Refresh"),
+                ("F4", "Claude"),
+                ("F5", "Git"),
+                ("F6", "Term"),
                 ("Esc", "Exit"),
                 ("F12", "Help"),
             ]
@@ -245,11 +249,11 @@ impl Widget for Footer {
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
+                ("F9", "Menu"),
                 ("^P", "Find"),
                 (".", "Hidden"),
                 ("o", "Open"),
                 ("O", "Finder"),
-                ("^,", "Settings"),
                 ("F12", "Help"),
             ]
         };
