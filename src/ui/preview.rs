@@ -111,20 +111,38 @@ impl PreviewState {
 
             // Use tui-markdown for markdown files, syntect for others
             if self.is_markdown {
-                let md_text = tui_markdown::from_str(&content);
-                // Convert to owned Lines to avoid lifetime issues
-                self.highlighted_lines = md_text
-                    .lines
-                    .into_iter()
-                    .map(|line| {
-                        Line::from(
-                            line.spans
-                                .into_iter()
-                                .map(|span| Span::styled(span.content.to_string(), span.style))
-                                .collect::<Vec<_>>(),
-                        )
-                    })
-                    .collect();
+                // Catch potential panics in tui-markdown library (known bug in 0.3.7)
+                let content_clone = content.clone();
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    tui_markdown::from_str(&content_clone)
+                }));
+
+                match result {
+                    Ok(md_text) => {
+                        // Convert to owned Lines to avoid lifetime issues
+                        self.highlighted_lines = md_text
+                            .lines
+                            .into_iter()
+                            .map(|line| {
+                                Line::from(
+                                    line.spans
+                                        .into_iter()
+                                        .map(|span| {
+                                            Span::styled(span.content.to_string(), span.style)
+                                        })
+                                        .collect::<Vec<_>>(),
+                                )
+                            })
+                            .collect();
+                    }
+                    Err(_) => {
+                        // Fallback: show raw markdown content when tui-markdown panics
+                        self.highlighted_lines = content
+                            .lines()
+                            .map(|line| Line::from(line.to_string()))
+                            .collect();
+                    }
+                }
             } else {
                 self.highlighted_lines = syntax_manager.highlight(&content, &path);
             }

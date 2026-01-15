@@ -24,12 +24,14 @@ const HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
         }
         @media (prefers-color-scheme: dark) {
             body { background: #1e1e1e; color: #d4d4d4; }
-            code { background: #2d2d2d; }
-            pre { background: #2d2d2d; }
-            blockquote { border-color: #444; color: #999; }
-            th { background: #2d2d2d; }
+            code { background: #2d2d2d; color: #e8e8e8; }
+            pre { background: #2d2d2d; color: #e8e8e8; }
+            pre code { color: #e8e8e8; }
+            blockquote { border-color: #444; color: #aaa; }
+            th { background: #2d2d2d; color: #e8e8e8; }
             th, td { border-color: #444; }
             a { color: #6db3f2; }
+            h1, h2 { border-color: #444; }
         }
         h1, h2, h3, h4, h5, h6 { margin-top: 1.5em; margin-bottom: 0.5em; }
         h1 { border-bottom: 2px solid #eee; padding-bottom: 0.3em; }
@@ -37,18 +39,21 @@ const HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
         code {
             font-family: 'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace;
             background: #f4f4f4;
+            color: #333;
             padding: 0.2em 0.4em;
             border-radius: 3px;
             font-size: 0.9em;
         }
         pre {
             background: #f4f4f4;
+            color: #333;
             padding: 1rem;
             overflow-x: auto;
             border-radius: 5px;
         }
         pre code {
             background: none;
+            color: inherit;
             padding: 0;
         }
         blockquote {
