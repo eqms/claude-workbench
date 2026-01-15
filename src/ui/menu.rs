@@ -10,6 +10,7 @@ use ratatui::{
 pub enum MenuAction {
     None,
     NewFile,
+    NewDirectory,
     RenameFile,
     DuplicateFile,
     CopyFileTo,
@@ -40,12 +41,12 @@ impl MenuBar {
     }
 
     pub fn next(&mut self) {
-        self.selected = (self.selected + 1) % 8;
+        self.selected = (self.selected + 1) % 9;
     }
 
     pub fn prev(&mut self) {
         if self.selected == 0 {
-            self.selected = 7;
+            self.selected = 8;
         } else {
             self.selected -= 1;
         }
@@ -54,13 +55,14 @@ impl MenuBar {
     pub fn action(&self) -> MenuAction {
         match self.selected {
             0 => MenuAction::NewFile,
-            1 => MenuAction::RenameFile,
-            2 => MenuAction::DuplicateFile,
-            3 => MenuAction::CopyFileTo,
-            4 => MenuAction::MoveFileTo,
-            5 => MenuAction::DeleteFile,
-            6 => MenuAction::CopyAbsolutePath,
-            7 => MenuAction::CopyRelativePath,
+            1 => MenuAction::NewDirectory,
+            2 => MenuAction::RenameFile,
+            3 => MenuAction::DuplicateFile,
+            4 => MenuAction::CopyFileTo,
+            5 => MenuAction::MoveFileTo,
+            6 => MenuAction::DeleteFile,
+            7 => MenuAction::CopyAbsolutePath,
+            8 => MenuAction::CopyRelativePath,
             _ => MenuAction::None,
         }
     }
@@ -73,6 +75,7 @@ pub fn render(f: &mut Frame, area: Rect, menu: &MenuBar) {
 
     let items = vec![
         ("n", "New File"),
+        ("N", "New Directory"),
         ("r", "Rename"),
         ("u", "Duplicate"),
         ("c", "Copy to..."),

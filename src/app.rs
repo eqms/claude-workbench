@@ -728,7 +728,7 @@ impl App {
 
                         // Dialog handling (highest priority)
                         if self.dialog.is_active() {
-                            match &mut self.dialog.dialog_type {
+                            match &self.dialog.dialog_type {
                                 ui::dialog::DialogType::Input { value, action, .. } => {
                                     match key.code {
                                         KeyCode::Esc => self.dialog.close(),
@@ -738,8 +738,13 @@ impl App {
                                             self.dialog.close();
                                             self.execute_dialog_action(act, Some(val));
                                         }
-                                        KeyCode::Backspace => { value.pop(); }
-                                        KeyCode::Char(c) => { value.push(c); }
+                                        KeyCode::Backspace => self.dialog.delete_char_before(),
+                                        KeyCode::Delete => self.dialog.delete_char_at(),
+                                        KeyCode::Left => self.dialog.cursor_left(),
+                                        KeyCode::Right => self.dialog.cursor_right(),
+                                        KeyCode::Home => self.dialog.cursor_home(),
+                                        KeyCode::End => self.dialog.cursor_end(),
+                                        KeyCode::Char(c) => self.dialog.insert_char(c),
                                         _ => {}
                                     }
                                 }
@@ -771,6 +776,7 @@ impl App {
                                     self.handle_menu_action(action);
                                 }
                                 KeyCode::Char('n') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::NewFile); }
+                                KeyCode::Char('N') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::NewDirectory); }
                                 KeyCode::Char('r') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::RenameFile); }
                                 KeyCode::Char('u') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::DuplicateFile); }
                                 KeyCode::Char('c') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyFileTo); }
@@ -1575,7 +1581,16 @@ impl App {
                 self.dialog.dialog_type = DialogType::Input {
                     title: "New File".to_string(),
                     value: String::new(),
+                    cursor: 0,
                     action: DialogAction::NewFile,
+                };
+            }
+            MenuAction::NewDirectory => {
+                self.dialog.dialog_type = DialogType::Input {
+                    title: "New Directory".to_string(),
+                    value: String::new(),
+                    cursor: 0,
+                    action: DialogAction::NewDirectory,
                 };
             }
             MenuAction::RenameFile => {
@@ -1583,9 +1598,11 @@ impl App {
                     let name = selected.file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
+                    let cursor_pos = name.chars().count();
                     self.dialog.dialog_type = DialogType::Input {
                         title: "Rename".to_string(),
                         value: name,
+                        cursor: cursor_pos,
                         action: DialogAction::RenameFile { old_path: selected },
                     };
                 }
@@ -1625,9 +1642,12 @@ impl App {
             MenuAction::CopyFileTo => {
                 if let Some(selected) = self.file_browser.selected_file() {
                     if selected.is_file() {
+                        let dir_str = self.file_browser.current_dir.to_string_lossy().to_string();
+                        let cursor_pos = dir_str.chars().count();
                         self.dialog.dialog_type = DialogType::Input {
                             title: "Copy to".to_string(),
-                            value: self.file_browser.current_dir.to_string_lossy().to_string(),
+                            value: dir_str,
+                            cursor: cursor_pos,
                             action: DialogAction::CopyFileTo { source: selected },
                         };
                     }
@@ -1636,9 +1656,12 @@ impl App {
             MenuAction::MoveFileTo => {
                 if let Some(selected) = self.file_browser.selected_file() {
                     if selected.is_file() {
+                        let dir_str = self.file_browser.current_dir.to_string_lossy().to_string();
+                        let cursor_pos = dir_str.chars().count();
                         self.dialog.dialog_type = DialogType::Input {
                             title: "Move to".to_string(),
-                            value: self.file_browser.current_dir.to_string_lossy().to_string(),
+                            value: dir_str,
+                            cursor: cursor_pos,
                             action: DialogAction::MoveFileTo { source: selected },
                         };
                     }
@@ -1688,6 +1711,18 @@ impl App {
                         let new_path = self.file_browser.current_dir.join(&name);
                         let _ = std::fs::write(&new_path, "");
                         self.file_browser.refresh();
+                    }
+                }
+            }
+            DialogAction::NewDirectory => {
+                if let Some(name) = value {
+                    if !name.is_empty() {
+                        let new_path = self.file_browser.current_dir.join(&name);
+                        if let Err(e) = std::fs::create_dir(&new_path) {
+                            eprintln!("Failed to create directory: {}", e);
+                        } else {
+                            self.file_browser.refresh();
+                        }
                     }
                 }
             }

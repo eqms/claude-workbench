@@ -86,7 +86,7 @@ When copying to Claude, the output is automatically filtered:
 - **Setup Wizard (Ctrl+Shift+W)**: First-run configuration assistant
 - **About Dialog (F10)**: License info and open source components
 - **Help (F12)**: Scrollable keyboard shortcuts and usage guide (j/k, arrows, PgUp/PgDn, g/G)
-- **Context Menu (F9)**: File operations (New, Rename, Duplicate, Copy to, Move to, Delete, Copy Path)
+- **Context Menu (F9)**: File operations (New File, New Directory, Rename, Duplicate, Copy to, Move to, Delete, Copy Path)
 
 ### Installation
 
@@ -242,7 +242,7 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer, entwickelt für KI
   - Rot: Konflikt (!)
 - Statusleiste zeigt Dateigröße, Änderungsdatum und Git-Branch-Info
 - Doppelklick zum Öffnen von Dateien oder Betreten von Verzeichnissen
-- Kontextmenü (F9) für Dateioperationen: Neu, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren
+- Kontextmenü (F9) für Dateioperationen: Neue Datei, Neues Verzeichnis, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren
 
 #### Vorschau-Bereich (F2)
 - Syntax-Hervorhebung für über 500 Sprachen (via syntect)
@@ -307,7 +307,7 @@ Beim Kopieren zu Claude wird die Ausgabe automatisch gefiltert:
 - **Setup-Assistent (Ctrl+Shift+W)**: Erstkonfigurationsassistent
 - **Über-Dialog (F10)**: Lizenzinfo und Open-Source-Komponenten
 - **Hilfe (F12)**: Scrollbare Tastenkürzel und Bedienungsanleitung (j/k, Pfeile, PgUp/PgDn, g/G)
-- **Kontextmenü (F9)**: Dateioperationen (Neu, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren)
+- **Kontextmenü (F9)**: Dateioperationen (Neue Datei, Neues Verzeichnis, Umbenennen, Duplizieren, Kopieren nach, Verschieben nach, Löschen, Pfad kopieren)
 
 ### Installation
 

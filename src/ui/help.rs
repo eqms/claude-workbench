@@ -49,11 +49,11 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  F9           ", Style::default().fg(Color::Cyan)),
-            Span::raw("File Menu (n:New, r:Rename, u:Duplicate,"),
+            Span::raw("File Menu (n:New, N:Dir, r:Rename,"),
         ]),
         Line::from(vec![
             Span::styled("               ", Style::default().fg(Color::Cyan)),
-            Span::raw("c:Copy to, m:Move to, d:Delete, y/Y:Path)"),
+            Span::raw("u:Dup, c:Copy, m:Move, d:Del, y/Y:Path)"),
         ]),
         Line::from(vec![
             Span::styled("  F10          ", Style::default().fg(Color::Cyan)),
@@ -153,7 +153,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  F9           ", Style::default().fg(Color::Cyan)),
-            Span::raw("File Menu (New, Rename, Duplicate, etc.)"),
+            Span::raw("File Menu (New File/Dir, Rename, etc.)"),
         ]),
         Line::from(""),
         Line::from(Span::styled("  Status bar shows:", Style::default().fg(Color::DarkGray))),

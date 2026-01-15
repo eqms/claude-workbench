@@ -9,13 +9,14 @@ use ratatui::{
 #[derive(Debug, Clone, PartialEq)]
 pub enum DialogType {
     None,
-    Input { title: String, value: String, action: DialogAction },
+    Input { title: String, value: String, cursor: usize, action: DialogAction },
     Confirm { title: String, message: String, action: DialogAction },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DialogAction {
     NewFile,
+    NewDirectory,
     RenameFile { old_path: std::path::PathBuf },
     DeleteFile { path: std::path::PathBuf },
     /// Copy file to destination (value is destination path)
@@ -98,15 +99,86 @@ impl Dialog {
         }
     }
 
-    pub fn push_char(&mut self, c: char) {
-        if let DialogType::Input { value, .. } = &mut self.dialog_type {
-            value.push(c);
+    /// Insert character at cursor position
+    pub fn insert_char(&mut self, c: char) {
+        if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
+            // Get byte position from char index
+            let byte_pos = value.char_indices()
+                .nth(*cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(value.len());
+            value.insert(byte_pos, c);
+            *cursor += 1;
         }
     }
 
-    pub fn pop_char(&mut self) {
-        if let DialogType::Input { value, .. } = &mut self.dialog_type {
-            value.pop();
+    /// Delete character before cursor (Backspace)
+    pub fn delete_char_before(&mut self) {
+        if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
+            if *cursor > 0 {
+                // Get byte position of char before cursor
+                let byte_pos = value.char_indices()
+                    .nth(*cursor - 1)
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                value.remove(byte_pos);
+                *cursor -= 1;
+            }
+        }
+    }
+
+    /// Delete character at cursor (Delete key)
+    pub fn delete_char_at(&mut self) {
+        if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
+            let char_count = value.chars().count();
+            if *cursor < char_count {
+                let byte_pos = value.char_indices()
+                    .nth(*cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(value.len());
+                value.remove(byte_pos);
+            }
+        }
+    }
+
+    /// Move cursor left
+    pub fn cursor_left(&mut self) {
+        if let DialogType::Input { cursor, .. } = &mut self.dialog_type {
+            if *cursor > 0 {
+                *cursor -= 1;
+            }
+        }
+    }
+
+    /// Move cursor right
+    pub fn cursor_right(&mut self) {
+        if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
+            let char_count = value.chars().count();
+            if *cursor < char_count {
+                *cursor += 1;
+            }
+        }
+    }
+
+    /// Move cursor to start (Home)
+    pub fn cursor_home(&mut self) {
+        if let DialogType::Input { cursor, .. } = &mut self.dialog_type {
+            *cursor = 0;
+        }
+    }
+
+    /// Move cursor to end (End)
+    pub fn cursor_end(&mut self) {
+        if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
+            *cursor = value.chars().count();
+        }
+    }
+
+    /// Get current cursor position
+    pub fn cursor_pos(&self) -> usize {
+        match &self.dialog_type {
+            DialogType::Input { cursor, .. } => *cursor,
+            _ => 0,
         }
     }
 
@@ -127,7 +199,7 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
 
     match &dialog.dialog_type {
         DialogType::None => {}
-        DialogType::Input { title, value, .. } => {
+        DialogType::Input { title, value, cursor, .. } => {
             let width = 50u16.min(area.width.saturating_sub(4));
             let height = 5u16;
             let x = area.x + (area.width.saturating_sub(width)) / 2;
@@ -144,10 +216,24 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
             let inner = block.inner(popup_area);
             f.render_widget(block, popup_area);
 
-            // Input field
+            // Input field with cursor at correct position
+            let chars: Vec<char> = value.chars().collect();
+            let before_cursor: String = chars[..*cursor].iter().collect();
+            let at_cursor: String = if *cursor < chars.len() {
+                chars[*cursor].to_string()
+            } else {
+                " ".to_string()
+            };
+            let after_cursor: String = if *cursor < chars.len() {
+                chars[*cursor + 1..].iter().collect()
+            } else {
+                String::new()
+            };
+
             let input_line = Line::from(vec![
-                Span::styled(value.as_str(), Style::default().fg(Color::Yellow)),
-                Span::styled("_", Style::default().fg(Color::White).add_modifier(Modifier::SLOW_BLINK)),
+                Span::styled(before_cursor, Style::default().fg(Color::Yellow)),
+                Span::styled(at_cursor, Style::default().fg(Color::Black).bg(Color::Yellow).add_modifier(Modifier::SLOW_BLINK)),
+                Span::styled(after_cursor, Style::default().fg(Color::Yellow)),
             ]);
             f.render_widget(Paragraph::new(input_line), Rect::new(inner.x, inner.y + 1, inner.width, 1));
 
