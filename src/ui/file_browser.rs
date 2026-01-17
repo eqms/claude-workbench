@@ -1,15 +1,15 @@
+use crate::git;
+use crate::types::{GitFileStatus, GitRepoInfo};
 use ratatui::{
-    widgets::{Block, List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState},
-    style::{Style, Modifier, Color},
-    Frame,
     prelude::Rect,
+    style::{Color, Modifier, Style},
+    widgets::{Block, List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    Frame,
 };
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 use std::time::SystemTime;
-use crate::types::{GitFileStatus, GitRepoInfo};
-use crate::git;
 
 /// Format file modification date for display using local timezone
 fn format_file_date(utc_secs: u64) -> String {
@@ -28,7 +28,10 @@ fn format_file_date(utc_secs: u64) -> String {
     let hours = tm.tm_hour;
     let minutes = tm.tm_min;
 
-    format!("{:02}.{:02}.{} {:02}:{:02}", day, month, year, hours, minutes)
+    format!(
+        "{:02}.{:02}.{} {:02}:{:02}",
+        day, month, year, hours, minutes
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -97,7 +100,11 @@ impl FileBrowserState {
             for entry in entries.flatten() {
                 let path = entry.path();
                 let is_dir = path.is_dir();
-                let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
 
                 // Filter hidden files based on config
                 if !self.show_hidden && name.starts_with('.') {
@@ -133,8 +140,12 @@ impl FileBrowserState {
 
         // Sort: ".." first, then Directories, then files
         self.entries.sort_by(|a, b| {
-            if a.name == ".." { return std::cmp::Ordering::Less; }
-            if b.name == ".." { return std::cmp::Ordering::Greater; }
+            if a.name == ".." {
+                return std::cmp::Ordering::Less;
+            }
+            if b.name == ".." {
+                return std::cmp::Ordering::Greater;
+            }
             if a.is_dir == b.is_dir {
                 a.name.cmp(&b.name)
             } else if a.is_dir {
@@ -145,7 +156,7 @@ impl FileBrowserState {
         });
 
         if !self.entries.is_empty() {
-             self.list_state.select(Some(0));
+            self.list_state.select(Some(0));
         }
     }
 
@@ -176,7 +187,7 @@ impl FileBrowserState {
         };
         self.list_state.select(Some(i));
     }
-    
+
     pub fn enter_selected(&mut self) -> Option<PathBuf> {
         if let Some(i) = self.list_state.selected() {
             if let Some(entry) = self.entries.get(i) {
@@ -198,11 +209,13 @@ impl FileBrowserState {
             self.load_directory();
         }
     }
-    
+
     pub fn selected_file(&self) -> Option<PathBuf> {
-        self.list_state.selected().and_then(|i| self.entries.get(i).map(|e| e.path.clone()))
+        self.list_state
+            .selected()
+            .and_then(|i| self.entries.get(i).map(|e| e.path.clone()))
     }
-    
+
     pub fn refresh(&mut self) {
         let selected = self.list_state.selected();
         self.load_directory();
@@ -221,16 +234,18 @@ fn style_for_git_status(status: GitFileStatus) -> Style {
         GitFileStatus::Untracked => Style::default().fg(Color::Yellow),
         GitFileStatus::Modified => Style::default().fg(Color::Rgb(255, 165, 0)), // Orange
         GitFileStatus::Staged => Style::default().fg(Color::Green),
-        GitFileStatus::Ignored => Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+        GitFileStatus::Ignored => Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM),
         GitFileStatus::Conflict => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         GitFileStatus::Clean | GitFileStatus::Unknown => Style::default(),
     }
 }
 
 pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focused: bool) {
-    use ratatui::layout::{Layout, Direction, Constraint};
-    use ratatui::widgets::Paragraph;
+    use ratatui::layout::{Constraint, Direction, Layout};
     use ratatui::text::{Line, Span};
+    use ratatui::widgets::Paragraph;
 
     // Split area: list + info bar
     let chunks = Layout::default()
@@ -241,33 +256,41 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
     let list_area = chunks[0];
     let info_area = chunks[1];
 
-    let items: Vec<ListItem> = state.entries.iter().map(|entry| {
-        let icon = if entry.name == ".." { "↩️ " } else if entry.is_dir { "📁 " } else { "📄 " };
+    let items: Vec<ListItem> = state
+        .entries
+        .iter()
+        .map(|entry| {
+            let icon = if entry.name == ".." {
+                "↩️ "
+            } else if entry.is_dir {
+                "📁 "
+            } else {
+                "📄 "
+            };
 
-        // Get git status symbol and style
-        let status_symbol = entry.git_status.symbol();
-        let status_style = style_for_git_status(entry.git_status);
+            // Get git status symbol and style
+            let status_symbol = entry.git_status.symbol();
+            let status_style = style_for_git_status(entry.git_status);
 
-        // Build the line with colored status symbol and name
-        let line = Line::from(vec![
-            Span::styled(status_symbol, status_style),
-            Span::raw(" "),
-            Span::styled(format!("{}{}", icon, entry.name), status_style),
-        ]);
+            // Build the line with colored status symbol and name
+            let line = Line::from(vec![
+                Span::styled(status_symbol, status_style),
+                Span::raw(" "),
+                Span::styled(format!("{}{}", icon, entry.name), status_style),
+            ]);
 
-        ListItem::new(line)
-    }).collect();
+            ListItem::new(line)
+        })
+        .collect();
 
     let border_style = if is_focused {
         Style::default().fg(Color::Green)
     } else {
         Style::default()
     };
-    
+
     let title = format!(" {} ", state.current_dir.display());
-    let block = Block::bordered()
-        .title(title)
-        .border_style(border_style);
+    let block = Block::bordered().title(title).border_style(border_style);
 
     let list = List::new(items)
         .block(block)
@@ -280,8 +303,8 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
         .begin_symbol(Some("▲"))
         .end_symbol(Some("▼"));
 
-    let mut scrollbar_state = ScrollbarState::new(state.entries.len())
-        .position(state.list_state.selected().unwrap_or(0));
+    let mut scrollbar_state =
+        ScrollbarState::new(state.entries.len()).position(state.list_state.selected().unwrap_or(0));
 
     // Render scrollbar in the inner area (inside the border)
     let scrollbar_area = Rect {
@@ -317,7 +340,8 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
                 " 📁 Dir".to_string()
             } else {
                 let size_kb = entry.size as f64 / 1024.0;
-                let date_str = entry.modified
+                let date_str = entry
+                    .modified
                     .and_then(|m| m.duration_since(SystemTime::UNIX_EPOCH).ok())
                     .map(|d| format_file_date(d.as_secs()))
                     .unwrap_or_default();
@@ -341,7 +365,6 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
         format!("{} │ {}", file_info_text, git_info_str)
     };
 
-    let info = Paragraph::new(info_text)
-        .style(Style::default().fg(Color::DarkGray));
+    let info = Paragraph::new(info_text).style(Style::default().fg(Color::DarkGray));
     f.render_widget(info, info_area);
 }

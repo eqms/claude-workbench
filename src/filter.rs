@@ -251,7 +251,11 @@ pub fn filter_lines(input: Vec<String>, options: &FilterOptions) -> FilteredOutp
     }
 
     // Trim trailing blank lines
-    while filtered_lines.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+    while filtered_lines
+        .last()
+        .map(|l| l.trim().is_empty())
+        .unwrap_or(false)
+    {
         filtered_lines.pop();
     }
 

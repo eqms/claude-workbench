@@ -1,8 +1,8 @@
 use ratatui::{
     layout::Rect,
-    style::{Color, Style, Modifier},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, List, ListItem, ListState},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
 use std::path::{Path, PathBuf};
@@ -61,7 +61,8 @@ impl FuzzyFinder {
             self.filtered = self.all_files.clone();
         } else {
             let query_lower = self.query.to_lowercase();
-            self.filtered = self.all_files
+            self.filtered = self
+                .all_files
                 .iter()
                 .filter(|p| {
                     let name = p.to_string_lossy().to_lowercase();
@@ -70,7 +71,7 @@ impl FuzzyFinder {
                 .cloned()
                 .collect();
         }
-        
+
         // Reset selection
         if !self.filtered.is_empty() {
             self.list_state.select(Some(0));
@@ -80,21 +81,35 @@ impl FuzzyFinder {
     }
 
     pub fn next(&mut self) {
-        if self.filtered.is_empty() { return; }
+        if self.filtered.is_empty() {
+            return;
+        }
         let i = self.list_state.selected().unwrap_or(0);
-        let next = if i >= self.filtered.len() - 1 { 0 } else { i + 1 };
+        let next = if i >= self.filtered.len() - 1 {
+            0
+        } else {
+            i + 1
+        };
         self.list_state.select(Some(next));
     }
 
     pub fn prev(&mut self) {
-        if self.filtered.is_empty() { return; }
+        if self.filtered.is_empty() {
+            return;
+        }
         let i = self.list_state.selected().unwrap_or(0);
-        let prev = if i == 0 { self.filtered.len() - 1 } else { i - 1 };
+        let prev = if i == 0 {
+            self.filtered.len() - 1
+        } else {
+            i - 1
+        };
         self.list_state.select(Some(prev));
     }
 
     pub fn selected(&self) -> Option<PathBuf> {
-        self.list_state.selected().and_then(|i| self.filtered.get(i).cloned())
+        self.list_state
+            .selected()
+            .and_then(|i| self.filtered.get(i).cloned())
     }
 }
 
@@ -120,20 +135,37 @@ fn collect_files(dir: &Path, max_depth: usize) -> Vec<PathBuf> {
     files
 }
 
-fn collect_files_recursive(base: &Path, dir: &Path, max_depth: usize, depth: usize, files: &mut Vec<PathBuf>) {
-    if depth > max_depth { return; }
-    
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
-    
+fn collect_files_recursive(
+    base: &Path,
+    dir: &Path,
+    max_depth: usize,
+    depth: usize,
+    files: &mut Vec<PathBuf>,
+) {
+    if depth > max_depth {
+        return;
+    }
+
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+
     for entry in entries.flatten() {
         let path = entry.path();
-        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-        
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+
         // Skip hidden files and common ignore patterns
-        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "__pycache__" {
+        if name.starts_with('.')
+            || name == "node_modules"
+            || name == "target"
+            || name == "__pycache__"
+        {
             continue;
         }
-        
+
         if path.is_file() {
             // Store relative path
             if let Ok(rel) = path.strip_prefix(base) {
@@ -146,7 +178,9 @@ fn collect_files_recursive(base: &Path, dir: &Path, max_depth: usize, depth: usi
 }
 
 pub fn render(f: &mut Frame, area: Rect, finder: &mut FuzzyFinder) {
-    if !finder.visible { return; }
+    if !finder.visible {
+        return;
+    }
 
     // Modal size
     let width = (area.width * 70 / 100).min(80);
@@ -170,7 +204,12 @@ pub fn render(f: &mut Frame, area: Rect, finder: &mut FuzzyFinder) {
     let input_line = Line::from(vec![
         Span::styled("> ", Style::default().fg(Color::Cyan)),
         Span::styled(&finder.query, Style::default().fg(Color::Yellow)),
-        Span::styled("_", Style::default().fg(Color::White).add_modifier(Modifier::SLOW_BLINK)),
+        Span::styled(
+            "_",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::SLOW_BLINK),
+        ),
     ]);
     f.render_widget(Paragraph::new(input_line), input_area);
 
@@ -179,13 +218,19 @@ pub fn render(f: &mut Frame, area: Rect, finder: &mut FuzzyFinder) {
     let count_text = format!("{}/{} files", finder.filtered.len(), finder.all_files.len());
     f.render_widget(
         Paragraph::new(count_text).style(Style::default().fg(Color::DarkGray)),
-        count_area
+        count_area,
     );
 
     // File list
-    let list_area = Rect::new(inner.x, inner.y + 2, inner.width, inner.height.saturating_sub(2));
-    
-    let items: Vec<ListItem> = finder.filtered
+    let list_area = Rect::new(
+        inner.x,
+        inner.y + 2,
+        inner.width,
+        inner.height.saturating_sub(2),
+    );
+
+    let items: Vec<ListItem> = finder
+        .filtered
         .iter()
         .take(list_area.height as usize)
         .map(|p| {
@@ -195,7 +240,12 @@ pub fn render(f: &mut Frame, area: Rect, finder: &mut FuzzyFinder) {
         .collect();
 
     let list = List::new(items)
-        .highlight_style(Style::default().bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD))
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
         .highlight_symbol("> ");
 
     f.render_stateful_widget(list, list_area, &mut finder.list_state);

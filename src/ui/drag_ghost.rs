@@ -1,7 +1,7 @@
+use crate::types::DragState;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
-use crate::types::DragState;
 
 /// Renders a small ghost element that follows the cursor during drag operations.
 /// Shows the filename being dragged with an icon.
@@ -15,10 +15,7 @@ pub fn render(f: &mut Frame, drag_state: &DragState) {
     };
 
     // Get filename for display
-    let filename = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("file");
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
 
     // Determine icon based on whether it's a directory
     let icon = if path.is_dir() { "📁" } else { "📄" };

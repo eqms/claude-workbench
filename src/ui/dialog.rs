@@ -1,6 +1,6 @@
 use ratatui::{
     layout::Rect,
-    style::{Color, Style, Modifier},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -9,25 +9,48 @@ use ratatui::{
 #[derive(Debug, Clone, PartialEq)]
 pub enum DialogType {
     None,
-    Input { title: String, value: String, cursor: usize, action: DialogAction },
-    Confirm { title: String, message: String, action: DialogAction },
+    Input {
+        title: String,
+        value: String,
+        cursor: usize,
+        action: DialogAction,
+    },
+    Confirm {
+        title: String,
+        message: String,
+        action: DialogAction,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DialogAction {
     NewFile,
     NewDirectory,
-    RenameFile { old_path: std::path::PathBuf },
-    DeleteFile { path: std::path::PathBuf },
+    RenameFile {
+        old_path: std::path::PathBuf,
+    },
+    DeleteFile {
+        path: std::path::PathBuf,
+    },
     /// Copy file to destination (value is destination path)
-    CopyFileTo { source: std::path::PathBuf },
+    CopyFileTo {
+        source: std::path::PathBuf,
+    },
     /// Move file to destination (value is destination path)
-    MoveFileTo { source: std::path::PathBuf },
+    MoveFileTo {
+        source: std::path::PathBuf,
+    },
     DiscardEditorChanges,
-    SwitchFile { target_idx: usize },
-    EnterDirectory { target_idx: usize },
+    SwitchFile {
+        target_idx: usize,
+    },
+    EnterDirectory {
+        target_idx: usize,
+    },
     /// Git pull confirmation (repo_root is the path to pull from)
-    GitPull { repo_root: std::path::PathBuf },
+    GitPull {
+        repo_root: std::path::PathBuf,
+    },
     /// Navigate to a specific path
     GoToPath,
 }
@@ -105,7 +128,8 @@ impl Dialog {
     pub fn insert_char(&mut self, c: char) {
         if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
             // Get byte position from char index
-            let byte_pos = value.char_indices()
+            let byte_pos = value
+                .char_indices()
                 .nth(*cursor)
                 .map(|(i, _)| i)
                 .unwrap_or(value.len());
@@ -119,7 +143,8 @@ impl Dialog {
         if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
             if *cursor > 0 {
                 // Get byte position of char before cursor
-                let byte_pos = value.char_indices()
+                let byte_pos = value
+                    .char_indices()
                     .nth(*cursor - 1)
                     .map(|(i, _)| i)
                     .unwrap_or(0);
@@ -134,7 +159,8 @@ impl Dialog {
         if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
             let char_count = value.chars().count();
             if *cursor < char_count {
-                let byte_pos = value.char_indices()
+                let byte_pos = value
+                    .char_indices()
                     .nth(*cursor)
                     .map(|(i, _)| i)
                     .unwrap_or(value.len());
@@ -201,7 +227,12 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
 
     match &dialog.dialog_type {
         DialogType::None => {}
-        DialogType::Input { title, value, cursor, .. } => {
+        DialogType::Input {
+            title,
+            value,
+            cursor,
+            ..
+        } => {
             let width = 50u16.min(area.width.saturating_sub(4));
             let height = 5u16;
             let x = area.x + (area.width.saturating_sub(width)) / 2;
@@ -234,10 +265,19 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
 
             let input_line = Line::from(vec![
                 Span::styled(before_cursor, Style::default().fg(Color::Yellow)),
-                Span::styled(at_cursor, Style::default().fg(Color::Black).bg(Color::Yellow).add_modifier(Modifier::SLOW_BLINK)),
+                Span::styled(
+                    at_cursor,
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::SLOW_BLINK),
+                ),
                 Span::styled(after_cursor, Style::default().fg(Color::Yellow)),
             ]);
-            f.render_widget(Paragraph::new(input_line), Rect::new(inner.x, inner.y + 1, inner.width, 1));
+            f.render_widget(
+                Paragraph::new(input_line),
+                Rect::new(inner.x, inner.y + 1, inner.width, 1),
+            );
 
             // Help text
             let help = Paragraph::new("Enter: Confirm | Esc: Cancel")
@@ -246,7 +286,7 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
         }
         DialogType::Confirm { title, message, .. } => {
             let width = 50u16.min(area.width.saturating_sub(4));
-            let height = 7u16;  // Slightly taller for better spacing
+            let height = 7u16; // Slightly taller for better spacing
             let x = area.x + (area.width.saturating_sub(width)) / 2;
             let y = area.y + (area.height.saturating_sub(height)) / 2;
             let popup_rect = Rect::new(x, y, width, height);
@@ -261,15 +301,18 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Yellow))
                 .title(format!(" ⚠ {} ", title))
-                .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .title_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
                 .style(Style::default().bg(Color::DarkGray));
 
             let inner = block.inner(popup_rect);
             f.render_widget(block, popup_rect);
 
             // Message with white text on dark background
-            let msg = Paragraph::new(message.as_str())
-                .style(Style::default().fg(Color::White));
+            let msg = Paragraph::new(message.as_str()).style(Style::default().fg(Color::White));
             f.render_widget(msg, Rect::new(inner.x, inner.y + 1, inner.width, 2));
 
             // Button dimensions: " [Y] Yes " = 9 chars, "   " = 3 chars, " [N] No " = 8 chars
@@ -280,15 +323,26 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
 
             // Store button areas for mouse click detection
             dialog.yes_button_area = Some(Rect::new(inner.x, button_y, yes_width, 1));
-            dialog.no_button_area = Some(Rect::new(inner.x + yes_width + gap_width, button_y, no_width, 1));
+            dialog.no_button_area = Some(Rect::new(
+                inner.x + yes_width + gap_width,
+                button_y,
+                no_width,
+                1,
+            ));
 
             // Buttons with better contrast
             let buttons = Line::from(vec![
-                Span::styled(" [Y] Yes ", Style::default().bg(Color::Cyan).fg(Color::Black)),
+                Span::styled(
+                    " [Y] Yes ",
+                    Style::default().bg(Color::Cyan).fg(Color::Black),
+                ),
                 Span::raw("   "),
                 Span::styled(" [N] No ", Style::default().bg(Color::Red).fg(Color::White)),
             ]);
-            f.render_widget(Paragraph::new(buttons), Rect::new(inner.x, button_y, inner.width, 1));
+            f.render_widget(
+                Paragraph::new(buttons),
+                Rect::new(inner.x, button_y, inner.width, 1),
+            );
         }
     }
 }

@@ -65,8 +65,18 @@ pub fn render(frame: &mut Frame, area: Rect, state: &ClaudeStartupState) {
     }
 
     // Calculate popup size - width based on content
-    let max_name_len = state.prefixes.iter().map(|p| p.name.len()).max().unwrap_or(10);
-    let max_desc_len = state.prefixes.iter().map(|p| p.description.len()).max().unwrap_or(20);
+    let max_name_len = state
+        .prefixes
+        .iter()
+        .map(|p| p.name.len())
+        .max()
+        .unwrap_or(10);
+    let max_desc_len = state
+        .prefixes
+        .iter()
+        .map(|p| p.description.len())
+        .max()
+        .unwrap_or(20);
     let content_width = (max_name_len + max_desc_len + 10).min(60) as u16;
     let popup_width = content_width.max(40);
     let popup_height = (state.prefixes.len() as u16 + 6).min(20);
@@ -92,7 +102,11 @@ pub fn render(frame: &mut Frame, area: Rect, state: &ClaudeStartupState) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan))
         .title(" Claude Startup ")
-        .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+        .title_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
     frame.render_widget(block, popup_area);
 
     // Title area
@@ -102,8 +116,7 @@ pub fn render(frame: &mut Frame, area: Rect, state: &ClaudeStartupState) {
         chunks[0].width.saturating_sub(2),
         1,
     );
-    let title = Paragraph::new("Select an action:")
-        .style(Style::default().fg(Color::White));
+    let title = Paragraph::new("Select an action:").style(Style::default().fg(Color::White));
     frame.render_widget(title, title_area);
 
     // List area
@@ -125,22 +138,28 @@ pub fn render(frame: &mut Frame, area: Rect, state: &ClaudeStartupState) {
             let line = Line::from(vec![
                 Span::styled(
                     selector,
-                    Style::default().fg(if is_selected { Color::Yellow } else { Color::DarkGray }),
+                    Style::default().fg(if is_selected {
+                        Color::Yellow
+                    } else {
+                        Color::DarkGray
+                    }),
                 ),
                 Span::styled(
                     format!("{:<15}", prefix.name),
                     Style::default()
-                        .fg(if is_selected { Color::Yellow } else { Color::White })
-                        .add_modifier(if is_selected { Modifier::BOLD } else { Modifier::empty() }),
+                        .fg(if is_selected {
+                            Color::Yellow
+                        } else {
+                            Color::White
+                        })
+                        .add_modifier(if is_selected {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
                 ),
-                Span::styled(
-                    " - ",
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled(
-                    &prefix.description,
-                    Style::default().fg(Color::Gray),
-                ),
+                Span::styled(" - ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&prefix.description, Style::default().fg(Color::Gray)),
             ]);
 
             ListItem::new(line)
@@ -160,9 +179,15 @@ pub fn render(frame: &mut Frame, area: Rect, state: &ClaudeStartupState) {
     let footer = Line::from(vec![
         Span::styled(" Enter ", Style::default().bg(Color::Cyan).fg(Color::Black)),
         Span::raw(" Select  "),
-        Span::styled(" Esc ", Style::default().bg(Color::DarkGray).fg(Color::White)),
+        Span::styled(
+            " Esc ",
+            Style::default().bg(Color::DarkGray).fg(Color::White),
+        ),
         Span::raw(" Skip  "),
-        Span::styled(" ↑↓ ", Style::default().bg(Color::DarkGray).fg(Color::White)),
+        Span::styled(
+            " ↑↓ ",
+            Style::default().bg(Color::DarkGray).fg(Color::White),
+        ),
         Span::raw(" Navigate"),
     ]);
     frame.render_widget(Paragraph::new(footer), footer_area);

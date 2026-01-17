@@ -112,7 +112,10 @@ impl Default for WizardState {
             .collect();
 
         // Default to first available shell, or /bin/bash
-        let default_shell = available_shells.first().cloned().unwrap_or_else(|| "/bin/bash".to_string());
+        let default_shell = available_shells
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "/bin/bash".to_string());
 
         Self {
             visible: false,

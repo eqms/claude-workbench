@@ -282,8 +282,8 @@ impl MouseSelection {
         if self.selecting {
             // Clamp Y to pane boundaries to prevent selection overflow
             if let Some(area) = self.pane_area {
-                let min_y = area.y + 1;  // Account for top border
-                let max_y = area.y + area.height.saturating_sub(2);  // Account for bottom border
+                let min_y = area.y + 1; // Account for top border
+                let max_y = area.y + area.height.saturating_sub(2); // Account for bottom border
                 self.current_y = y.clamp(min_y, max_y);
             } else {
                 self.current_y = y;
@@ -436,7 +436,9 @@ impl SearchState {
 
     /// Get the line number of the current match
     pub fn current_match_line(&self) -> Option<usize> {
-        self.matches.get(self.current_match).map(|(line, _, _)| *line)
+        self.matches
+            .get(self.current_match)
+            .map(|(line, _, _)| *line)
     }
 
     /// Get current match position: (line, start_col, end_col)
@@ -466,7 +468,10 @@ pub enum GitRemoteCheckResult {
     /// No changes detected - local is up to date
     UpToDate,
     /// Remote has commits ahead of local
-    RemoteAhead { commits_ahead: usize, branch: String },
+    RemoteAhead {
+        commits_ahead: usize,
+        branch: String,
+    },
     /// Check failed (network error, no remote configured, etc.)
     Error(String),
 }

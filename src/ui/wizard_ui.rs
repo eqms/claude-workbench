@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::setup::wizard::{WizardState, WizardStep, WizardField};
+use crate::setup::wizard::{WizardField, WizardState, WizardStep};
 
 /// Render the installation wizard
 pub fn render(frame: &mut Frame, area: Rect, state: &WizardState) {
@@ -68,7 +68,12 @@ fn render_welcome(frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("Welcome to ", Style::default()),
-            Span::styled("Claude Workbench", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Claude Workbench",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
     ])
     .alignment(ratatui::layout::Alignment::Center);
@@ -122,8 +127,8 @@ fn render_dependencies(frame: &mut Frame, area: Rect, state: &WizardState) {
     .split(area);
 
     // Header
-    let header = Paragraph::new("Checking installed tools...")
-        .style(Style::default().fg(Color::Yellow));
+    let header =
+        Paragraph::new("Checking installed tools...").style(Style::default().fg(Color::Yellow));
     frame.render_widget(header, chunks[0]);
 
     // Dependencies list
@@ -148,7 +153,12 @@ fn render_dependencies(frame: &mut Frame, area: Rect, state: &WizardState) {
 
     // Claude CLI
     let claude_status = if state.deps.claude_cli.found {
-        let version = state.deps.claude_cli.version.as_deref().unwrap_or("unknown");
+        let version = state
+            .deps
+            .claude_cli
+            .version
+            .as_deref()
+            .unwrap_or("unknown");
         Line::from(vec![
             Span::styled("✓ ", Style::default().fg(Color::Green)),
             Span::styled("claude", Style::default().add_modifier(Modifier::BOLD)),
@@ -158,7 +168,10 @@ fn render_dependencies(frame: &mut Frame, area: Rect, state: &WizardState) {
         Line::from(vec![
             Span::styled("○ ", Style::default().fg(Color::Yellow)),
             Span::styled("claude", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(" - not found (optional)", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                " - not found (optional)",
+                Style::default().fg(Color::DarkGray),
+            ),
         ])
     };
     items.push(ListItem::new(claude_status));
@@ -175,19 +188,27 @@ fn render_dependencies(frame: &mut Frame, area: Rect, state: &WizardState) {
         Line::from(vec![
             Span::styled("○ ", Style::default().fg(Color::Yellow)),
             Span::styled("lazygit", Style::default().add_modifier(Modifier::BOLD)),
-            Span::styled(" - not found (optional)", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                " - not found (optional)",
+                Style::default().fg(Color::DarkGray),
+            ),
         ])
     };
     items.push(ListItem::new(lazygit_status));
 
     // Shells header
     items.push(ListItem::new(Line::from("")));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled("Available Shells:", Style::default().add_modifier(Modifier::BOLD)),
-    ])));
+    items.push(ListItem::new(Line::from(vec![Span::styled(
+        "Available Shells:",
+        Style::default().add_modifier(Modifier::BOLD),
+    )])));
 
     for shell in &state.deps.shells {
-        let path = shell.path.as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+        let path = shell
+            .path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
         items.push(ListItem::new(Line::from(vec![
             Span::styled("  ✓ ", Style::default().fg(Color::Green)),
             Span::raw(&shell.name),
@@ -218,11 +239,7 @@ fn render_dependencies(frame: &mut Frame, area: Rect, state: &WizardState) {
 }
 
 fn render_shell_selection(frame: &mut Frame, area: Rect, state: &WizardState) {
-    let chunks = Layout::vertical([
-        Constraint::Length(2),
-        Constraint::Min(1),
-    ])
-    .split(area);
+    let chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(area);
 
     let header = Paragraph::new("Select your preferred shell for the terminal pane:");
     frame.render_widget(header, chunks[0]);
@@ -232,9 +249,15 @@ fn render_shell_selection(frame: &mut Frame, area: Rect, state: &WizardState) {
         .iter()
         .enumerate()
         .map(|(i, shell)| {
-            let prefix = if i == state.selected_shell_idx { "● " } else { "○ " };
+            let prefix = if i == state.selected_shell_idx {
+                "● "
+            } else {
+                "○ "
+            };
             let style = if i == state.selected_shell_idx {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             };
@@ -276,7 +299,11 @@ fn render_claude_config(frame: &mut Frame, area: Rect, state: &WizardState) {
         state.claude_path.clone()
     };
 
-    let claude_status = if state.deps.claude_cli.found { "✓" } else { "○" };
+    let claude_status = if state.deps.claude_cli.found {
+        "✓"
+    } else {
+        "○"
+    };
     let claude_status_style = if state.deps.claude_cli.found {
         Style::default().fg(Color::Green)
     } else {
@@ -285,7 +312,10 @@ fn render_claude_config(frame: &mut Frame, area: Rect, state: &WizardState) {
 
     let claude_block = Paragraph::new(vec![
         Line::from(vec![
-            Span::styled("Claude CLI Path: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Claude CLI Path: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
             Span::styled(claude_status, claude_status_style),
         ]),
         Line::from(vec![
@@ -293,7 +323,11 @@ fn render_claude_config(frame: &mut Frame, area: Rect, state: &WizardState) {
             Span::styled(&claude_value, claude_style),
         ]),
         Line::from(Span::styled(
-            if claude_editing { "  [Enter to confirm, Esc to cancel]" } else { "  [Enter to edit]" },
+            if claude_editing {
+                "  [Enter to confirm, Esc to cancel]"
+            } else {
+                "  [Enter to edit]"
+            },
             Style::default().fg(Color::DarkGray),
         )),
     ]);
@@ -313,7 +347,11 @@ fn render_claude_config(frame: &mut Frame, area: Rect, state: &WizardState) {
         state.lazygit_path.clone()
     };
 
-    let lazygit_status = if state.deps.lazygit.found { "✓" } else { "○" };
+    let lazygit_status = if state.deps.lazygit.found {
+        "✓"
+    } else {
+        "○"
+    };
     let lazygit_status_style = if state.deps.lazygit.found {
         Style::default().fg(Color::Green)
     } else {
@@ -322,7 +360,10 @@ fn render_claude_config(frame: &mut Frame, area: Rect, state: &WizardState) {
 
     let lazygit_block = Paragraph::new(vec![
         Line::from(vec![
-            Span::styled("LazyGit Path: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "LazyGit Path: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
             Span::styled(lazygit_status, lazygit_status_style),
         ]),
         Line::from(vec![
@@ -330,7 +371,11 @@ fn render_claude_config(frame: &mut Frame, area: Rect, state: &WizardState) {
             Span::styled(&lazygit_value, lazygit_style),
         ]),
         Line::from(Span::styled(
-            if lazygit_editing { "  [Enter to confirm, Esc to cancel]" } else { "  [Enter to edit]" },
+            if lazygit_editing {
+                "  [Enter to confirm, Esc to cancel]"
+            } else {
+                "  [Enter to edit]"
+            },
             Style::default().fg(Color::DarkGray),
         )),
     ]);
@@ -379,7 +424,10 @@ fn render_confirmation(frame: &mut Frame, area: Rect, state: &WizardState) {
     let hint = Paragraph::new(Line::from(vec![
         Span::styled("Press ", Style::default().fg(Color::DarkGray)),
         Span::styled("Enter", Style::default().fg(Color::Green)),
-        Span::styled(" to save configuration", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            " to save configuration",
+            Style::default().fg(Color::DarkGray),
+        ),
     ]))
     .alignment(ratatui::layout::Alignment::Center);
     frame.render_widget(hint, chunks[2]);
@@ -391,7 +439,12 @@ fn render_complete(frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("✓ ", Style::default().fg(Color::Green)),
-            Span::styled("Setup Complete!", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Setup Complete!",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(""),
         Line::from("Your configuration has been saved."),

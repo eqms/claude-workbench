@@ -1,7 +1,7 @@
 //! Template system for predefined configurations
 
-use serde::{Deserialize, Serialize};
 use crate::config::{Config, LayoutConfig, PtyConfig};
+use serde::{Deserialize, Serialize};
 
 /// Template categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,7 +20,7 @@ impl TemplateCategory {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "layout" => Some(TemplateCategory::Layout),
             "pty" => Some(TemplateCategory::Pty),
@@ -43,7 +43,7 @@ pub struct Template {
 
 impl Template {
     pub fn category_enum(&self) -> Option<TemplateCategory> {
-        TemplateCategory::from_str(&self.category)
+        TemplateCategory::parse(&self.category)
     }
 }
 

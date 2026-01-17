@@ -56,7 +56,16 @@ pub fn can_preview_in_browser(path: &Path) -> bool {
     matches!(
         ext.as_deref(),
         Some(
-            "html" | "htm" | "md" | "markdown" | "mdown" | "mkd" | "pdf" | "png" | "jpg" | "jpeg"
+            "html"
+                | "htm"
+                | "md"
+                | "markdown"
+                | "mdown"
+                | "mkd"
+                | "pdf"
+                | "png"
+                | "jpg"
+                | "jpeg"
                 | "gif"
                 | "svg"
                 | "webp"

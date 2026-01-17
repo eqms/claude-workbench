@@ -16,15 +16,18 @@ fn help_content() -> Vec<Line<'static>> {
         // Title
         Line::from(Span::styled(
             "Claude Workbench Help",
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from("═".repeat(40)),
         Line::from(""),
-
         // Global Shortcuts
         Line::from(Span::styled(
             "Global Shortcuts (work everywhere)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(vec![
@@ -68,11 +71,12 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Close Dialogs / Help"),
         ]),
         Line::from(""),
-
         // Context Shortcuts
         Line::from(Span::styled(
             "Context Shortcuts (FileBrowser/Preview only)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(vec![
@@ -84,11 +88,12 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("About (FileBrowser only)"),
         ]),
         Line::from(""),
-
         // Navigation/Panes
         Line::from(Span::styled(
             "Navigation / Panes",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(vec![
@@ -112,11 +117,12 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("User Terminal (PTY)"),
         ]),
         Line::from(""),
-
         // File Browser
         Line::from(Span::styled(
             "File Browser (F1)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(vec![
@@ -156,11 +162,17 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("File Menu (New File/Dir, Rename, etc.)"),
         ]),
         Line::from(""),
-        Line::from(Span::styled("  Status bar shows:", Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled(
+            "  Status bar shows:",
+            Style::default().fg(Color::DarkGray),
+        )),
         Line::from("  - File size and modification date"),
         Line::from("  - Git branch, modified/untracked/staged counts"),
         Line::from(""),
-        Line::from(Span::styled("  Git Status Colors:", Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled(
+            "  Git Status Colors:",
+            Style::default().fg(Color::DarkGray),
+        )),
         Line::from(vec![
             Span::raw("  - "),
             Span::styled("Yellow", Style::default().fg(Color::Yellow)),
@@ -194,11 +206,12 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from("  - Auto-checks for remote changes on repo switch"),
         Line::from("  - Prompts to pull if remote is ahead"),
         Line::from(""),
-
         // Browser Preview
         Line::from(Span::styled(
             "Browser Preview (o key)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from("  - HTML/HTM:  Direct browser opening"),
@@ -206,11 +219,12 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from("  - PDF:       Open in default PDF viewer"),
         Line::from("  - Images:    PNG/JPG/GIF/SVG/WebP in viewer"),
         Line::from(""),
-
         // Fuzzy Finder
         Line::from(Span::styled(
             "Fuzzy Finder (Ctrl+P)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(vec![
@@ -230,11 +244,12 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Close finder"),
         ]),
         Line::from(""),
-
         // Preview Pane
         Line::from(Span::styled(
             "Preview Pane (F2)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from("  - Syntax highlighting for 500+ languages"),
@@ -293,11 +308,12 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Cancel search"),
         ]),
         Line::from(""),
-
         // Editor Mode
         Line::from(Span::styled(
             "Editor Mode (in Preview Pane)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(vec![
@@ -346,11 +362,12 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Delete current line"),
         ]),
         Line::from(""),
-
         // Terminal Panes
         Line::from(Span::styled(
             "Terminal Panes (F4/F5/F6)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from("  All keys map to PTY (shell input)."),
@@ -392,7 +409,6 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Jump to line end (End)"),
         ]),
         Line::from(""),
-
         // IMPORTANT: Selection Mode (highlighted section)
         Line::from("━".repeat(40)),
         Line::from(Span::styled(
@@ -405,7 +421,9 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(""),
         Line::from(Span::styled(
             "Select text from Terminal or Preview and copy to Claude.",
-            Style::default().fg(Color::White).add_modifier(Modifier::ITALIC),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
         )),
         Line::from(""),
         Line::from(vec![
@@ -450,11 +468,12 @@ fn help_content() -> Vec<Line<'static>> {
             Style::default().fg(Color::DarkGray),
         )),
         Line::from(""),
-
         // Mouse Selection
         Line::from(Span::styled(
             "Mouse Selection (Alt+Click)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from("  Alt+Click and drag in Terminal or Preview panes"),
@@ -465,22 +484,24 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(""),
         Line::from("━".repeat(40)),
         Line::from(""),
-
         // Drag & Drop
         Line::from(Span::styled(
             "Drag & Drop",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from("  Drag files from File Browser to"),
         Line::from("  Claude/Terminal panes to insert path."),
         Line::from("  Paths with spaces are auto-quoted."),
         Line::from(""),
-
         // Configuration
         Line::from(Span::styled(
             "Configuration (config.yaml)",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from("  - Shell path and arguments"),
@@ -488,7 +509,6 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from("  - File browser settings (hidden files, date)"),
         Line::from("  - Claude startup prefixes (optional)"),
         Line::from(""),
-
         // Footer
         Line::from(Span::styled(
             "Footer: Shows shortcuts, date/time, version.",
@@ -529,8 +549,8 @@ pub fn render(frame: &mut Frame, state: &mut HelpState) {
 
     // Layout: content area + footer
     let chunks = Layout::vertical([
-        Constraint::Min(1),     // Content
-        Constraint::Length(1),  // Footer
+        Constraint::Min(1),    // Content
+        Constraint::Length(1), // Footer
     ])
     .split(inner);
 
@@ -564,8 +584,7 @@ pub fn render(frame: &mut Frame, state: &mut HelpState) {
             .begin_symbol(Some("▲"))
             .end_symbol(Some("▼"));
 
-        let mut scrollbar_state = ScrollbarState::new(max_scroll)
-            .position(scroll);
+        let mut scrollbar_state = ScrollbarState::new(max_scroll).position(scroll);
 
         // Render scrollbar in the popup area (right border)
         let scrollbar_area = Rect::new(

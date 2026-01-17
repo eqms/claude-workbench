@@ -51,8 +51,10 @@ impl AboutState {
     /// Handle mouse click at coordinates
     pub fn handle_click(&mut self, x: u16, y: u16) -> bool {
         if let Some(list_area) = self.list_area {
-            if x >= list_area.x && x < list_area.x + list_area.width
-                && y >= list_area.y && y < list_area.y + list_area.height
+            if x >= list_area.x
+                && x < list_area.x + list_area.width
+                && y >= list_area.y
+                && y < list_area.y + list_area.height
             {
                 let relative_y = y.saturating_sub(list_area.y) as usize;
                 let clicked_idx = self.scroll + relative_y;
@@ -96,7 +98,7 @@ struct ComponentLicense {
     name: &'static str,
     version: &'static str,
     license: &'static str,
-    url: &'static str,  // Reserved for future use (clickable links)
+    url: &'static str, // Reserved for future use (clickable links)
 }
 
 const COMPONENTS: &[ComponentLicense] = &[
@@ -216,9 +218,9 @@ pub fn render(frame: &mut Frame, area: Rect, state: &mut AboutState) {
 
     // Split into header, content, and footer
     let chunks = Layout::vertical([
-        Constraint::Length(6),  // Header
-        Constraint::Min(1),     // Component list
-        Constraint::Length(2),  // Footer
+        Constraint::Length(6), // Header
+        Constraint::Min(1),    // Component list
+        Constraint::Length(2), // Footer
     ])
     .split(inner);
 
@@ -235,9 +237,12 @@ pub fn render(frame: &mut Frame, area: Rect, state: &mut AboutState) {
             Span::styled("MIT License", Style::default().fg(Color::Green)),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Open Source Components:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        ]),
+        Line::from(vec![Span::styled(
+            "Open Source Components:",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
     ]);
     frame.render_widget(header, chunks[0]);
 
@@ -270,18 +275,9 @@ pub fn render(frame: &mut Frame, area: Rect, state: &mut AboutState) {
                     if is_selected { "▸ " } else { "  " },
                     style.fg(Color::Yellow),
                 ),
-                Span::styled(
-                    format!("{:<13}", comp.name),
-                    style.fg(Color::Cyan),
-                ),
-                Span::styled(
-                    format!(" v{:<7}", comp.version),
-                    style.fg(Color::DarkGray),
-                ),
-                Span::styled(
-                    format!(" {:<14}", comp.license),
-                    style.fg(Color::Green),
-                ),
+                Span::styled(format!("{:<13}", comp.name), style.fg(Color::Cyan)),
+                Span::styled(format!(" v{:<7}", comp.version), style.fg(Color::DarkGray)),
+                Span::styled(format!(" {:<14}", comp.license), style.fg(Color::Green)),
             ]))
         })
         .collect();
@@ -291,7 +287,11 @@ pub fn render(frame: &mut Frame, area: Rect, state: &mut AboutState) {
 
     // Scroll indicator
     if COMPONENTS.len() > visible_height {
-        let indicator = format!(" [{}/{}] ", scroll + 1, COMPONENTS.len().saturating_sub(visible_height) + 1);
+        let indicator = format!(
+            " [{}/{}] ",
+            scroll + 1,
+            COMPONENTS.len().saturating_sub(visible_height) + 1
+        );
         let indicator_area = Rect::new(
             popup_area.x + popup_area.width - indicator.len() as u16 - 2,
             popup_area.y,

@@ -1,14 +1,14 @@
 //! Settings menu UI and state
 
+use crate::config::Config;
+use crate::setup::templates::{get_builtin_templates, Template};
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
+    Frame,
 };
-use crate::config::Config;
-use crate::setup::templates::{Template, get_builtin_templates};
 
 /// Settings categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -119,7 +119,7 @@ impl Default for SettingsState {
             input_buffer: String::new(),
             shell_path: "/bin/bash".to_string(),
             scrollback_lines: 1000,
-            show_hidden_files: true,  // Show hidden files by default
+            show_hidden_files: true, // Show hidden files by default
             auto_refresh_ms: 2000,
             file_browser_width: 20,
             preview_width: 50,
@@ -149,10 +149,16 @@ impl SettingsState {
         self.preview_width = config.layout.preview_width_percent;
         self.right_panel_width = config.layout.right_panel_width_percent;
         self.claude_height = config.layout.claude_height_percent;
-        self.claude_path = config.pty.claude_command.first()
+        self.claude_path = config
+            .pty
+            .claude_command
+            .first()
             .cloned()
             .unwrap_or_else(|| "claude".to_string());
-        self.lazygit_path = config.pty.lazygit_command.first()
+        self.lazygit_path = config
+            .pty
+            .lazygit_command
+            .first()
             .cloned()
             .unwrap_or_else(|| "lazygit".to_string());
         self.has_changes = false;
@@ -198,9 +204,9 @@ impl SettingsState {
 
     pub fn item_count(&self) -> usize {
         match self.category {
-            SettingsCategory::General => 4,   // shell, scrollback, hidden, auto-refresh
-            SettingsCategory::Layout => 4,    // file_browser, preview, right_panel, claude_height
-            SettingsCategory::Paths => 2,     // claude, lazygit
+            SettingsCategory::General => 4, // shell, scrollback, hidden, auto-refresh
+            SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
+            SettingsCategory::Paths => 2,   // claude, lazygit
             SettingsCategory::Templates => self.available_templates.len(),
             SettingsCategory::About => 0,
         }
@@ -360,9 +366,9 @@ pub fn render(frame: &mut Frame, area: Rect, state: &SettingsState) {
 
     // Layout: tabs on top, content below, footer at bottom
     let layout = Layout::vertical([
-        Constraint::Length(3),  // Category tabs
-        Constraint::Min(1),     // Content
-        Constraint::Length(3),  // Footer
+        Constraint::Length(3), // Category tabs
+        Constraint::Min(1),    // Content
+        Constraint::Length(3), // Footer
     ])
     .split(inner);
 
@@ -412,10 +418,32 @@ fn render_general(frame: &mut Frame, area: Rect, state: &SettingsState) {
     };
 
     let items = vec![
-        format_setting("Shell Path", &state.shell_path, state.selected_idx == 0, state.editing.as_ref() == Some(&SettingsField::ShellPath), &state.input_buffer),
-        format_setting("Scrollback Lines", &state.scrollback_lines.to_string(), state.selected_idx == 1, state.editing.as_ref() == Some(&SettingsField::ScrollbackLines), &state.input_buffer),
-        format_bool_setting("Show Hidden Files", state.show_hidden_files, state.selected_idx == 2),
-        format_setting("Auto Refresh (ms)", &auto_refresh_display, state.selected_idx == 3, state.editing.as_ref() == Some(&SettingsField::AutoRefreshMs), &state.input_buffer),
+        format_setting(
+            "Shell Path",
+            &state.shell_path,
+            state.selected_idx == 0,
+            state.editing.as_ref() == Some(&SettingsField::ShellPath),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Scrollback Lines",
+            &state.scrollback_lines.to_string(),
+            state.selected_idx == 1,
+            state.editing.as_ref() == Some(&SettingsField::ScrollbackLines),
+            &state.input_buffer,
+        ),
+        format_bool_setting(
+            "Show Hidden Files",
+            state.show_hidden_files,
+            state.selected_idx == 2,
+        ),
+        format_setting(
+            "Auto Refresh (ms)",
+            &auto_refresh_display,
+            state.selected_idx == 3,
+            state.editing.as_ref() == Some(&SettingsField::AutoRefreshMs),
+            &state.input_buffer,
+        ),
     ];
 
     let list = create_settings_list(items);
@@ -424,10 +452,34 @@ fn render_general(frame: &mut Frame, area: Rect, state: &SettingsState) {
 
 fn render_layout(frame: &mut Frame, area: Rect, state: &SettingsState) {
     let items = vec![
-        format_setting("File Browser Width %", &state.file_browser_width.to_string(), state.selected_idx == 0, state.editing.as_ref() == Some(&SettingsField::FileBrowserWidth), &state.input_buffer),
-        format_setting("Preview Width %", &state.preview_width.to_string(), state.selected_idx == 1, state.editing.as_ref() == Some(&SettingsField::PreviewWidth), &state.input_buffer),
-        format_setting("Right Panel Width %", &state.right_panel_width.to_string(), state.selected_idx == 2, state.editing.as_ref() == Some(&SettingsField::RightPanelWidth), &state.input_buffer),
-        format_setting("Claude Height %", &state.claude_height.to_string(), state.selected_idx == 3, state.editing.as_ref() == Some(&SettingsField::ClaudeHeight), &state.input_buffer),
+        format_setting(
+            "File Browser Width %",
+            &state.file_browser_width.to_string(),
+            state.selected_idx == 0,
+            state.editing.as_ref() == Some(&SettingsField::FileBrowserWidth),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Preview Width %",
+            &state.preview_width.to_string(),
+            state.selected_idx == 1,
+            state.editing.as_ref() == Some(&SettingsField::PreviewWidth),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Right Panel Width %",
+            &state.right_panel_width.to_string(),
+            state.selected_idx == 2,
+            state.editing.as_ref() == Some(&SettingsField::RightPanelWidth),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Claude Height %",
+            &state.claude_height.to_string(),
+            state.selected_idx == 3,
+            state.editing.as_ref() == Some(&SettingsField::ClaudeHeight),
+            &state.input_buffer,
+        ),
     ];
 
     let list = create_settings_list(items);
@@ -436,8 +488,20 @@ fn render_layout(frame: &mut Frame, area: Rect, state: &SettingsState) {
 
 fn render_paths(frame: &mut Frame, area: Rect, state: &SettingsState) {
     let items = vec![
-        format_setting("Claude CLI Path", &state.claude_path, state.selected_idx == 0, state.editing.as_ref() == Some(&SettingsField::ClaudePath), &state.input_buffer),
-        format_setting("LazyGit Path", &state.lazygit_path, state.selected_idx == 1, state.editing.as_ref() == Some(&SettingsField::LazygitPath), &state.input_buffer),
+        format_setting(
+            "Claude CLI Path",
+            &state.claude_path,
+            state.selected_idx == 0,
+            state.editing.as_ref() == Some(&SettingsField::ClaudePath),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "LazyGit Path",
+            &state.lazygit_path,
+            state.selected_idx == 1,
+            state.editing.as_ref() == Some(&SettingsField::LazygitPath),
+            &state.input_buffer,
+        ),
     ];
 
     let list = create_settings_list(items);
@@ -445,7 +509,8 @@ fn render_paths(frame: &mut Frame, area: Rect, state: &SettingsState) {
 }
 
 fn render_templates(frame: &mut Frame, area: Rect, state: &SettingsState) {
-    let items: Vec<ListItem> = state.available_templates
+    let items: Vec<ListItem> = state
+        .available_templates
         .iter()
         .enumerate()
         .map(|(i, template)| {
@@ -466,33 +531,42 @@ fn render_templates(frame: &mut Frame, area: Rect, state: &SettingsState) {
         })
         .collect();
 
-    let list = List::new(items)
-        .block(Block::default().borders(Borders::NONE));
+    let list = List::new(items).block(Block::default().borders(Borders::NONE));
     frame.render_widget(list, area);
 }
 
 fn render_about(frame: &mut Frame, area: Rect) {
     let text = vec![
         Line::from(""),
-        Line::from(Span::styled("Claude Workbench", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-        Line::from(format!("Version: 0.6.1")),
+        Line::from(Span::styled(
+            "Claude Workbench",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from("Version: 0.6.1"),
         Line::from(""),
         Line::from("A TUI multiplexer for Claude Code development"),
         Line::from(""),
-        Line::from(Span::styled("Components:", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            "Components:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
         Line::from("  • Ratatui - Terminal UI framework"),
         Line::from("  • portable-pty - PTY management"),
         Line::from("  • vt100 - Terminal emulation"),
         Line::from("  • syntect - Syntax highlighting"),
         Line::from(""),
-        Line::from(Span::styled("Keyboard Shortcuts:", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            "Keyboard Shortcuts:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
         Line::from("  F1-F6: Switch panes"),
         Line::from("  Ctrl+,: Open settings"),
         Line::from("  Ctrl+Q: Quit"),
     ];
 
-    let paragraph = Paragraph::new(text)
-        .alignment(Alignment::Center);
+    let paragraph = Paragraph::new(text).alignment(Alignment::Center);
     frame.render_widget(paragraph, area);
 }
 
@@ -512,7 +586,13 @@ fn render_footer(frame: &mut Frame, area: Rect, state: &SettingsState) {
     frame.render_widget(footer, area);
 }
 
-fn format_setting(label: &str, value: &str, selected: bool, editing: bool, input_buffer: &str) -> ListItem<'static> {
+fn format_setting(
+    label: &str,
+    value: &str,
+    selected: bool,
+    editing: bool,
+    input_buffer: &str,
+) -> ListItem<'static> {
     let display_value = if editing {
         format!("{}█", input_buffer)
     } else {
@@ -542,8 +622,7 @@ fn format_bool_setting(label: &str, value: bool, selected: bool) -> ListItem<'st
 }
 
 fn create_settings_list(items: Vec<ListItem<'static>>) -> List<'static> {
-    List::new(items)
-        .block(Block::default().borders(Borders::NONE))
+    List::new(items).block(Block::default().borders(Borders::NONE))
 }
 
 #[cfg(test)]

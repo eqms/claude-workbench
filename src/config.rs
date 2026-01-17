@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::Path;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -33,7 +33,9 @@ pub struct PtyConfig {
     pub auto_restart: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl Default for PtyConfig {
     fn default() -> Self {
@@ -106,13 +108,13 @@ pub struct FileBrowserConfig {
     pub show_hidden: bool,
     pub show_file_info: bool,
     pub date_format: String,
-    pub auto_refresh_ms: u64,  // 0 = disabled
+    pub auto_refresh_ms: u64, // 0 = disabled
 }
 
 impl Default for FileBrowserConfig {
     fn default() -> Self {
         Self {
-            show_hidden: true,  // Show hidden files by default (toggle with '.')
+            show_hidden: true, // Show hidden files by default (toggle with '.')
             show_file_info: true,
             date_format: "%d.%m.%Y %H:%M:%S".to_string(),
             auto_refresh_ms: 2000, // 2 seconds
@@ -154,18 +156,18 @@ pub fn load_config() -> Result<Config> {
     // 1. Check local config.yaml (project-specific override)
     let local_config = Path::new("config.yaml");
     if local_config.exists() {
-         let contents = fs::read_to_string(local_config)?;
-         let config: Config = serde_yaml::from_str(&contents)?;
-         return Ok(config);
+        let contents = fs::read_to_string(local_config)?;
+        let config: Config = serde_yaml::from_str(&contents)?;
+        return Ok(config);
     }
 
     // 2. Check ~/.config/claude-workbench/config.yaml (XDG-style)
     if let Some(config_dir) = get_config_dir() {
         let config_path = config_dir.join("config.yaml");
         if config_path.exists() {
-             let contents = fs::read_to_string(&config_path)?;
-             let config: Config = serde_yaml::from_str(&contents)?;
-             return Ok(config);
+            let contents = fs::read_to_string(&config_path)?;
+            let config: Config = serde_yaml::from_str(&contents)?;
+            return Ok(config);
         }
     }
 

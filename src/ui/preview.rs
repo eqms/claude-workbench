@@ -105,9 +105,7 @@ impl PreviewState {
             self.original_content = content.clone();
 
             // Store file modification time for auto-refresh
-            self.last_modified = fs::metadata(&path)
-                .and_then(|m| m.modified())
-                .ok();
+            self.last_modified = fs::metadata(&path).and_then(|m| m.modified()).ok();
 
             // Use tui-markdown for markdown files, syntect for others
             if self.is_markdown {
@@ -383,7 +381,7 @@ impl PreviewState {
         let new_line = format!("{}{}{}", before, self.search.replace_text, after);
 
         // Get all lines and rebuild with the modified line
-        let mut all_lines: Vec<String> = editor.lines().iter().cloned().collect();
+        let mut all_lines: Vec<String> = editor.lines().to_vec();
         all_lines[line_idx] = new_line;
 
         // Rebuild the editor with modified content
@@ -436,7 +434,7 @@ impl PreviewState {
         }
 
         // Get all lines and perform replacement
-        let mut lines: Vec<String> = editor.lines().iter().cloned().collect();
+        let mut lines: Vec<String> = editor.lines().to_vec();
         let mut total_replacements = 0;
 
         for line in lines.iter_mut() {
@@ -618,7 +616,7 @@ fn render_gutter(
             ]);
             gutter_lines.push(line);
         } else {
-            let is_current = current_line.map_or(false, |cl| cl + 1 == line_number);
+            let is_current = current_line.is_some_and(|cl| cl + 1 == line_number);
 
             let number_style = if is_current {
                 // Current line: highlighted (yellow/bold)
@@ -686,11 +684,9 @@ pub fn render(
 
                 // Calculate gutter width and split inner area
                 let gutter_width = calculate_gutter_width(total_lines);
-                let chunks = Layout::horizontal([
-                    Constraint::Length(gutter_width),
-                    Constraint::Min(1),
-                ])
-                .split(inner);
+                let chunks =
+                    Layout::horizontal([Constraint::Length(gutter_width), Constraint::Min(1)])
+                        .split(inner);
 
                 let gutter_area = chunks[0];
                 let content_area = chunks[1];
@@ -724,21 +720,32 @@ pub fn render(
 
                 for (idx, line_content) in editor_lines.iter().enumerate() {
                     // Get the highlighted line if available, otherwise use plain text
-                    let base_line = state.edit_highlighted_lines
+                    let base_line = state
+                        .edit_highlighted_lines
                         .get(idx)
                         .cloned()
                         .unwrap_or_else(|| Line::from(line_content.clone()));
 
                     // Apply selection highlighting if this line is in selection range
-                    let line_with_selection = if let Some((start_row, start_col, end_row, end_col)) = selection {
-                        apply_selection_to_line(&base_line, line_content, idx, start_row, start_col, end_row, end_col)
-                    } else {
-                        base_line
-                    };
+                    let line_with_selection =
+                        if let Some((start_row, start_col, end_row, end_col)) = selection {
+                            apply_selection_to_line(
+                                &base_line,
+                                line_content,
+                                idx,
+                                start_row,
+                                start_col,
+                                end_row,
+                                end_col,
+                            )
+                        } else {
+                            base_line
+                        };
 
                     if idx == cursor_row {
                         // Insert cursor into this line
-                        let line_with_cursor = insert_cursor_into_line(&line_with_selection, cursor_col, line_content);
+                        let line_with_cursor =
+                            insert_cursor_into_line(&line_with_selection, cursor_col, line_content);
                         lines_with_cursor.push(line_with_cursor);
                     } else {
                         lines_with_cursor.push(line_with_selection);
@@ -746,8 +753,7 @@ pub fn render(
                 }
 
                 // Render content without block (block already rendered)
-                let paragraph = Paragraph::new(lines_with_cursor)
-                    .scroll((scroll_offset as u16, 0));
+                let paragraph = Paragraph::new(lines_with_cursor).scroll((scroll_offset as u16, 0));
 
                 f.render_widget(paragraph, content_area);
 
@@ -757,8 +763,8 @@ pub fn render(
                         .begin_symbol(Some("▲"))
                         .end_symbol(Some("▼"));
 
-                    let mut scrollbar_state = ScrollbarState::new(total_lines)
-                        .position(scroll_offset);
+                    let mut scrollbar_state =
+                        ScrollbarState::new(total_lines).position(scroll_offset);
 
                     f.render_stateful_widget(scrollbar, editor_area, &mut scrollbar_state);
                 }
@@ -777,11 +783,8 @@ pub fn render(
             // Calculate inner area and split for gutter
             let inner = block.inner(area);
             let gutter_width = calculate_gutter_width(total_lines);
-            let chunks = Layout::horizontal([
-                Constraint::Length(gutter_width),
-                Constraint::Min(1),
-            ])
-            .split(inner);
+            let chunks = Layout::horizontal([Constraint::Length(gutter_width), Constraint::Min(1)])
+                .split(inner);
 
             let gutter_area = chunks[0];
             let content_area = chunks[1];
@@ -803,20 +806,29 @@ pub fn render(
             let lines = if let Some((start, end)) = selection_range {
                 let adjusted_start = start + scroll_offset;
                 let adjusted_end = end + scroll_offset;
-                state.highlighted_lines.iter().enumerate().map(|(idx, line)| {
-                    if idx >= adjusted_start && idx <= adjusted_end {
-                        // Apply DarkGray background to selected lines
-                        let styled_spans: Vec<Span> = line.spans.iter().map(|span| {
-                            Span::styled(
-                                span.content.clone(),
-                                span.style.bg(Color::DarkGray),
-                            )
-                        }).collect();
-                        Line::from(styled_spans)
-                    } else {
-                        line.clone()
-                    }
-                }).collect::<Vec<_>>()
+                state
+                    .highlighted_lines
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, line)| {
+                        if idx >= adjusted_start && idx <= adjusted_end {
+                            // Apply DarkGray background to selected lines
+                            let styled_spans: Vec<Span> = line
+                                .spans
+                                .iter()
+                                .map(|span| {
+                                    Span::styled(
+                                        span.content.clone(),
+                                        span.style.bg(Color::DarkGray),
+                                    )
+                                })
+                                .collect();
+                            Line::from(styled_spans)
+                        } else {
+                            line.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>()
             } else {
                 state.highlighted_lines.clone()
             };
@@ -834,8 +846,7 @@ pub fn render(
                     .begin_symbol(Some("▲"))
                     .end_symbol(Some("▼"));
 
-                let mut scrollbar_state = ScrollbarState::new(total_lines)
-                    .position(scroll_offset);
+                let mut scrollbar_state = ScrollbarState::new(total_lines).position(scroll_offset);
 
                 f.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
             }
@@ -888,7 +899,11 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
     };
 
     // Case sensitivity indicator
-    let case_indicator = if state.search.case_sensitive { "[Aa]" } else { "[aa]" };
+    let case_indicator = if state.search.case_sensitive {
+        "[Aa]"
+    } else {
+        "[aa]"
+    };
 
     // Search line
     let search_line_area = Rect {
@@ -909,11 +924,23 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
     };
 
     let search_line = Line::from(vec![
-        Span::styled(search_label, Style::default().fg(Color::Cyan).bg(Color::DarkGray)),
+        Span::styled(
+            search_label,
+            Style::default().fg(Color::Cyan).bg(Color::DarkGray),
+        ),
         Span::styled(state.search.query.clone(), search_style),
-        Span::styled(search_cursor, Style::default().fg(Color::White).bg(Color::DarkGray)),
-        Span::styled(match_info, Style::default().fg(Color::Gray).bg(Color::DarkGray)),
-        Span::styled(format!(" {}", case_indicator), Style::default().fg(Color::DarkGray).bg(Color::DarkGray)),
+        Span::styled(
+            search_cursor,
+            Style::default().fg(Color::White).bg(Color::DarkGray),
+        ),
+        Span::styled(
+            match_info,
+            Style::default().fg(Color::Gray).bg(Color::DarkGray),
+        ),
+        Span::styled(
+            format!(" {}", case_indicator),
+            Style::default().fg(Color::DarkGray).bg(Color::DarkGray),
+        ),
     ]);
 
     f.render_widget(Paragraph::new(search_line), search_line_area);
@@ -937,9 +964,15 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
         };
 
         let replace_line = Line::from(vec![
-            Span::styled("Repl: ", Style::default().fg(Color::Cyan).bg(Color::DarkGray)),
+            Span::styled(
+                "Repl: ",
+                Style::default().fg(Color::Cyan).bg(Color::DarkGray),
+            ),
             Span::styled(state.search.replace_text.clone(), replace_style),
-            Span::styled(replace_cursor, Style::default().fg(Color::White).bg(Color::DarkGray)),
+            Span::styled(
+                replace_cursor,
+                Style::default().fg(Color::White).bg(Color::DarkGray),
+            ),
         ]);
 
         f.render_widget(Paragraph::new(replace_line), replace_line_area);
@@ -965,10 +998,7 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
             "[Read-only - press E to edit]  n:Next  N:Prev  Esc:Close"
         };
 
-        f.render_widget(
-            Paragraph::new(hints).style(hint_style),
-            hints_area,
-        );
+        f.render_widget(Paragraph::new(hints).style(hint_style), hints_area);
     }
 }
 
@@ -1039,7 +1069,9 @@ fn apply_selection_to_line(
             // Selected part
             let sel_start_in_span = overlap_start.saturating_sub(current_col);
             let sel_end_in_span = (overlap_end - current_col).min(span_len);
-            let selected: String = span_chars[sel_start_in_span..sel_end_in_span].iter().collect();
+            let selected: String = span_chars[sel_start_in_span..sel_end_in_span]
+                .iter()
+                .collect();
             // Combine existing style with selection background
             let combined_style = span.style.bg(Color::DarkGray);
             result_spans.push(Span::styled(selected, combined_style));
@@ -1069,8 +1101,7 @@ fn apply_selection_to_line(
 
 fn insert_cursor_into_line(line: &Line<'static>, col: usize, raw_text: &str) -> Line<'static> {
     // Use REVERSED + SLOW_BLINK for maximum visibility
-    let cursor_style = Style::default()
-        .add_modifier(Modifier::REVERSED | Modifier::SLOW_BLINK);
+    let cursor_style = Style::default().add_modifier(Modifier::REVERSED | Modifier::SLOW_BLINK);
 
     // Get the character at cursor position, or use block char for visibility at end of line
     let cursor_char: char = raw_text.chars().nth(col).unwrap_or('█');
@@ -1149,8 +1180,7 @@ fn render_edit_shortcuts(f: &mut Frame, area: Rect, block_marking: bool) {
         ));
     }
 
-    let paragraph = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(Color::Blue));
+    let paragraph = Paragraph::new(Line::from(spans)).style(Style::default().bg(Color::Blue));
     f.render_widget(paragraph, area);
 }
 
@@ -1184,7 +1214,12 @@ fn build_title(state: &PreviewState) -> String {
     title
 }
 
-fn get_border_style(is_focused: bool, mode: EditorMode, modified: bool, selection_active: bool) -> Style {
+fn get_border_style(
+    is_focused: bool,
+    mode: EditorMode,
+    modified: bool,
+    selection_active: bool,
+) -> Style {
     // Selection mode takes priority (yellow border like terminal panes)
     if selection_active {
         return Style::default().fg(Color::Yellow);

@@ -5,5 +5,5 @@ pub mod templates;
 pub mod wizard;
 
 pub use dependency_checker::{DependencyReport, DependencyStatus};
-pub use templates::{Template, TemplateCategory, get_builtin_templates, apply_template};
+pub use templates::{apply_template, get_builtin_templates, Template, TemplateCategory};
 pub use wizard::{WizardState, WizardStep};

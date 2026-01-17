@@ -71,10 +71,10 @@ impl PseudoTerminal {
         // Ensure UTF-8 encoding for proper character handling
         cmd.env("LANG", "en_US.UTF-8");
         cmd.env("LC_ALL", "en_US.UTF-8");
-        
+
         let _child = pair.slave.spawn_command(cmd)?;
-        
-        // We drop _child here, it runs in background. 
+
+        // We drop _child here, it runs in background.
         // In a real app we might want to keep it to check exit status.
 
         let writer = pair.master.take_writer()?;
@@ -96,7 +96,7 @@ impl PseudoTerminal {
                 return Ok(());
             }
         }
-        
+
         self.master.resize(PtySize {
             rows,
             cols,

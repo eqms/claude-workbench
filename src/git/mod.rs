@@ -11,11 +11,7 @@ use std::sync::mpsc;
 
 /// Find the git repository root for a given path
 pub fn find_repo_root(path: &Path) -> Option<PathBuf> {
-    let path = if path.is_file() {
-        path.parent()?
-    } else {
-        path
-    };
+    let path = if path.is_file() { path.parent()? } else { path };
 
     let output = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
@@ -89,7 +85,9 @@ fn parse_git_status(repo_root: &Path) -> HashMap<PathBuf, GitFileStatus> {
 }
 
 /// Get git status for all files in a directory
-pub fn get_status_for_directory(dir: &Path) -> (HashMap<PathBuf, GitFileStatus>, Option<GitRepoInfo>) {
+pub fn get_status_for_directory(
+    dir: &Path,
+) -> (HashMap<PathBuf, GitFileStatus>, Option<GitRepoInfo>) {
     // Find repo root
     let Some(repo_root) = find_repo_root(dir) else {
         return (HashMap::new(), None);
@@ -154,7 +152,11 @@ pub fn aggregate_directory_status(
 fn get_commits_behind(repo_root: &Path, branch: &str) -> Option<usize> {
     // Get the upstream tracking branch
     let output = Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", &format!("{}@{{upstream}}", branch)])
+        .args([
+            "rev-parse",
+            "--abbrev-ref",
+            &format!("{}@{{upstream}}", branch),
+        ])
         .current_dir(repo_root)
         .output()
         .ok()?;
@@ -173,10 +175,7 @@ fn get_commits_behind(repo_root: &Path, branch: &str) -> Option<usize> {
         .ok()?;
 
     if output.status.success() {
-        String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .parse()
-            .ok()
+        String::from_utf8_lossy(&output.stdout).trim().parse().ok()
     } else {
         None
     }

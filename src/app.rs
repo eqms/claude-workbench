@@ -5,24 +5,27 @@ use std::collections::HashMap;
 
 use crate::config::Config;
 use crate::session::SessionState;
-use crate::ui;
-use crate::types::{EditorMode, PaneId, TerminalSelection, DragState, HelpState, MouseSelection, GitRemoteState, GitRemoteCheckResult, SearchMode};
 use crate::terminal::PseudoTerminal;
-use std::borrow::Cow;
-use std::path::Path;
-use shell_escape::escape;
+use crate::types::{
+    DragState, EditorMode, GitRemoteCheckResult, GitRemoteState, HelpState, MouseSelection, PaneId,
+    SearchMode, TerminalSelection,
+};
+use crate::ui;
 use crate::ui::file_browser::FileBrowserState;
 use crate::ui::preview::PreviewState;
 use crate::ui::syntax::SyntaxManager;
+use shell_escape::escape;
+use std::borrow::Cow;
+use std::path::Path;
 
-use crate::ui::menu::MenuBar;
-use crate::ui::dialog::Dialog;
-use crate::ui::fuzzy_finder::FuzzyFinder;
-use crate::ui::settings::SettingsState;
-use crate::ui::about::AboutState;
-use crate::setup::wizard::WizardState;
 use crate::browser;
 use crate::git;
+use crate::setup::wizard::WizardState;
+use crate::ui::about::AboutState;
+use crate::ui::dialog::Dialog;
+use crate::ui::fuzzy_finder::FuzzyFinder;
+use crate::ui::menu::MenuBar;
+use crate::ui::settings::SettingsState;
 
 pub struct App {
     pub config: Config,
@@ -66,7 +69,7 @@ pub struct App {
 
 impl App {
     pub fn new(config: Config, session: SessionState) -> Self {
-        let rows = 24; 
+        let rows = 24;
         let cols = 80;
 
         let file_browser = FileBrowserState::new(config.file_browser.show_hidden);
@@ -105,7 +108,7 @@ impl App {
             config.pty.lazygit_command.clone()
         };
         if let Ok(pty) = PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
-             terminals.insert(PaneId::LazyGit, pty);
+            terminals.insert(PaneId::LazyGit, pty);
         }
 
         // 3. User Terminal (from Config)
@@ -115,7 +118,7 @@ impl App {
         cmd.extend(args.clone());
 
         if let Ok(pty) = PseudoTerminal::new(&cmd, rows, cols, &cwd) {
-             terminals.insert(PaneId::Terminal, pty);
+            terminals.insert(PaneId::Terminal, pty);
         }
 
         let syntax_manager = SyntaxManager::new();
@@ -159,8 +162,7 @@ impl App {
         if should_open_wizard {
             app.wizard.open();
         }
-        
-        
+
         app.update_preview();
 
         // Initial cd for Terminal only (Claude should not receive early commands)
@@ -207,20 +209,28 @@ impl App {
             if event::poll(std::time::Duration::from_millis(16))? {
                 match event::read()? {
                     Event::Mouse(mouse) => {
-                         let size = terminal.size()?;
-                         let area = Rect::new(0, 0, size.width, size.height);
-                         let (files, preview, claude, lazygit, term, footer_area) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit, self.show_preview);
-                         
-                         let x = mouse.column;
-                         let y = mouse.row;
-                         
-                         // Helper closure for hit testing
-                         let is_inside = |r: Rect, x: u16, y: u16| -> bool {
-                             x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
-                         };
+                        let size = terminal.size()?;
+                        let area = Rect::new(0, 0, size.width, size.height);
+                        let (files, preview, claude, lazygit, term, footer_area) =
+                            ui::layout::compute_layout(
+                                area,
+                                self.show_terminal,
+                                self.show_lazygit,
+                                self.show_preview,
+                            );
 
-                         match mouse.kind {
-                            crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                        let x = mouse.column;
+                        let y = mouse.row;
+
+                        // Helper closure for hit testing
+                        let is_inside = |r: Rect, x: u16, y: u16| -> bool {
+                            x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
+                        };
+
+                        match mouse.kind {
+                            crossterm::event::MouseEventKind::Down(
+                                crossterm::event::MouseButton::Left,
+                            ) => {
                                 // Block all background interaction when any modal is open
                                 // About dialog
                                 if self.about.visible {
@@ -304,18 +314,25 @@ impl App {
                                         // Check for double-click (same item within 300ms)
                                         let now = std::time::Instant::now();
                                         let is_double_click = self.last_click_idx == Some(idx)
-                                            && now.duration_since(self.last_click_time).as_millis() < 300;
+                                            && now.duration_since(self.last_click_time).as_millis()
+                                                < 300;
 
                                         // Update tracking for next click
                                         self.last_click_time = now;
                                         self.last_click_idx = Some(idx);
 
                                         // Check if editor has unsaved changes before switching
-                                        let has_unsaved = self.preview.mode == EditorMode::Edit && self.preview.is_modified();
+                                        let has_unsaved = self.preview.mode == EditorMode::Edit
+                                            && self.preview.is_modified();
 
                                         if is_double_click {
                                             // Double-click: enter directory or open file
-                                            let is_dir = self.file_browser.entries.get(idx).map(|e| e.is_dir).unwrap_or(false);
+                                            let is_dir = self
+                                                .file_browser
+                                                .entries
+                                                .get(idx)
+                                                .map(|e| e.is_dir)
+                                                .unwrap_or(false);
                                             if is_dir {
                                                 if has_unsaved {
                                                     self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
@@ -334,22 +351,29 @@ impl App {
                                         } else {
                                             // Single click: just select (but check for unsaved changes)
                                             if has_unsaved {
-                                                self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
-                                                    title: "Unsaved Changes".to_string(),
-                                                    message: "Discard changes and switch file?".to_string(),
-                                                    action: ui::dialog::DialogAction::SwitchFile { target_idx: idx },
-                                                };
+                                                self.dialog.dialog_type =
+                                                    ui::dialog::DialogType::Confirm {
+                                                        title: "Unsaved Changes".to_string(),
+                                                        message: "Discard changes and switch file?"
+                                                            .to_string(),
+                                                        action:
+                                                            ui::dialog::DialogAction::SwitchFile {
+                                                                target_idx: idx,
+                                                            },
+                                                    };
                                             } else {
                                                 self.file_browser.list_state.select(Some(idx));
                                                 self.update_preview();
                                             }
                                         }
                                     }
-                                }
-                                else if is_inside(preview, x, y) {
+                                } else if is_inside(preview, x, y) {
                                     // Alt+Click starts selection in Preview (Read-Only mode only)
-                                    if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT)
-                                       && self.preview.mode == crate::types::EditorMode::ReadOnly {
+                                    if mouse
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::ALT)
+                                        && self.preview.mode == crate::types::EditorMode::ReadOnly
+                                    {
                                         self.mouse_selection.start(PaneId::Preview, y, preview);
                                     }
                                     // Click-to-position cursor in Edit mode
@@ -357,34 +381,42 @@ impl App {
                                         self.position_preview_cursor(preview, x, y);
                                     }
                                     self.active_pane = PaneId::Preview;
-                                }
-                                else if is_inside(claude, x, y) {
+                                } else if is_inside(claude, x, y) {
                                     // Show startup dialog if prefixes configured and not yet shown
-                                    if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
-                                        self.claude_startup.open(self.config.claude.startup_prefixes.clone());
+                                    if !self.claude_startup.shown_this_session
+                                        && !self.config.claude.startup_prefixes.is_empty()
+                                    {
+                                        self.claude_startup
+                                            .open(self.config.claude.startup_prefixes.clone());
                                     } else {
                                         // Alt+Click starts mouse text selection
-                                        if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT) {
+                                        if mouse
+                                            .modifiers
+                                            .contains(crossterm::event::KeyModifiers::ALT)
+                                        {
                                             self.mouse_selection.start(PaneId::Claude, y, claude);
                                         }
                                         self.active_pane = PaneId::Claude;
                                     }
-                                }
-                                else if is_inside(lazygit, x, y) {
+                                } else if is_inside(lazygit, x, y) {
                                     // Alt+Click starts mouse text selection
-                                    if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT) {
+                                    if mouse
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::ALT)
+                                    {
                                         self.mouse_selection.start(PaneId::LazyGit, y, lazygit);
                                     }
                                     self.active_pane = PaneId::LazyGit;
-                                }
-                                else if is_inside(term, x, y) {
+                                } else if is_inside(term, x, y) {
                                     // Alt+Click starts mouse text selection
-                                    if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT) {
+                                    if mouse
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::ALT)
+                                    {
                                         self.mouse_selection.start(PaneId::Terminal, y, term);
                                     }
                                     self.active_pane = PaneId::Terminal;
-                                }
-                                else if is_inside(footer_area, x, y) {
+                                } else if is_inside(footer_area, x, y) {
                                     // Use context-aware button positions
                                     let footer_x = x.saturating_sub(footer_area.x);
                                     let is_selection_mode = self.terminal_selection.active;
@@ -398,7 +430,9 @@ impl App {
                                         if footer_x >= start && footer_x < end {
                                             use ui::footer::FooterAction;
                                             match action {
-                                                FooterAction::FocusFiles => self.active_pane = PaneId::FileBrowser,
+                                                FooterAction::FocusFiles => {
+                                                    self.active_pane = PaneId::FileBrowser
+                                                }
                                                 FooterAction::TogglePreview => {
                                                     self.show_preview = !self.show_preview;
                                                     if self.show_preview {
@@ -407,68 +441,123 @@ impl App {
                                                         self.active_pane = PaneId::FileBrowser;
                                                     }
                                                 }
-                                                FooterAction::Refresh => { self.file_browser.refresh(); self.update_preview(); }
+                                                FooterAction::Refresh => {
+                                                    self.file_browser.refresh();
+                                                    self.update_preview();
+                                                }
                                                 FooterAction::FocusClaude => {
-                                                    if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
-                                                        self.claude_startup.open(self.config.claude.startup_prefixes.clone());
+                                                    if !self.claude_startup.shown_this_session
+                                                        && !self
+                                                            .config
+                                                            .claude
+                                                            .startup_prefixes
+                                                            .is_empty()
+                                                    {
+                                                        self.claude_startup.open(
+                                                            self.config
+                                                                .claude
+                                                                .startup_prefixes
+                                                                .clone(),
+                                                        );
                                                     } else {
                                                         self.active_pane = PaneId::Claude;
                                                     }
                                                 }
-                                                FooterAction::ToggleGit => { self.show_lazygit = !self.show_lazygit; if self.show_lazygit { self.active_pane = PaneId::LazyGit; } }
-                                                FooterAction::ToggleTerm => { self.show_terminal = !self.show_terminal; if self.show_terminal { self.active_pane = PaneId::Terminal; } }
-                                                FooterAction::FuzzyFind => { self.fuzzy_finder.open(&self.file_browser.current_dir); }
+                                                FooterAction::ToggleGit => {
+                                                    self.show_lazygit = !self.show_lazygit;
+                                                    if self.show_lazygit {
+                                                        self.active_pane = PaneId::LazyGit;
+                                                    }
+                                                }
+                                                FooterAction::ToggleTerm => {
+                                                    self.show_terminal = !self.show_terminal;
+                                                    if self.show_terminal {
+                                                        self.active_pane = PaneId::Terminal;
+                                                    }
+                                                }
+                                                FooterAction::FuzzyFind => {
+                                                    self.fuzzy_finder
+                                                        .open(&self.file_browser.current_dir);
+                                                }
                                                 FooterAction::OpenFile => {
-                                                    if let Some(path) = self.file_browser.selected_file() {
+                                                    if let Some(path) =
+                                                        self.file_browser.selected_file()
+                                                    {
                                                         if browser::can_preview_in_browser(&path) {
-                                                            let preview_path = if browser::is_markdown(&path) {
-                                                                browser::markdown_to_html(&path).unwrap_or(path)
-                                                            } else {
-                                                                path
-                                                            };
-                                                            let _ = browser::open_file(&preview_path);
+                                                            let preview_path =
+                                                                if browser::is_markdown(&path) {
+                                                                    browser::markdown_to_html(&path)
+                                                                        .unwrap_or(path)
+                                                                } else {
+                                                                    path
+                                                                };
+                                                            let _ =
+                                                                browser::open_file(&preview_path);
                                                         }
                                                     }
                                                 }
-                                                FooterAction::OpenFinder => { let _ = browser::open_in_file_manager(&self.file_browser.current_dir); }
+                                                FooterAction::OpenFinder => {
+                                                    let _ = browser::open_in_file_manager(
+                                                        &self.file_browser.current_dir,
+                                                    );
+                                                }
                                                 FooterAction::ToggleHidden => {
-                                                    self.file_browser.show_hidden = !self.file_browser.show_hidden;
+                                                    self.file_browser.show_hidden =
+                                                        !self.file_browser.show_hidden;
                                                     self.file_browser.refresh();
                                                     self.update_preview();
                                                 }
-                                                FooterAction::Settings => { let cfg = self.config.clone(); self.settings.open(&cfg); }
+                                                FooterAction::Settings => {
+                                                    let cfg = self.config.clone();
+                                                    self.settings.open(&cfg);
+                                                }
                                                 FooterAction::About => self.about.open(),
                                                 FooterAction::Help => self.help.open(),
                                                 FooterAction::Edit => {
                                                     // Enter edit mode in Preview
                                                     if self.active_pane == PaneId::Preview {
-                                                        self.preview.mode = crate::types::EditorMode::Edit;
+                                                        self.preview.mode =
+                                                            crate::types::EditorMode::Edit;
                                                     }
                                                 }
                                                 FooterAction::StartSelect => {
                                                     // Start selection mode in current pane
                                                     if self.active_pane == PaneId::Preview {
-                                                        self.terminal_selection.start(self.preview.scroll as usize, PaneId::Preview);
-                                                    } else if matches!(self.active_pane, PaneId::Claude | PaneId::LazyGit | PaneId::Terminal) {
-                                                        self.terminal_selection.start(0, self.active_pane);
+                                                        self.terminal_selection.start(
+                                                            self.preview.scroll as usize,
+                                                            PaneId::Preview,
+                                                        );
+                                                    } else if matches!(
+                                                        self.active_pane,
+                                                        PaneId::Claude
+                                                            | PaneId::LazyGit
+                                                            | PaneId::Terminal
+                                                    ) {
+                                                        self.terminal_selection
+                                                            .start(0, self.active_pane);
                                                     }
                                                 }
                                                 FooterAction::Save => {
                                                     // Save in edit mode
-                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
                                                         let _ = self.preview.save();
                                                     }
                                                 }
                                                 FooterAction::ExitEdit => {
                                                     // Exit edit mode
                                                     if self.active_pane == PaneId::Preview {
-                                                        self.preview.mode = crate::types::EditorMode::ReadOnly;
+                                                        self.preview.mode =
+                                                            crate::types::EditorMode::ReadOnly;
                                                     }
                                                 }
                                                 FooterAction::Undo | FooterAction::Redo => {
                                                     // Undo/Redo handled by keyboard only
                                                 }
-                                                FooterAction::SelectDown | FooterAction::SelectUp => {
+                                                FooterAction::SelectDown
+                                                | FooterAction::SelectUp => {
                                                     // Selection navigation not clickable
                                                 }
                                                 FooterAction::SelectCopy => {
@@ -483,30 +572,46 @@ impl App {
                                                 }
                                                 FooterAction::ToggleBlock => {
                                                     // MC Edit: Toggle block marking (F3)
-                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
                                                         self.preview.toggle_block_marking();
                                                     }
                                                 }
                                                 FooterAction::CopyBlock => {
                                                     // MC Edit: Copy block (F5)
-                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
                                                         self.preview.copy_block();
                                                     }
                                                 }
                                                 FooterAction::MoveBlock => {
                                                     // MC Edit: Move/cut block (F6)
-                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
                                                         self.preview.move_block();
                                                         self.preview.update_modified();
-                                                        self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                        self.preview.update_edit_highlighting(
+                                                            &self.syntax_manager,
+                                                        );
                                                     }
                                                 }
                                                 FooterAction::DeleteBlock => {
                                                     // MC Edit: Delete block (F8)
-                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
                                                         self.preview.delete_block();
                                                         self.preview.update_modified();
-                                                        self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                        self.preview.update_edit_highlighting(
+                                                            &self.syntax_manager,
+                                                        );
                                                     }
                                                 }
                                                 FooterAction::Search => {
@@ -517,9 +622,13 @@ impl App {
                                                 }
                                                 FooterAction::SearchReplace => {
                                                     // Open search & replace (Ctrl+H) - only in Edit mode
-                                                    if self.active_pane == PaneId::Preview && self.preview.mode == crate::types::EditorMode::Edit {
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
                                                         self.preview.search.open();
-                                                        self.preview.search.mode = crate::types::SearchMode::Replace;
+                                                        self.preview.search.mode =
+                                                            crate::types::SearchMode::Replace;
                                                     }
                                                 }
                                                 FooterAction::FileMenu => {
@@ -536,11 +645,19 @@ impl App {
                                 }
                             }
                             // Handle drag movement
-                            crossterm::event::MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
+                            crossterm::event::MouseEventKind::Drag(
+                                crossterm::event::MouseButton::Left,
+                            ) => {
                                 // Block drag when any modal is open
-                                if self.about.visible || self.help.visible || self.settings.visible
-                                    || self.dialog.is_active() || self.fuzzy_finder.visible
-                                    || self.claude_startup.visible || self.wizard.visible || self.menu.visible {
+                                if self.about.visible
+                                    || self.help.visible
+                                    || self.settings.visible
+                                    || self.dialog.is_active()
+                                    || self.fuzzy_finder.visible
+                                    || self.claude_startup.visible
+                                    || self.wizard.visible
+                                    || self.menu.visible
+                                {
                                     continue;
                                 }
                                 // Handle mouse text selection in terminal panes
@@ -551,16 +668,25 @@ impl App {
                                 }
                             }
                             // Handle drag drop and mouse selection finish
-                            crossterm::event::MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
+                            crossterm::event::MouseEventKind::Up(
+                                crossterm::event::MouseButton::Left,
+                            ) => {
                                 // Block drop when any modal is open
-                                if self.about.visible || self.help.visible || self.settings.visible
-                                    || self.dialog.is_active() || self.fuzzy_finder.visible
-                                    || self.claude_startup.visible || self.wizard.visible || self.menu.visible {
+                                if self.about.visible
+                                    || self.help.visible
+                                    || self.settings.visible
+                                    || self.dialog.is_active()
+                                    || self.fuzzy_finder.visible
+                                    || self.claude_startup.visible
+                                    || self.wizard.visible
+                                    || self.menu.visible
+                                {
                                     continue;
                                 }
                                 // Handle mouse text selection finish - convert to terminal selection
                                 if self.mouse_selection.selecting {
-                                    if let Some((start, end, pane)) = self.mouse_selection.finish() {
+                                    if let Some((start, end, pane)) = self.mouse_selection.finish()
+                                    {
                                         // Enter keyboard selection mode with the mouse-selected range
                                         self.terminal_selection.active = true;
                                         self.terminal_selection.start_line = Some(start);
@@ -609,17 +735,20 @@ impl App {
                                 }
 
                                 // Block scroll for all other modals
-                                if self.settings.visible || self.dialog.is_active()
-                                    || self.fuzzy_finder.visible || self.claude_startup.visible
-                                    || self.wizard.visible || self.menu.visible {
+                                if self.settings.visible
+                                    || self.dialog.is_active()
+                                    || self.fuzzy_finder.visible
+                                    || self.claude_startup.visible
+                                    || self.wizard.visible
+                                    || self.menu.visible
+                                {
                                     continue;
                                 }
 
                                 if is_inside(files, x, y) {
                                     self.file_browser.down();
                                     self.update_preview();
-                                }
-                                else if is_inside(preview, x, y) {
+                                } else if is_inside(preview, x, y) {
                                     // In Edit mode, move TextArea cursor; in ReadOnly mode, scroll
                                     if self.preview.mode == crate::types::EditorMode::Edit {
                                         if let Some(editor) = &mut self.preview.editor {
@@ -630,10 +759,19 @@ impl App {
                                     } else {
                                         self.preview.scroll_down();
                                     }
+                                } else if is_inside(claude, x, y) {
+                                    if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
+                                        pty.scroll_down(3);
+                                    }
+                                } else if is_inside(lazygit, x, y) {
+                                    if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) {
+                                        pty.scroll_down(3);
+                                    }
+                                } else if is_inside(term, x, y) {
+                                    if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
+                                        pty.scroll_down(3);
+                                    }
                                 }
-                                else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_down(3); } }
-                                else if is_inside(lazygit, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) { pty.scroll_down(3); } }
-                                else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_down(3); } }
                             }
                             crossterm::event::MouseEventKind::ScrollUp => {
                                 // Block all background scroll when any modal is open
@@ -655,17 +793,20 @@ impl App {
                                 }
 
                                 // Block scroll for all other modals
-                                if self.settings.visible || self.dialog.is_active()
-                                    || self.fuzzy_finder.visible || self.claude_startup.visible
-                                    || self.wizard.visible || self.menu.visible {
+                                if self.settings.visible
+                                    || self.dialog.is_active()
+                                    || self.fuzzy_finder.visible
+                                    || self.claude_startup.visible
+                                    || self.wizard.visible
+                                    || self.menu.visible
+                                {
                                     continue;
                                 }
 
                                 if is_inside(files, x, y) {
                                     self.file_browser.up();
                                     self.update_preview();
-                                }
-                                else if is_inside(preview, x, y) {
+                                } else if is_inside(preview, x, y) {
                                     // In Edit mode, move TextArea cursor; in ReadOnly mode, scroll
                                     if self.preview.mode == crate::types::EditorMode::Edit {
                                         if let Some(editor) = &mut self.preview.editor {
@@ -676,562 +817,874 @@ impl App {
                                     } else {
                                         self.preview.scroll_up();
                                     }
+                                } else if is_inside(claude, x, y) {
+                                    if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
+                                        pty.scroll_up(3);
+                                    }
+                                } else if is_inside(lazygit, x, y) {
+                                    if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) {
+                                        pty.scroll_up(3);
+                                    }
+                                } else if is_inside(term, x, y) {
+                                    if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
+                                        pty.scroll_up(3);
+                                    }
                                 }
-                                else if is_inside(claude, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) { pty.scroll_up(3); } }
-                                else if is_inside(lazygit, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) { pty.scroll_up(3); } }
-                                else if is_inside(term, x, y) { if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) { pty.scroll_up(3); } }
                             }
                             _ => {}
-                         }
+                        }
                     }
                     Event::Key(key) => {
                         if key.kind == KeyEventKind::Press {
-                        
-                        // Fuzzy finder handling (highest priority)
-                        if self.fuzzy_finder.visible {
-                            match key.code {
-                                KeyCode::Esc => self.fuzzy_finder.close(),
-                                KeyCode::Enter => {
-                                    if let Some(selected) = self.fuzzy_finder.selected() {
-                                        let full_path = self.fuzzy_finder.base_dir.join(&selected);
-                                        // Navigate to file's directory and select it
-                                        if let Some(parent) = full_path.parent() {
-                                            self.file_browser.current_dir = parent.to_path_buf();
-                                            self.file_browser.load_directory();
-                                            // Try to select the file
-                                            let file_name = full_path.file_name().map(|n| n.to_string_lossy().to_string());
-                                            if let Some(name) = file_name {
-                                                for (i, entry) in self.file_browser.entries.iter().enumerate() {
-                                                    if entry.name == name {
-                                                        self.file_browser.list_state.select(Some(i));
-                                                        break;
+                            // Fuzzy finder handling (highest priority)
+                            if self.fuzzy_finder.visible {
+                                match key.code {
+                                    KeyCode::Esc => self.fuzzy_finder.close(),
+                                    KeyCode::Enter => {
+                                        if let Some(selected) = self.fuzzy_finder.selected() {
+                                            let full_path =
+                                                self.fuzzy_finder.base_dir.join(&selected);
+                                            // Navigate to file's directory and select it
+                                            if let Some(parent) = full_path.parent() {
+                                                self.file_browser.current_dir =
+                                                    parent.to_path_buf();
+                                                self.file_browser.load_directory();
+                                                // Try to select the file
+                                                let file_name = full_path
+                                                    .file_name()
+                                                    .map(|n| n.to_string_lossy().to_string());
+                                                if let Some(name) = file_name {
+                                                    for (i, entry) in
+                                                        self.file_browser.entries.iter().enumerate()
+                                                    {
+                                                        if entry.name == name {
+                                                            self.file_browser
+                                                                .list_state
+                                                                .select(Some(i));
+                                                            break;
+                                                        }
                                                     }
                                                 }
-                                            }
-                                            self.update_preview();
-                                            self.sync_terminals();
-                                        }
-                                        self.fuzzy_finder.close();
-                                    }
-                                }
-                                KeyCode::Up => self.fuzzy_finder.prev(),
-                                KeyCode::Down => self.fuzzy_finder.next(),
-                                KeyCode::Backspace => self.fuzzy_finder.pop_char(),
-                                KeyCode::Char(c) => self.fuzzy_finder.push_char(c),
-                                _ => {}
-                            }
-                            continue;
-                        }
-
-                        // Wizard handling (high priority)
-                        if self.wizard.visible {
-                            self.handle_wizard_input(key.code, key.modifiers);
-                            continue;
-                        }
-
-                        // Settings handling (high priority)
-                        if self.settings.visible {
-                            self.handle_settings_input(key.code, key.modifiers);
-                            continue;
-                        }
-
-                        // Dialog handling (highest priority)
-                        if self.dialog.is_active() {
-                            match &self.dialog.dialog_type {
-                                ui::dialog::DialogType::Input { value, action, .. } => {
-                                    match key.code {
-                                        KeyCode::Esc => self.dialog.close(),
-                                        KeyCode::Enter => {
-                                            let val = value.clone();
-                                            let act = action.clone();
-                                            self.dialog.close();
-                                            self.execute_dialog_action(act, Some(val));
-                                        }
-                                        KeyCode::Backspace => self.dialog.delete_char_before(),
-                                        KeyCode::Delete => self.dialog.delete_char_at(),
-                                        KeyCode::Left => self.dialog.cursor_left(),
-                                        KeyCode::Right => self.dialog.cursor_right(),
-                                        KeyCode::Home => self.dialog.cursor_home(),
-                                        KeyCode::End => self.dialog.cursor_end(),
-                                        KeyCode::Char(c) => self.dialog.insert_char(c),
-                                        _ => {}
-                                    }
-                                }
-                                ui::dialog::DialogType::Confirm { action, .. } => {
-                                    match key.code {
-                                        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => self.dialog.close(),
-                                        KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
-                                            let act = action.clone();
-                                            self.dialog.close();
-                                            self.execute_dialog_action(act, None);
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                ui::dialog::DialogType::None => {}
-                            }
-                            continue;
-                        }
-                        
-                        // Menu handling
-                        if self.menu.visible {
-                            match key.code {
-                                KeyCode::Esc => self.menu.visible = false,
-                                KeyCode::Up | KeyCode::Char('k') => self.menu.prev(),
-                                KeyCode::Down | KeyCode::Char('j') => self.menu.next(),
-                                KeyCode::Enter => {
-                                    let action = self.menu.action();
-                                    self.menu.visible = false;
-                                    self.handle_menu_action(action);
-                                }
-                                KeyCode::Char('n') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::NewFile); }
-                                KeyCode::Char('N') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::NewDirectory); }
-                                KeyCode::Char('r') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::RenameFile); }
-                                KeyCode::Char('u') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::DuplicateFile); }
-                                KeyCode::Char('c') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyFileTo); }
-                                KeyCode::Char('m') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::MoveFileTo); }
-                                KeyCode::Char('d') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::DeleteFile); }
-                                KeyCode::Char('y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyAbsolutePath); }
-                                KeyCode::Char('Y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyRelativePath); }
-                                KeyCode::Char('g') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::GoToPath); }
-                                _ => {}
-                            }
-                            continue;
-                        }
-                        
-                        // About dialog handling
-                        if self.about.visible {
-                            match key.code {
-                                KeyCode::Esc | KeyCode::F(10) | KeyCode::Char('q') => self.about.close(),
-                                KeyCode::Up | KeyCode::Char('k') => self.about.scroll_up(),
-                                KeyCode::Down | KeyCode::Char('j') => self.about.scroll_down(),
-                                _ => {}
-                            }
-                            continue;
-                        }
-
-                        if self.help.visible {
-                            match key.code {
-                                KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => self.help.close(),
-                                KeyCode::Up | KeyCode::Char('k') => self.help.scroll_up(1),
-                                KeyCode::Down | KeyCode::Char('j') => self.help.scroll_down(1),
-                                KeyCode::PageUp => self.help.page_up(),
-                                KeyCode::PageDown => self.help.page_down(),
-                                KeyCode::Home | KeyCode::Char('g') => self.help.scroll_to_top(),
-                                KeyCode::End | KeyCode::Char('G') => self.help.scroll_to_bottom(),
-                                _ => {}
-                            }
-                            // Consume all keys while help is open
-                            continue;
-                        }
-
-                        // Global Keys - F10/F12 work everywhere
-                        if key.code == KeyCode::F(12) {
-                            self.help.open();
-                            continue;
-                        }
-
-                        if key.code == KeyCode::F(10) {
-                            self.about.open();
-                            continue;
-                        }
-
-                        // Context-specific shortcuts (only in non-terminal panes)
-                        // '?' for help - only in FileBrowser or Preview (read-only)
-                        if key.code == KeyCode::Char('?')
-                            && matches!(self.active_pane, PaneId::FileBrowser | PaneId::Preview)
-                            && self.preview.mode != EditorMode::Edit {
-                            self.help.open();
-                            continue;
-                        }
-
-                        // 'i' for about - only in FileBrowser (not Preview, as 'i' is common text)
-                        if key.code == KeyCode::Char('i')
-                            && self.active_pane == PaneId::FileBrowser {
-                            self.about.open();
-                            continue;
-                        }
-                        
-                        if key.code == KeyCode::F(9) {
-                            self.menu.toggle();
-                            continue;
-                        }
-                        
-                        // Ctrl+P: Open fuzzy finder
-                        if key.code == KeyCode::Char('p') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            self.fuzzy_finder.open(&self.file_browser.current_dir);
-                            continue;
-                        }
-
-                        // Ctrl+,: Open settings
-                        if key.code == KeyCode::Char(',') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            self.settings.open(&self.config);
-                            continue;
-                        }
-
-                        // Ctrl+Shift+W: Re-run setup wizard
-                        if key.code == KeyCode::Char('W') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL | crossterm::event::KeyModifiers::SHIFT) {
-                            self.wizard.open();
-                            continue;
-                        }
-
-                        // Claude startup dialog handling (high priority)
-                        if self.claude_startup.visible {
-                            match key.code {
-                                KeyCode::Esc => {
-                                    self.claude_startup.close();
-                                    self.active_pane = PaneId::Claude;
-                                }
-                                KeyCode::Enter => {
-                                    if let Some(prefix) = self.claude_startup.selected_prefix() {
-                                        if !prefix.is_empty() {
-                                            if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
-                                                let cmd = format!("{}\n", prefix);
-                                                let _ = pty.write_input(cmd.as_bytes());
-                                            }
-                                        }
-                                    }
-                                    self.claude_startup.close();
-                                    self.active_pane = PaneId::Claude;
-                                }
-                                KeyCode::Up | KeyCode::Char('k') => self.claude_startup.prev(),
-                                KeyCode::Down | KeyCode::Char('j') => self.claude_startup.next(),
-                                _ => {}
-                            }
-                            continue;
-                        }
-
-                        // Global Focus Switching
-                        match key.code {
-                            KeyCode::F(1) => self.active_pane = PaneId::FileBrowser,
-                            KeyCode::F(2) => {
-                                self.show_preview = !self.show_preview;
-                                if self.show_preview {
-                                    self.active_pane = PaneId::Preview;
-                                } else if self.active_pane == PaneId::Preview {
-                                    self.active_pane = PaneId::FileBrowser;
-                                }
-                            }
-                            KeyCode::F(3) => { self.file_browser.refresh(); self.update_preview(); }
-                            KeyCode::F(4) => {
-                                // Show startup dialog if prefixes configured and not yet shown
-                                if !self.claude_startup.shown_this_session && !self.config.claude.startup_prefixes.is_empty() {
-                                    self.claude_startup.open(self.config.claude.startup_prefixes.clone());
-                                } else {
-                                    self.active_pane = PaneId::Claude;
-                                }
-                            }
-                            KeyCode::F(5) => {
-                                self.show_lazygit = !self.show_lazygit;
-                                if self.show_lazygit {
-                                    self.active_pane = PaneId::LazyGit;
-                                } else if self.active_pane == PaneId::LazyGit {
-                                    self.active_pane = PaneId::Preview;
-                                }
-                            }
-                            KeyCode::F(6) => {
-                                self.show_terminal = !self.show_terminal;
-                                if self.show_terminal {
-                                    self.active_pane = PaneId::Terminal;
-                                } else if self.active_pane == PaneId::Terminal {
-                                    self.active_pane = PaneId::Preview;
-                                }
-                            }
-                            // QUIT: Ctrl+Q
-                            KeyCode::Char('q') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                                self.should_quit = true;
-                            }
-                             _ => {
-                                // Pane specific handling
-                                match self.active_pane {
-                                    PaneId::FileBrowser => {
-                                        match key.code {
-                                            KeyCode::Down | KeyCode::Char('j') => {
-                                                self.file_browser.down();
-                                                self.update_preview();
-                                            }
-                                            KeyCode::Up | KeyCode::Char('k') => {
-                                                self.file_browser.up();
-                                                self.update_preview();
-                                            }
-                                            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                                                if let Some(_path) = self.file_browser.enter_selected() {
-                                                    // File opened
-                                                } else {
-                                                    self.update_preview();
-                                                    self.sync_terminals();
-                                                    self.check_repo_change();
-                                                }
-                                            }
-                                            KeyCode::Backspace | KeyCode::Left | KeyCode::Char('h') => {
-                                                self.file_browser.go_parent();
                                                 self.update_preview();
                                                 self.sync_terminals();
-                                                self.check_repo_change();
                                             }
-                                            // Open file in browser/external viewer
-                                            KeyCode::Char('o') => {
-                                                if let Some(path) = self.file_browser.selected_file() {
-                                                    if browser::can_preview_in_browser(&path) {
-                                                        let preview_path = if browser::is_markdown(&path) {
-                                                            browser::markdown_to_html(&path).unwrap_or(path)
-                                                        } else {
-                                                            path
-                                                        };
-                                                        let _ = browser::open_file(&preview_path);
-                                                    }
-                                                }
+                                            self.fuzzy_finder.close();
+                                        }
+                                    }
+                                    KeyCode::Up => self.fuzzy_finder.prev(),
+                                    KeyCode::Down => self.fuzzy_finder.next(),
+                                    KeyCode::Backspace => self.fuzzy_finder.pop_char(),
+                                    KeyCode::Char(c) => self.fuzzy_finder.push_char(c),
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
+                            // Wizard handling (high priority)
+                            if self.wizard.visible {
+                                self.handle_wizard_input(key.code, key.modifiers);
+                                continue;
+                            }
+
+                            // Settings handling (high priority)
+                            if self.settings.visible {
+                                self.handle_settings_input(key.code, key.modifiers);
+                                continue;
+                            }
+
+                            // Dialog handling (highest priority)
+                            if self.dialog.is_active() {
+                                match &self.dialog.dialog_type {
+                                    ui::dialog::DialogType::Input { value, action, .. } => {
+                                        match key.code {
+                                            KeyCode::Esc => self.dialog.close(),
+                                            KeyCode::Enter => {
+                                                let val = value.clone();
+                                                let act = action.clone();
+                                                self.dialog.close();
+                                                self.execute_dialog_action(act, Some(val));
                                             }
-                                            // Open current directory in file manager
-                                            KeyCode::Char('O') => {
-                                                let _ = browser::open_in_file_manager(&self.file_browser.current_dir);
-                                            }
-                                            // Allow single q to quit if in browser
-                                            KeyCode::Char('q') => {
-                                                 self.should_quit = true;
-                                            }
-                                            // Toggle hidden files visibility
-                                            KeyCode::Char('.') => {
-                                                self.file_browser.show_hidden = !self.file_browser.show_hidden;
-                                                self.file_browser.refresh();
-                                                self.update_preview();
+                                            KeyCode::Backspace => self.dialog.delete_char_before(),
+                                            KeyCode::Delete => self.dialog.delete_char_at(),
+                                            KeyCode::Left => self.dialog.cursor_left(),
+                                            KeyCode::Right => self.dialog.cursor_right(),
+                                            KeyCode::Home => self.dialog.cursor_home(),
+                                            KeyCode::End => self.dialog.cursor_end(),
+                                            KeyCode::Char(c) => self.dialog.insert_char(c),
+                                            _ => {}
+                                        }
+                                    }
+                                    ui::dialog::DialogType::Confirm { action, .. } => {
+                                        match key.code {
+                                            KeyCode::Esc
+                                            | KeyCode::Char('n')
+                                            | KeyCode::Char('N') => self.dialog.close(),
+                                            KeyCode::Char('y')
+                                            | KeyCode::Char('Y')
+                                            | KeyCode::Enter => {
+                                                let act = action.clone();
+                                                self.dialog.close();
+                                                self.execute_dialog_action(act, None);
                                             }
                                             _ => {}
                                         }
                                     }
+                                    ui::dialog::DialogType::None => {}
+                                }
+                                continue;
+                            }
 
-                                    PaneId::Preview => {
-                                        // Search/Replace mode handling (priority over other modes)
-                                        if self.preview.search.active {
+                            // Menu handling
+                            if self.menu.visible {
+                                match key.code {
+                                    KeyCode::Esc => self.menu.visible = false,
+                                    KeyCode::Up | KeyCode::Char('k') => self.menu.prev(),
+                                    KeyCode::Down | KeyCode::Char('j') => self.menu.next(),
+                                    KeyCode::Enter => {
+                                        let action = self.menu.action();
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(action);
+                                    }
+                                    KeyCode::Char('n') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(ui::menu::MenuAction::NewFile);
+                                    }
+                                    KeyCode::Char('N') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(ui::menu::MenuAction::NewDirectory);
+                                    }
+                                    KeyCode::Char('r') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(ui::menu::MenuAction::RenameFile);
+                                    }
+                                    KeyCode::Char('u') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(
+                                            ui::menu::MenuAction::DuplicateFile,
+                                        );
+                                    }
+                                    KeyCode::Char('c') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(ui::menu::MenuAction::CopyFileTo);
+                                    }
+                                    KeyCode::Char('m') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(ui::menu::MenuAction::MoveFileTo);
+                                    }
+                                    KeyCode::Char('d') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(ui::menu::MenuAction::DeleteFile);
+                                    }
+                                    KeyCode::Char('y') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(
+                                            ui::menu::MenuAction::CopyAbsolutePath,
+                                        );
+                                    }
+                                    KeyCode::Char('Y') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(
+                                            ui::menu::MenuAction::CopyRelativePath,
+                                        );
+                                    }
+                                    KeyCode::Char('g') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(ui::menu::MenuAction::GoToPath);
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
+                            // About dialog handling
+                            if self.about.visible {
+                                match key.code {
+                                    KeyCode::Esc | KeyCode::F(10) | KeyCode::Char('q') => {
+                                        self.about.close()
+                                    }
+                                    KeyCode::Up | KeyCode::Char('k') => self.about.scroll_up(),
+                                    KeyCode::Down | KeyCode::Char('j') => self.about.scroll_down(),
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
+                            if self.help.visible {
+                                match key.code {
+                                    KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => {
+                                        self.help.close()
+                                    }
+                                    KeyCode::Up | KeyCode::Char('k') => self.help.scroll_up(1),
+                                    KeyCode::Down | KeyCode::Char('j') => self.help.scroll_down(1),
+                                    KeyCode::PageUp => self.help.page_up(),
+                                    KeyCode::PageDown => self.help.page_down(),
+                                    KeyCode::Home | KeyCode::Char('g') => self.help.scroll_to_top(),
+                                    KeyCode::End | KeyCode::Char('G') => {
+                                        self.help.scroll_to_bottom()
+                                    }
+                                    _ => {}
+                                }
+                                // Consume all keys while help is open
+                                continue;
+                            }
+
+                            // Global Keys - F10/F12 work everywhere
+                            if key.code == KeyCode::F(12) {
+                                self.help.open();
+                                continue;
+                            }
+
+                            if key.code == KeyCode::F(10) {
+                                self.about.open();
+                                continue;
+                            }
+
+                            // Context-specific shortcuts (only in non-terminal panes)
+                            // '?' for help - only in FileBrowser or Preview (read-only)
+                            if key.code == KeyCode::Char('?')
+                                && matches!(self.active_pane, PaneId::FileBrowser | PaneId::Preview)
+                                && self.preview.mode != EditorMode::Edit
+                            {
+                                self.help.open();
+                                continue;
+                            }
+
+                            // 'i' for about - only in FileBrowser (not Preview, as 'i' is common text)
+                            if key.code == KeyCode::Char('i')
+                                && self.active_pane == PaneId::FileBrowser
+                            {
+                                self.about.open();
+                                continue;
+                            }
+
+                            if key.code == KeyCode::F(9) {
+                                self.menu.toggle();
+                                continue;
+                            }
+
+                            // Ctrl+P: Open fuzzy finder
+                            if key.code == KeyCode::Char('p')
+                                && key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL)
+                            {
+                                self.fuzzy_finder.open(&self.file_browser.current_dir);
+                                continue;
+                            }
+
+                            // Ctrl+,: Open settings
+                            if key.code == KeyCode::Char(',')
+                                && key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL)
+                            {
+                                self.settings.open(&self.config);
+                                continue;
+                            }
+
+                            // Ctrl+Shift+W: Re-run setup wizard
+                            if key.code == KeyCode::Char('W')
+                                && key.modifiers.contains(
+                                    crossterm::event::KeyModifiers::CONTROL
+                                        | crossterm::event::KeyModifiers::SHIFT,
+                                )
+                            {
+                                self.wizard.open();
+                                continue;
+                            }
+
+                            // Claude startup dialog handling (high priority)
+                            if self.claude_startup.visible {
+                                match key.code {
+                                    KeyCode::Esc => {
+                                        self.claude_startup.close();
+                                        self.active_pane = PaneId::Claude;
+                                    }
+                                    KeyCode::Enter => {
+                                        if let Some(prefix) = self.claude_startup.selected_prefix()
+                                        {
+                                            if !prefix.is_empty() {
+                                                if let Some(pty) =
+                                                    self.terminals.get_mut(&PaneId::Claude)
+                                                {
+                                                    let cmd = format!("{}\n", prefix);
+                                                    let _ = pty.write_input(cmd.as_bytes());
+                                                }
+                                            }
+                                        }
+                                        self.claude_startup.close();
+                                        self.active_pane = PaneId::Claude;
+                                    }
+                                    KeyCode::Up | KeyCode::Char('k') => self.claude_startup.prev(),
+                                    KeyCode::Down | KeyCode::Char('j') => {
+                                        self.claude_startup.next()
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
+                            // Global Focus Switching
+                            match key.code {
+                                KeyCode::F(1) => self.active_pane = PaneId::FileBrowser,
+                                KeyCode::F(2) => {
+                                    self.show_preview = !self.show_preview;
+                                    if self.show_preview {
+                                        self.active_pane = PaneId::Preview;
+                                    } else if self.active_pane == PaneId::Preview {
+                                        self.active_pane = PaneId::FileBrowser;
+                                    }
+                                }
+                                KeyCode::F(3) => {
+                                    self.file_browser.refresh();
+                                    self.update_preview();
+                                }
+                                KeyCode::F(4) => {
+                                    // Show startup dialog if prefixes configured and not yet shown
+                                    if !self.claude_startup.shown_this_session
+                                        && !self.config.claude.startup_prefixes.is_empty()
+                                    {
+                                        self.claude_startup
+                                            .open(self.config.claude.startup_prefixes.clone());
+                                    } else {
+                                        self.active_pane = PaneId::Claude;
+                                    }
+                                }
+                                KeyCode::F(5) => {
+                                    self.show_lazygit = !self.show_lazygit;
+                                    if self.show_lazygit {
+                                        self.active_pane = PaneId::LazyGit;
+                                    } else if self.active_pane == PaneId::LazyGit {
+                                        self.active_pane = PaneId::Preview;
+                                    }
+                                }
+                                KeyCode::F(6) => {
+                                    self.show_terminal = !self.show_terminal;
+                                    if self.show_terminal {
+                                        self.active_pane = PaneId::Terminal;
+                                    } else if self.active_pane == PaneId::Terminal {
+                                        self.active_pane = PaneId::Preview;
+                                    }
+                                }
+                                // QUIT: Ctrl+Q
+                                KeyCode::Char('q')
+                                    if key
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                                {
+                                    self.should_quit = true;
+                                }
+                                _ => {
+                                    // Pane specific handling
+                                    match self.active_pane {
+                                        PaneId::FileBrowser => {
                                             match key.code {
-                                                KeyCode::Esc => {
-                                                    self.preview.search.close();
-                                                    continue;
+                                                KeyCode::Down | KeyCode::Char('j') => {
+                                                    self.file_browser.down();
+                                                    self.update_preview();
                                                 }
-                                                // Ctrl+H: Toggle between Search and Replace mode (when search is open)
-                                                KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                                    if self.preview.mode == EditorMode::Edit {
-                                                        self.preview.search.toggle_replace_mode();
-                                                    }
-                                                    continue;
+                                                KeyCode::Up | KeyCode::Char('k') => {
+                                                    self.file_browser.up();
+                                                    self.update_preview();
                                                 }
-                                                // Tab: Switch between search/replace fields (only in Replace mode)
-                                                KeyCode::Tab => {
-                                                    self.preview.search.toggle_field_focus();
-                                                    continue;
-                                                }
-                                                // Ctrl+I: Toggle case sensitivity
-                                                KeyCode::Char('i') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                                    self.preview.search.case_sensitive = !self.preview.search.case_sensitive;
-                                                    self.preview.perform_search();
-                                                    continue;
-                                                }
-                                                KeyCode::Char('\x09') => {
-                                                    // Ctrl+I as control char
-                                                    self.preview.search.case_sensitive = !self.preview.search.case_sensitive;
-                                                    self.preview.perform_search();
-                                                    continue;
-                                                }
-                                                // Enter: In Search mode = confirm and close
-                                                //        In Replace mode = replace current and move to next
-                                                KeyCode::Enter => {
-                                                    if self.preview.search.mode == SearchMode::Replace && self.preview.mode == EditorMode::Edit {
-                                                        self.preview.replace_and_next(&self.syntax_manager);
+                                                KeyCode::Enter
+                                                | KeyCode::Right
+                                                | KeyCode::Char('l') => {
+                                                    if let Some(_path) =
+                                                        self.file_browser.enter_selected()
+                                                    {
+                                                        // File opened
                                                     } else {
-                                                        self.preview.jump_to_current_match();
-                                                        self.preview.search.active = false; // Keep query for n/N navigation
+                                                        self.update_preview();
+                                                        self.sync_terminals();
+                                                        self.check_repo_change();
                                                     }
-                                                    continue;
                                                 }
-                                                // Ctrl+R: Replace all (only in Replace mode)
-                                                KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) && self.preview.search.mode == SearchMode::Replace => {
-                                                    if self.preview.mode == EditorMode::Edit {
-                                                        let _count = self.preview.replace_all(&self.syntax_manager);
-                                                        // Could show count in status
+                                                KeyCode::Backspace
+                                                | KeyCode::Left
+                                                | KeyCode::Char('h') => {
+                                                    self.file_browser.go_parent();
+                                                    self.update_preview();
+                                                    self.sync_terminals();
+                                                    self.check_repo_change();
+                                                }
+                                                // Open file in browser/external viewer
+                                                KeyCode::Char('o') => {
+                                                    if let Some(path) =
+                                                        self.file_browser.selected_file()
+                                                    {
+                                                        if browser::can_preview_in_browser(&path) {
+                                                            let preview_path =
+                                                                if browser::is_markdown(&path) {
+                                                                    browser::markdown_to_html(&path)
+                                                                        .unwrap_or(path)
+                                                                } else {
+                                                                    path
+                                                                };
+                                                            let _ =
+                                                                browser::open_file(&preview_path);
+                                                        }
                                                     }
-                                                    continue;
                                                 }
-                                                // Ctrl+N: Next match while typing (n/N without modifiers go to character input)
-                                                KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                                    self.preview.search.next_match();
-                                                    self.preview.jump_to_current_match();
-                                                    continue;
+                                                // Open current directory in file manager
+                                                KeyCode::Char('O') => {
+                                                    let _ = browser::open_in_file_manager(
+                                                        &self.file_browser.current_dir,
+                                                    );
                                                 }
-                                                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                                    self.preview.search.prev_match();
-                                                    self.preview.jump_to_current_match();
-                                                    continue;
+                                                // Allow single q to quit if in browser
+                                                KeyCode::Char('q') => {
+                                                    self.should_quit = true;
                                                 }
-                                                // Backspace: Delete from active field
-                                                KeyCode::Backspace => {
-                                                    if self.preview.search.focus_on_replace {
-                                                        self.preview.search.replace_text.pop();
-                                                    } else {
-                                                        self.preview.search.query.pop();
-                                                        self.preview.perform_search();
-                                                        self.preview.jump_to_current_match();
-                                                    }
-                                                    continue;
+                                                // Toggle hidden files visibility
+                                                KeyCode::Char('.') => {
+                                                    self.file_browser.show_hidden =
+                                                        !self.file_browser.show_hidden;
+                                                    self.file_browser.refresh();
+                                                    self.update_preview();
                                                 }
-                                                // Character input to active field
-                                                KeyCode::Char(c) => {
-                                                    if self.preview.search.focus_on_replace {
-                                                        self.preview.search.replace_text.push(c);
-                                                    } else {
-                                                        self.preview.search.query.push(c);
-                                                        self.preview.perform_search();
-                                                        self.preview.jump_to_current_match();
-                                                    }
-                                                    continue;
-                                                }
-                                                _ => { continue; }
+                                                _ => {}
                                             }
                                         }
 
-                                        // Check for search trigger (/ in read-only, Ctrl+F in any mode)
-                                        let is_ctrl_f = (key.code == KeyCode::Char('f') && key.modifiers.contains(KeyModifiers::CONTROL))
-                                            || key.code == KeyCode::Char('\x06'); // Ctrl+F as control char
-                                        let is_slash = key.code == KeyCode::Char('/') && self.preview.mode == EditorMode::ReadOnly;
-                                        // Ctrl+H opens Search & Replace directly
-                                        let is_ctrl_h = (key.code == KeyCode::Char('h') && key.modifiers.contains(KeyModifiers::CONTROL))
-                                            || key.code == KeyCode::Char('\x08'); // Ctrl+H as control char (backspace, but with CONTROL modifier)
+                                        PaneId::Preview => {
+                                            // Search/Replace mode handling (priority over other modes)
+                                            if self.preview.search.active {
+                                                match key.code {
+                                                    KeyCode::Esc => {
+                                                        self.preview.search.close();
+                                                        continue;
+                                                    }
+                                                    // Ctrl+H: Toggle between Search and Replace mode (when search is open)
+                                                    KeyCode::Char('h')
+                                                        if key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL) =>
+                                                    {
+                                                        if self.preview.mode == EditorMode::Edit {
+                                                            self.preview
+                                                                .search
+                                                                .toggle_replace_mode();
+                                                        }
+                                                        continue;
+                                                    }
+                                                    // Tab: Switch between search/replace fields (only in Replace mode)
+                                                    KeyCode::Tab => {
+                                                        self.preview.search.toggle_field_focus();
+                                                        continue;
+                                                    }
+                                                    // Ctrl+I: Toggle case sensitivity
+                                                    KeyCode::Char('i')
+                                                        if key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL) =>
+                                                    {
+                                                        self.preview.search.case_sensitive =
+                                                            !self.preview.search.case_sensitive;
+                                                        self.preview.perform_search();
+                                                        continue;
+                                                    }
+                                                    KeyCode::Char('\x09') => {
+                                                        // Ctrl+I as control char
+                                                        self.preview.search.case_sensitive =
+                                                            !self.preview.search.case_sensitive;
+                                                        self.preview.perform_search();
+                                                        continue;
+                                                    }
+                                                    // Enter: In Search mode = confirm and close
+                                                    //        In Replace mode = replace current and move to next
+                                                    KeyCode::Enter => {
+                                                        if self.preview.search.mode
+                                                            == SearchMode::Replace
+                                                            && self.preview.mode == EditorMode::Edit
+                                                        {
+                                                            self.preview.replace_and_next(
+                                                                &self.syntax_manager,
+                                                            );
+                                                        } else {
+                                                            self.preview.jump_to_current_match();
+                                                            self.preview.search.active = false;
+                                                            // Keep query for n/N navigation
+                                                        }
+                                                        continue;
+                                                    }
+                                                    // Ctrl+R: Replace all (only in Replace mode)
+                                                    KeyCode::Char('r')
+                                                        if key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL)
+                                                            && self.preview.search.mode
+                                                                == SearchMode::Replace =>
+                                                    {
+                                                        if self.preview.mode == EditorMode::Edit {
+                                                            let _count = self
+                                                                .preview
+                                                                .replace_all(&self.syntax_manager);
+                                                            // Could show count in status
+                                                        }
+                                                        continue;
+                                                    }
+                                                    // Ctrl+N: Next match while typing (n/N without modifiers go to character input)
+                                                    KeyCode::Char('n')
+                                                        if key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL) =>
+                                                    {
+                                                        self.preview.search.next_match();
+                                                        self.preview.jump_to_current_match();
+                                                        continue;
+                                                    }
+                                                    KeyCode::Char('p')
+                                                        if key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL) =>
+                                                    {
+                                                        self.preview.search.prev_match();
+                                                        self.preview.jump_to_current_match();
+                                                        continue;
+                                                    }
+                                                    // Backspace: Delete from active field
+                                                    KeyCode::Backspace => {
+                                                        if self.preview.search.focus_on_replace {
+                                                            self.preview.search.replace_text.pop();
+                                                        } else {
+                                                            self.preview.search.query.pop();
+                                                            self.preview.perform_search();
+                                                            self.preview.jump_to_current_match();
+                                                        }
+                                                        continue;
+                                                    }
+                                                    // Character input to active field
+                                                    KeyCode::Char(c) => {
+                                                        if self.preview.search.focus_on_replace {
+                                                            self.preview
+                                                                .search
+                                                                .replace_text
+                                                                .push(c);
+                                                        } else {
+                                                            self.preview.search.query.push(c);
+                                                            self.preview.perform_search();
+                                                            self.preview.jump_to_current_match();
+                                                        }
+                                                        continue;
+                                                    }
+                                                    _ => {
+                                                        continue;
+                                                    }
+                                                }
+                                            }
 
-                                        if is_ctrl_f || is_slash {
-                                            self.preview.search.open();
-                                            continue;
-                                        }
+                                            // Check for search trigger (/ in read-only, Ctrl+F in any mode)
+                                            let is_ctrl_f = (key.code == KeyCode::Char('f')
+                                                && key.modifiers.contains(KeyModifiers::CONTROL))
+                                                || key.code == KeyCode::Char('\x06'); // Ctrl+F as control char
+                                            let is_slash = key.code == KeyCode::Char('/')
+                                                && self.preview.mode == EditorMode::ReadOnly;
+                                            // Ctrl+H opens Search & Replace directly
+                                            let is_ctrl_h = (key.code == KeyCode::Char('h')
+                                                && key.modifiers.contains(KeyModifiers::CONTROL))
+                                                || key.code == KeyCode::Char('\x08'); // Ctrl+H as control char (backspace, but with CONTROL modifier)
 
-                                        // Ctrl+H: Open search in Replace mode directly
-                                        if is_ctrl_h && self.preview.mode == EditorMode::Edit {
-                                            self.preview.search.open();
-                                            self.preview.search.mode = SearchMode::Replace;
-                                            continue;
-                                        }
+                                            if is_ctrl_f || is_slash {
+                                                self.preview.search.open();
+                                                continue;
+                                            }
 
-                                        // Edit mode handling
-                                        if self.preview.mode == EditorMode::Edit {
-                                            // Check for Ctrl+S (save) - handle both modifier and control char
-                                            let is_ctrl_s = (key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL))
-                                                || key.code == KeyCode::Char('\x13'); // Ctrl+S as control char
-                                            // Check for Ctrl+Y (delete line - MC Edit style)
-                                            let is_ctrl_y = (key.code == KeyCode::Char('y') && key.modifiers.contains(KeyModifiers::CONTROL))
-                                                || key.code == KeyCode::Char('\x19'); // Ctrl+Y as control char
+                                            // Ctrl+H: Open search in Replace mode directly
+                                            if is_ctrl_h && self.preview.mode == EditorMode::Edit {
+                                                self.preview.search.open();
+                                                self.preview.search.mode = SearchMode::Replace;
+                                                continue;
+                                            }
 
-                                            if key.code == KeyCode::Esc {
-                                                // Cancel selection first if active, then exit
-                                                if self.preview.block_marking {
-                                                    self.preview.cancel_selection();
-                                                } else if self.preview.is_modified() {
-                                                    // Show discard dialog
-                                                    self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                            // Edit mode handling
+                                            if self.preview.mode == EditorMode::Edit {
+                                                // Check for Ctrl+S (save) - handle both modifier and control char
+                                                let is_ctrl_s = (key.code == KeyCode::Char('s')
+                                                    && key
+                                                        .modifiers
+                                                        .contains(KeyModifiers::CONTROL))
+                                                    || key.code == KeyCode::Char('\x13'); // Ctrl+S as control char
+                                                                                          // Check for Ctrl+Y (delete line - MC Edit style)
+                                                let is_ctrl_y = (key.code == KeyCode::Char('y')
+                                                    && key
+                                                        .modifiers
+                                                        .contains(KeyModifiers::CONTROL))
+                                                    || key.code == KeyCode::Char('\x19'); // Ctrl+Y as control char
+
+                                                if key.code == KeyCode::Esc {
+                                                    // Cancel selection first if active, then exit
+                                                    if self.preview.block_marking {
+                                                        self.preview.cancel_selection();
+                                                    } else if self.preview.is_modified() {
+                                                        // Show discard dialog
+                                                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
                                                         title: "Unsaved Changes".to_string(),
                                                         message: "Discard changes?".to_string(),
                                                         action: ui::dialog::DialogAction::DiscardEditorChanges,
                                                     };
-                                                } else {
-                                                    self.preview.exit_edit_mode(true);
+                                                    } else {
+                                                        self.preview.exit_edit_mode(true);
+                                                    }
+                                                } else if is_ctrl_s {
+                                                    if let Err(_e) = self.preview.save() {
+                                                        // Could show error dialog here
+                                                    } else {
+                                                        // Refresh highlighting after save
+                                                        self.preview.refresh_highlighting(
+                                                            &self.syntax_manager,
+                                                        );
+                                                    }
                                                 }
-                                            } else if is_ctrl_s {
-                                                if let Err(_e) = self.preview.save() {
-                                                    // Could show error dialog here
-                                                } else {
-                                                    // Refresh highlighting after save
-                                                    self.preview.refresh_highlighting(&self.syntax_manager);
+                                                // MC Edit style: Ctrl+Y = delete line
+                                                else if is_ctrl_y {
+                                                    self.preview.delete_line();
+                                                    self.preview.update_modified();
+                                                    self.preview.update_edit_highlighting(
+                                                        &self.syntax_manager,
+                                                    );
                                                 }
-                                            }
-                                            // MC Edit style: Ctrl+Y = delete line
-                                            else if is_ctrl_y {
-                                                self.preview.delete_line();
-                                                self.preview.update_modified();
-                                                self.preview.update_edit_highlighting(&self.syntax_manager);
-                                            }
-                                            // MC Edit style: Ctrl+F3 = toggle block marking
-                                            else if key.code == KeyCode::F(3) && key.modifiers.contains(KeyModifiers::CONTROL) {
-                                                self.preview.toggle_block_marking();
-                                            }
-                                            // MC Edit style: Ctrl+F5 = copy block
-                                            else if key.code == KeyCode::F(5) && key.modifiers.contains(KeyModifiers::CONTROL) {
-                                                self.preview.copy_block();
-                                            }
-                                            // MC Edit style: Ctrl+F6 = move (cut) block
-                                            else if key.code == KeyCode::F(6) && key.modifiers.contains(KeyModifiers::CONTROL) {
-                                                self.preview.move_block();
-                                                self.preview.update_modified();
-                                                self.preview.update_edit_highlighting(&self.syntax_manager);
-                                            }
-                                            // MC Edit style: Ctrl+F8 = delete block
-                                            else if key.code == KeyCode::F(8) && key.modifiers.contains(KeyModifiers::CONTROL) {
-                                                self.preview.delete_block();
-                                                self.preview.update_modified();
-                                                self.preview.update_edit_highlighting(&self.syntax_manager);
-                                            }
-                                            // MC Edit style: Shift+Arrow = extend selection
-                                            else if key.modifiers.contains(KeyModifiers::SHIFT) {
-                                                use tui_textarea::CursorMove;
-                                                match key.code {
-                                                    KeyCode::Up => {
-                                                        self.preview.extend_selection(CursorMove::Up);
+                                                // MC Edit style: Ctrl+F3 = toggle block marking
+                                                else if key.code == KeyCode::F(3)
+                                                    && key.modifiers.contains(KeyModifiers::CONTROL)
+                                                {
+                                                    self.preview.toggle_block_marking();
+                                                }
+                                                // MC Edit style: Ctrl+F5 = copy block
+                                                else if key.code == KeyCode::F(5)
+                                                    && key.modifiers.contains(KeyModifiers::CONTROL)
+                                                {
+                                                    self.preview.copy_block();
+                                                }
+                                                // MC Edit style: Ctrl+F6 = move (cut) block
+                                                else if key.code == KeyCode::F(6)
+                                                    && key.modifiers.contains(KeyModifiers::CONTROL)
+                                                {
+                                                    self.preview.move_block();
+                                                    self.preview.update_modified();
+                                                    self.preview.update_edit_highlighting(
+                                                        &self.syntax_manager,
+                                                    );
+                                                }
+                                                // MC Edit style: Ctrl+F8 = delete block
+                                                else if key.code == KeyCode::F(8)
+                                                    && key.modifiers.contains(KeyModifiers::CONTROL)
+                                                {
+                                                    self.preview.delete_block();
+                                                    self.preview.update_modified();
+                                                    self.preview.update_edit_highlighting(
+                                                        &self.syntax_manager,
+                                                    );
+                                                }
+                                                // MC Edit style: Shift+Arrow = extend selection
+                                                else if key
+                                                    .modifiers
+                                                    .contains(KeyModifiers::SHIFT)
+                                                {
+                                                    use tui_textarea::CursorMove;
+                                                    match key.code {
+                                                        KeyCode::Up => {
+                                                            self.preview
+                                                                .extend_selection(CursorMove::Up);
+                                                        }
+                                                        KeyCode::Down => {
+                                                            self.preview
+                                                                .extend_selection(CursorMove::Down);
+                                                        }
+                                                        KeyCode::Left => {
+                                                            self.preview
+                                                                .extend_selection(CursorMove::Back);
+                                                        }
+                                                        KeyCode::Right => {
+                                                            self.preview.extend_selection(
+                                                                CursorMove::Forward,
+                                                            );
+                                                        }
+                                                        _ => {
+                                                            // Forward other Shift+key combos to TextArea
+                                                            if let Some(editor) =
+                                                                &mut self.preview.editor
+                                                            {
+                                                                editor.input(Event::Key(key));
+                                                                self.preview.update_modified();
+                                                                self.preview
+                                                                    .update_edit_highlighting(
+                                                                        &self.syntax_manager,
+                                                                    );
+                                                            }
+                                                        }
                                                     }
-                                                    KeyCode::Down => {
-                                                        self.preview.extend_selection(CursorMove::Down);
-                                                    }
-                                                    KeyCode::Left => {
-                                                        self.preview.extend_selection(CursorMove::Back);
-                                                    }
-                                                    KeyCode::Right => {
-                                                        self.preview.extend_selection(CursorMove::Forward);
-                                                    }
-                                                    _ => {
-                                                        // Forward other Shift+key combos to TextArea
-                                                        if let Some(editor) = &mut self.preview.editor {
-                                                            editor.input(Event::Key(key));
-                                                            self.preview.update_modified();
-                                                            self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                } else {
+                                                    // Handle scrolling keys specially (TextArea moves cursor, not view)
+                                                    match key.code {
+                                                        KeyCode::PageUp => {
+                                                            if let Some(editor) =
+                                                                &mut self.preview.editor
+                                                            {
+                                                                // Move cursor up by ~20 lines to simulate page scroll
+                                                                for _ in 0..20 {
+                                                                    editor.move_cursor(tui_textarea::CursorMove::Up);
+                                                                }
+                                                            }
+                                                        }
+                                                        KeyCode::PageDown => {
+                                                            if let Some(editor) =
+                                                                &mut self.preview.editor
+                                                            {
+                                                                for _ in 0..20 {
+                                                                    editor.move_cursor(tui_textarea::CursorMove::Down);
+                                                                }
+                                                            }
+                                                        }
+                                                        _ => {
+                                                            // Forward other keys to TextArea (handles Ctrl+Z undo, etc.)
+                                                            if let Some(editor) =
+                                                                &mut self.preview.editor
+                                                            {
+                                                                editor.input(Event::Key(key));
+                                                                self.preview.update_modified();
+                                                                // Update syntax highlighting for edit mode
+                                                                self.preview
+                                                                    .update_edit_highlighting(
+                                                                        &self.syntax_manager,
+                                                                    );
+                                                            }
                                                         }
                                                     }
                                                 }
                                             } else {
-                                                // Handle scrolling keys specially (TextArea moves cursor, not view)
-                                                match key.code {
-                                                    KeyCode::PageUp => {
-                                                        if let Some(editor) = &mut self.preview.editor {
-                                                            // Move cursor up by ~20 lines to simulate page scroll
-                                                            for _ in 0..20 {
-                                                                editor.move_cursor(tui_textarea::CursorMove::Up);
+                                                // Read-only mode - check for selection mode first
+                                                if self.terminal_selection.active
+                                                    && self.terminal_selection.source_pane
+                                                        == Some(PaneId::Preview)
+                                                {
+                                                    // Selection mode active in Preview
+                                                    match key.code {
+                                                        KeyCode::Up | KeyCode::Char('k') => {
+                                                            if let Some(end) =
+                                                                self.terminal_selection.end_line
+                                                            {
+                                                                self.terminal_selection
+                                                                    .extend(end.saturating_sub(1));
+                                                            }
+                                                            continue;
+                                                        }
+                                                        KeyCode::Down | KeyCode::Char('j') => {
+                                                            if let Some(end) =
+                                                                self.terminal_selection.end_line
+                                                            {
+                                                                self.terminal_selection
+                                                                    .extend(end + 1);
+                                                            }
+                                                            continue;
+                                                        }
+                                                        KeyCode::Enter | KeyCode::Char('y') => {
+                                                            self.copy_selection_to_claude();
+                                                            self.terminal_selection.clear();
+                                                            continue;
+                                                        }
+                                                        KeyCode::Esc => {
+                                                            self.terminal_selection.clear();
+                                                            continue;
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                } else {
+                                                    // Normal read-only mode (no selection)
+                                                    // Check for Ctrl+S to start selection mode
+                                                    let is_ctrl_s = (key.code
+                                                        == KeyCode::Char('s')
+                                                        && key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL))
+                                                        || key.code == KeyCode::Char('\x13');
+                                                    if is_ctrl_s {
+                                                        // Start keyboard selection at current scroll position
+                                                        self.terminal_selection.start(
+                                                            self.preview.scroll as usize,
+                                                            PaneId::Preview,
+                                                        );
+                                                        continue;
+                                                    }
+
+                                                    match key.code {
+                                                        KeyCode::Down | KeyCode::Char('j') => {
+                                                            self.preview.scroll_down()
+                                                        }
+                                                        KeyCode::Up | KeyCode::Char('k') => {
+                                                            self.preview.scroll_up()
+                                                        }
+                                                        KeyCode::PageDown => {
+                                                            for _ in 0..10 {
+                                                                self.preview.scroll_down();
                                                             }
                                                         }
-                                                    }
-                                                    KeyCode::PageDown => {
-                                                        if let Some(editor) = &mut self.preview.editor {
-                                                            for _ in 0..20 {
-                                                                editor.move_cursor(tui_textarea::CursorMove::Down);
+                                                        KeyCode::PageUp => {
+                                                            for _ in 0..10 {
+                                                                self.preview.scroll_up();
                                                             }
                                                         }
-                                                    }
-                                                    _ => {
-                                                        // Forward other keys to TextArea (handles Ctrl+Z undo, etc.)
-                                                        if let Some(editor) = &mut self.preview.editor {
-                                                            editor.input(Event::Key(key));
-                                                            self.preview.update_modified();
-                                                            // Update syntax highlighting for edit mode
-                                                            self.preview.update_edit_highlighting(&self.syntax_manager);
+                                                        KeyCode::Home => {
+                                                            self.preview.scroll = 0;
                                                         }
+                                                        KeyCode::End => {
+                                                            let max = self
+                                                                .preview
+                                                                .highlighted_lines
+                                                                .len()
+                                                                .saturating_sub(1)
+                                                                as u16;
+                                                            self.preview.scroll = max;
+                                                        }
+                                                        KeyCode::Char('e') | KeyCode::Char('E') => {
+                                                            self.preview.enter_edit_mode();
+                                                        }
+                                                        // Search navigation: n = next match, N = previous match
+                                                        KeyCode::Char('n')
+                                                            if !self
+                                                                .preview
+                                                                .search
+                                                                .matches
+                                                                .is_empty() =>
+                                                        {
+                                                            self.preview.search.next_match();
+                                                            self.preview.jump_to_current_match();
+                                                        }
+                                                        KeyCode::Char('N')
+                                                            if !self
+                                                                .preview
+                                                                .search
+                                                                .matches
+                                                                .is_empty() =>
+                                                        {
+                                                            self.preview.search.prev_match();
+                                                            self.preview.jump_to_current_match();
+                                                        }
+                                                        _ => {}
                                                     }
                                                 }
                                             }
-                                        } else {
-                                            // Read-only mode - check for selection mode first
-                                            if self.terminal_selection.active && self.terminal_selection.source_pane == Some(PaneId::Preview) {
-                                                // Selection mode active in Preview
+                                        }
+                                        PaneId::Terminal | PaneId::Claude | PaneId::LazyGit => {
+                                            // Terminal selection mode handling
+                                            if self.terminal_selection.active
+                                                && self.terminal_selection.source_pane
+                                                    == Some(self.active_pane)
+                                            {
                                                 match key.code {
                                                     KeyCode::Up | KeyCode::Char('k') => {
-                                                        if let Some(end) = self.terminal_selection.end_line {
-                                                            self.terminal_selection.extend(end.saturating_sub(1));
+                                                        if let Some(end) =
+                                                            self.terminal_selection.end_line
+                                                        {
+                                                            self.terminal_selection
+                                                                .extend(end.saturating_sub(1));
                                                         }
                                                         continue;
                                                     }
                                                     KeyCode::Down | KeyCode::Char('j') => {
-                                                        if let Some(end) = self.terminal_selection.end_line {
+                                                        if let Some(end) =
+                                                            self.terminal_selection.end_line
+                                                        {
                                                             self.terminal_selection.extend(end + 1);
                                                         }
                                                         continue;
@@ -1245,161 +1698,117 @@ impl App {
                                                         self.terminal_selection.clear();
                                                         continue;
                                                     }
-                                                    _ => {}
-                                                }
-                                            } else {
-                                                // Normal read-only mode (no selection)
-                                                // Check for Ctrl+S to start selection mode
-                                                let is_ctrl_s = (key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL))
-                                                    || key.code == KeyCode::Char('\x13');
-                                                if is_ctrl_s {
-                                                    // Start keyboard selection at current scroll position
-                                                    self.terminal_selection.start(self.preview.scroll as usize, PaneId::Preview);
-                                                    continue;
-                                                }
-
-                                                match key.code {
-                                                    KeyCode::Down | KeyCode::Char('j') => self.preview.scroll_down(),
-                                                    KeyCode::Up | KeyCode::Char('k') => self.preview.scroll_up(),
-                                                    KeyCode::PageDown => {
-                                                        for _ in 0..10 { self.preview.scroll_down(); }
+                                                    _ => {
+                                                        // Let other keys (like Ctrl+C) pass through to PTY
                                                     }
-                                                    KeyCode::PageUp => {
-                                                        for _ in 0..10 { self.preview.scroll_up(); }
-                                                    }
-                                                    KeyCode::Home => { self.preview.scroll = 0; }
-                                                    KeyCode::End => {
-                                                        let max = self.preview.highlighted_lines.len().saturating_sub(1) as u16;
-                                                        self.preview.scroll = max;
-                                                    }
-                                                    KeyCode::Char('e') | KeyCode::Char('E') => {
-                                                        self.preview.enter_edit_mode();
-                                                    }
-                                                    // Search navigation: n = next match, N = previous match
-                                                    KeyCode::Char('n') if !self.preview.search.matches.is_empty() => {
-                                                        self.preview.search.next_match();
-                                                        self.preview.jump_to_current_match();
-                                                    }
-                                                    KeyCode::Char('N') if !self.preview.search.matches.is_empty() => {
-                                                        self.preview.search.prev_match();
-                                                        self.preview.jump_to_current_match();
-                                                    }
-                                                    _ => {}
                                                 }
                                             }
-                                        }
-                                    }
-                                    PaneId::Terminal | PaneId::Claude | PaneId::LazyGit => {
-                                        // Terminal selection mode handling
-                                        if self.terminal_selection.active && self.terminal_selection.source_pane == Some(self.active_pane) {
-                                            match key.code {
-                                                KeyCode::Up | KeyCode::Char('k') => {
-                                                    if let Some(end) = self.terminal_selection.end_line {
-                                                        self.terminal_selection.extend(end.saturating_sub(1));
-                                                    }
-                                                    continue;
-                                                }
-                                                KeyCode::Down | KeyCode::Char('j') => {
-                                                    if let Some(end) = self.terminal_selection.end_line {
-                                                        self.terminal_selection.extend(end + 1);
-                                                    }
-                                                    continue;
-                                                }
-                                                KeyCode::Enter | KeyCode::Char('y') => {
-                                                    self.copy_selection_to_claude();
-                                                    self.terminal_selection.clear();
-                                                    continue;
-                                                }
-                                                KeyCode::Esc => {
-                                                    self.terminal_selection.clear();
-                                                    continue;
-                                                }
-                                                _ => {
-                                                    // Let other keys (like Ctrl+C) pass through to PTY
-                                                }
-                                            }
-                                        }
 
-                                        // Ctrl+S: Start terminal selection mode
-                                        if key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL) {
-                                            if let Some(pty) = self.terminals.get(&self.active_pane) {
-                                                let cursor_row = pty.cursor_row() as usize;
-                                                self.terminal_selection.start(cursor_row, self.active_pane);
-                                            }
-                                            continue;
-                                        }
-
-                                        if let Some(pty) = self.terminals.get(&self.active_pane) {
-                                            // Check if PTY has exited and auto_restart is disabled
-                                            if pty.has_exited() && !self.config.pty.auto_restart {
-                                                // Manual restart on Enter
-                                                if key.code == KeyCode::Enter {
-                                                    self.restart_single_pty(self.active_pane);
+                                            // Ctrl+S: Start terminal selection mode
+                                            if key.code == KeyCode::Char('s')
+                                                && key.modifiers.contains(KeyModifiers::CONTROL)
+                                            {
+                                                if let Some(pty) =
+                                                    self.terminals.get(&self.active_pane)
+                                                {
+                                                    let cursor_row = pty.cursor_row() as usize;
+                                                    self.terminal_selection
+                                                        .start(cursor_row, self.active_pane);
                                                 }
                                                 continue;
                                             }
-                                        }
 
-                                        if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
-                                            // Scroll Handling
-                                            if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
-                                                match key.code {
-                                                    KeyCode::PageUp => { pty.scroll_up(10); continue; }
-                                                    KeyCode::PageDown => { pty.scroll_down(10); continue; }
-                                                    KeyCode::Up => { pty.scroll_up(1); continue; }
-                                                    KeyCode::Down => { pty.scroll_down(1); continue; }
-                                                    _ => {}
+                                            if let Some(pty) = self.terminals.get(&self.active_pane)
+                                            {
+                                                // Check if PTY has exited and auto_restart is disabled
+                                                if pty.has_exited() && !self.config.pty.auto_restart
+                                                {
+                                                    // Manual restart on Enter
+                                                    if key.code == KeyCode::Enter {
+                                                        self.restart_single_pty(self.active_pane);
+                                                    }
+                                                    continue;
                                                 }
                                             }
 
-                                            if let Some(bytes) = crate::input::map_key_to_pty(key) {
-                                                let _ = pty.write_input(&bytes);
+                                            if let Some(pty) =
+                                                self.terminals.get_mut(&self.active_pane)
+                                            {
+                                                // Scroll Handling
+                                                if key
+                                                    .modifiers
+                                                    .contains(crossterm::event::KeyModifiers::SHIFT)
+                                                {
+                                                    match key.code {
+                                                        KeyCode::PageUp => {
+                                                            pty.scroll_up(10);
+                                                            continue;
+                                                        }
+                                                        KeyCode::PageDown => {
+                                                            pty.scroll_down(10);
+                                                            continue;
+                                                        }
+                                                        KeyCode::Up => {
+                                                            pty.scroll_up(1);
+                                                            continue;
+                                                        }
+                                                        KeyCode::Down => {
+                                                            pty.scroll_down(1);
+                                                            continue;
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                }
+
+                                                if let Some(bytes) =
+                                                    crate::input::map_key_to_pty(key)
+                                                {
+                                                    let _ = pty.write_input(&bytes);
+                                                }
                                             }
                                         }
                                     }
-        
                                 }
                             }
                         }
-                    }
-                } // End Key
-                // Handle paste events from clipboard (VipeCoding, etc.)
-                // Use bracketed paste mode to signal terminal that this is pasted text
-                // This prevents shells from interpreting newlines as immediate commands
-                Event::Paste(text) => {
-                    match self.active_pane {
-                        PaneId::Claude => {
-                            // Claude CLI doesn't understand bracketed paste sequences
-                            // Send text directly - for multiline, user must use \ continuation
-                            if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
-                                let _ = pty.write_input(text.as_bytes());
-                            }
-                        }
-                        PaneId::LazyGit | PaneId::Terminal => {
-                            if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
-                                // Wrap in bracketed paste escape sequences
-                                // \x1b[200~ = start paste, \x1b[201~ = end paste
-                                let bracketed = format!("\x1b[200~{}\x1b[201~", text);
-                                let _ = pty.write_input(bracketed.as_bytes());
-                            }
-                        }
-                        PaneId::Preview => {
-                            // Forward paste to editor in edit mode
-                            if self.preview.mode == EditorMode::Edit {
-                                if let Some(editor) = &mut self.preview.editor {
-                                    editor.insert_str(&text);
-                                    self.preview.update_modified();
-                                    self.preview.update_edit_highlighting(&self.syntax_manager);
+                    } // End Key
+                    // Handle paste events from clipboard (VipeCoding, etc.)
+                    // Use bracketed paste mode to signal terminal that this is pasted text
+                    // This prevents shells from interpreting newlines as immediate commands
+                    Event::Paste(text) => {
+                        match self.active_pane {
+                            PaneId::Claude => {
+                                // Claude CLI doesn't understand bracketed paste sequences
+                                // Send text directly - for multiline, user must use \ continuation
+                                if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
+                                    let _ = pty.write_input(text.as_bytes());
                                 }
                             }
-                        }
-                        PaneId::FileBrowser => {
-                            // Ignore paste in file browser
+                            PaneId::LazyGit | PaneId::Terminal => {
+                                if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
+                                    // Wrap in bracketed paste escape sequences
+                                    // \x1b[200~ = start paste, \x1b[201~ = end paste
+                                    let bracketed = format!("\x1b[200~{}\x1b[201~", text);
+                                    let _ = pty.write_input(bracketed.as_bytes());
+                                }
+                            }
+                            PaneId::Preview => {
+                                // Forward paste to editor in edit mode
+                                if self.preview.mode == EditorMode::Edit {
+                                    if let Some(editor) = &mut self.preview.editor {
+                                        editor.insert_str(&text);
+                                        self.preview.update_modified();
+                                        self.preview.update_edit_highlighting(&self.syntax_manager);
+                                    }
+                                }
+                            }
+                            PaneId::FileBrowser => {
+                                // Ignore paste in file browser
+                            }
                         }
                     }
-                }
-                _ => {}
-            } // End Match
+                    _ => {}
+                } // End Match
             }
         }
         Ok(())
@@ -1407,30 +1816,42 @@ impl App {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
-        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(area, self.show_terminal, self.show_lazygit, self.show_preview);
+        let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(
+            area,
+            self.show_terminal,
+            self.show_lazygit,
+            self.show_preview,
+        );
 
         // Helper to resize PTY
         // We need to account for borders (1px each side => -2)
         // Ensure strictly positive
-        let resize_pty = |terminals: &mut HashMap<PaneId, PseudoTerminal>, id: PaneId, rect: Rect| {
-            if let Some(pty) = terminals.get_mut(&id) {
-                let w = rect.width.saturating_sub(2);
-                let h = rect.height.saturating_sub(2);
-                if w > 0 && h > 0 {
-                    let _ = pty.resize(h, w);
+        let resize_pty =
+            |terminals: &mut HashMap<PaneId, PseudoTerminal>, id: PaneId, rect: Rect| {
+                if let Some(pty) = terminals.get_mut(&id) {
+                    let w = rect.width.saturating_sub(2);
+                    let h = rect.height.saturating_sub(2);
+                    if w > 0 && h > 0 {
+                        let _ = pty.resize(h, w);
+                    }
                 }
-            }
-        };
+            };
 
         resize_pty(&mut self.terminals, PaneId::Claude, claude);
         resize_pty(&mut self.terminals, PaneId::LazyGit, lazygit);
         resize_pty(&mut self.terminals, PaneId::Terminal, terminal);
 
-        ui::file_browser::render(frame, files, &mut self.file_browser, self.active_pane == PaneId::FileBrowser);
+        ui::file_browser::render(
+            frame,
+            files,
+            &mut self.file_browser,
+            self.active_pane == PaneId::FileBrowser,
+        );
 
         // Calculate Preview selection range (keyboard or mouse selection)
         let preview_selection_range = if self.terminal_selection.active
-            && self.terminal_selection.source_pane == Some(PaneId::Preview) {
+            && self.terminal_selection.source_pane == Some(PaneId::Preview)
+        {
             self.terminal_selection.line_range()
         } else if self.mouse_selection.is_selecting_in(PaneId::Preview) {
             self.mouse_selection.line_range()
@@ -1438,7 +1859,13 @@ impl App {
             None
         };
         if self.show_preview {
-            ui::preview::render(frame, preview, &self.preview, self.active_pane == PaneId::Preview, preview_selection_range);
+            ui::preview::render(
+                frame,
+                preview,
+                &self.preview,
+                self.active_pane == PaneId::Preview,
+                preview_selection_range,
+            );
         }
 
         ui::terminal_pane::render(frame, claude, PaneId::Claude, self);
@@ -1468,7 +1895,7 @@ impl App {
         if self.dialog.is_active() {
             ui::dialog::render(frame, area, &mut self.dialog);
         }
-        
+
         if self.fuzzy_finder.visible {
             ui::fuzzy_finder::render(frame, area, &mut self.fuzzy_finder);
         }
@@ -1532,7 +1959,8 @@ impl App {
                 if let Some(branch) = git::get_current_branch(repo_root) {
                     // Start async check
                     self.git_remote.checking = true;
-                    self.git_check_receiver = Some(git::check_remote_changes_async(repo_root, &branch));
+                    self.git_check_receiver =
+                        Some(git::check_remote_changes_async(repo_root, &branch));
                 }
             }
         }
@@ -1549,10 +1977,13 @@ impl App {
                 self.git_remote.checking = false;
 
                 match result {
-                    GitRemoteCheckResult::RemoteAhead { commits_ahead, branch } => {
+                    GitRemoteCheckResult::RemoteAhead {
+                        commits_ahead,
+                        branch,
+                    } => {
                         // Show pull confirmation dialog
                         if let Some(repo_root) = self.git_remote.last_repo_root.clone() {
-                            use ui::dialog::{DialogType, DialogAction};
+                            use ui::dialog::{DialogAction, DialogType};
                             self.dialog.dialog_type = DialogType::Confirm {
                                 title: "Git Pull".to_string(),
                                 message: format!(
@@ -1580,9 +2011,9 @@ impl App {
     }
 
     fn handle_menu_action(&mut self, action: ui::menu::MenuAction) {
+        use ui::dialog::{DialogAction, DialogType};
         use ui::menu::MenuAction;
-        use ui::dialog::{DialogType, DialogAction};
-        
+
         match action {
             MenuAction::NewFile => {
                 self.dialog.dialog_type = DialogType::Input {
@@ -1602,7 +2033,8 @@ impl App {
             }
             MenuAction::RenameFile => {
                 if let Some(selected) = self.file_browser.selected_file() {
-                    let name = selected.file_name()
+                    let name = selected
+                        .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
                     let cursor_pos = name.chars().count();
@@ -1619,10 +2051,12 @@ impl App {
                     if selected.is_file() {
                         // Generate duplicate name with counter
                         let parent = selected.parent().unwrap_or(&self.file_browser.current_dir);
-                        let stem = selected.file_stem()
+                        let stem = selected
+                            .file_stem()
                             .map(|s| s.to_string_lossy().to_string())
                             .unwrap_or_default();
-                        let ext = selected.extension()
+                        let ext = selected
+                            .extension()
                             .map(|e| format!(".{}", e.to_string_lossy()))
                             .unwrap_or_default();
 
@@ -1677,7 +2111,8 @@ impl App {
             MenuAction::DeleteFile => {
                 if let Some(selected) = self.file_browser.selected_file() {
                     if selected.file_name().map(|n| n.to_string_lossy()) != Some("..".into()) {
-                        let name = selected.file_name()
+                        let name = selected
+                            .file_name()
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_default();
                         self.dialog.dialog_type = DialogType::Confirm {
@@ -1717,10 +2152,10 @@ impl App {
             MenuAction::None => {}
         }
     }
-    
+
     fn execute_dialog_action(&mut self, action: ui::dialog::DialogAction, value: Option<String>) {
         use ui::dialog::DialogAction;
-        
+
         match action {
             DialogAction::NewFile => {
                 if let Some(name) = value {
@@ -1746,7 +2181,8 @@ impl App {
             DialogAction::RenameFile { old_path } => {
                 if let Some(new_name) = value {
                     if !new_name.is_empty() {
-                        let new_path = old_path.parent()
+                        let new_path = old_path
+                            .parent()
                             .map(|p| p.join(&new_name))
                             .unwrap_or_else(|| std::path::PathBuf::from(&new_name));
                         let _ = std::fs::rename(&old_path, &new_path);
@@ -1847,7 +2283,8 @@ impl App {
                                 // Select the file
                                 if let Some(name) = target.file_name() {
                                     let name_str = name.to_string_lossy().to_string();
-                                    for (idx, entry) in self.file_browser.entries.iter().enumerate() {
+                                    for (idx, entry) in self.file_browser.entries.iter().enumerate()
+                                    {
                                         if entry.name == name_str {
                                             self.file_browser.list_state.select(Some(idx));
                                             break;
@@ -1874,7 +2311,9 @@ impl App {
             match code {
                 KeyCode::Esc => self.wizard.cancel_editing(),
                 KeyCode::Enter => self.wizard.finish_editing(),
-                KeyCode::Backspace => { self.wizard.input_buffer.pop(); }
+                KeyCode::Backspace => {
+                    self.wizard.input_buffer.pop();
+                }
                 KeyCode::Char(c) => self.wizard.input_buffer.push(c),
                 _ => {}
             }
@@ -1914,36 +2353,34 @@ impl App {
             KeyCode::BackTab | KeyCode::Left => {
                 self.wizard.prev_step();
             }
-            KeyCode::Up | KeyCode::Char('k') => {
-                match self.wizard.step {
-                    WizardStep::ShellSelection => {
-                        if self.wizard.selected_shell_idx > 0 {
-                            self.wizard.selected_shell_idx -= 1;
-                        }
+            KeyCode::Up | KeyCode::Char('k') => match self.wizard.step {
+                WizardStep::ShellSelection => {
+                    if self.wizard.selected_shell_idx > 0 {
+                        self.wizard.selected_shell_idx -= 1;
                     }
-                    WizardStep::ClaudeConfig => {
-                        if self.wizard.focused_field > 0 {
-                            self.wizard.focused_field -= 1;
-                        }
-                    }
-                    _ => {}
                 }
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                match self.wizard.step {
-                    WizardStep::ShellSelection => {
-                        if self.wizard.selected_shell_idx < self.wizard.available_shells.len().saturating_sub(1) {
-                            self.wizard.selected_shell_idx += 1;
-                        }
+                WizardStep::ClaudeConfig => {
+                    if self.wizard.focused_field > 0 {
+                        self.wizard.focused_field -= 1;
                     }
-                    WizardStep::ClaudeConfig => {
-                        if self.wizard.focused_field < 1 {
-                            self.wizard.focused_field += 1;
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                _ => {}
+            },
+            KeyCode::Down | KeyCode::Char('j') => match self.wizard.step {
+                WizardStep::ShellSelection => {
+                    if self.wizard.selected_shell_idx
+                        < self.wizard.available_shells.len().saturating_sub(1)
+                    {
+                        self.wizard.selected_shell_idx += 1;
+                    }
+                }
+                WizardStep::ClaudeConfig => {
+                    if self.wizard.focused_field < 1 {
+                        self.wizard.focused_field += 1;
+                    }
+                }
+                _ => {}
+            },
             KeyCode::Char('e') | KeyCode::Char('E') => {
                 // Edit in ClaudeConfig step
                 if self.wizard.step == WizardStep::ClaudeConfig {
@@ -1967,7 +2404,9 @@ impl App {
             match code {
                 KeyCode::Esc => self.settings.cancel_editing(),
                 KeyCode::Enter => self.settings.finish_editing(),
-                KeyCode::Backspace => { self.settings.input_buffer.pop(); }
+                KeyCode::Backspace => {
+                    self.settings.input_buffer.pop();
+                }
                 KeyCode::Char(c) => self.settings.input_buffer.push(c),
                 _ => {}
             }
@@ -2025,7 +2464,8 @@ impl App {
         // Extract lines from source (terminal or preview)
         let lines = if source_pane == PaneId::Preview {
             // Extract lines from preview content
-            let content_lines: Vec<String> = self.preview.content.lines().map(String::from).collect();
+            let content_lines: Vec<String> =
+                self.preview.content.lines().map(String::from).collect();
             if start > content_lines.len() || end > content_lines.len() {
                 return;
             }
@@ -2056,11 +2496,7 @@ impl App {
 
         // Format for Claude - wrap in markdown code block with syntax hint
         let syntax = syntax_hint.as_deref().unwrap_or("");
-        let formatted = format!(
-            "```{}\n{}\n```\n",
-            syntax,
-            formatted_lines.join("\n")
-        );
+        let formatted = format!("```{}\n{}\n```\n", syntax, formatted_lines.join("\n"));
 
         // Send to Claude PTY
         if let Some(claude_pty) = self.terminals.get_mut(&PaneId::Claude) {
@@ -2072,7 +2508,9 @@ impl App {
     fn position_preview_cursor(&mut self, area: Rect, click_x: u16, click_y: u16) {
         use tui_textarea::CursorMove;
 
-        let Some(editor) = &mut self.preview.editor else { return };
+        let Some(editor) = &mut self.preview.editor else {
+            return;
+        };
 
         // Account for block border (1px on each side)
         let inner_x = area.x + 1;
@@ -2109,7 +2547,8 @@ impl App {
         let max_row = editor.lines().len().saturating_sub(1) as u16;
         let clamped_row = target_row.min(max_row);
 
-        let line_len = editor.lines()
+        let line_len = editor
+            .lines()
             .get(clamped_row as usize)
             .map(|l| l.len())
             .unwrap_or(0) as u16;
@@ -2131,7 +2570,8 @@ impl App {
         let cols = 80;
 
         // Check each terminal PTY
-        let panes_to_restart: Vec<PaneId> = self.terminals
+        let panes_to_restart: Vec<PaneId> = self
+            .terminals
             .iter()
             .filter(|(_, pty)| pty.has_exited())
             .map(|(id, _)| *id)
@@ -2232,29 +2672,29 @@ fn base64_encode(input: &str) -> String {
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let bytes = input.as_bytes();
     let mut result = String::new();
-    
+
     for chunk in bytes.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = chunk.get(1).map(|&b| b as u32).unwrap_or(0);
         let b2 = chunk.get(2).map(|&b| b as u32).unwrap_or(0);
-        
+
         let n = (b0 << 16) | (b1 << 8) | b2;
-        
+
         result.push(CHARSET[((n >> 18) & 0x3F) as usize] as char);
         result.push(CHARSET[((n >> 12) & 0x3F) as usize] as char);
-        
+
         if chunk.len() > 1 {
             result.push(CHARSET[((n >> 6) & 0x3F) as usize] as char);
         } else {
             result.push('=');
         }
-        
+
         if chunk.len() > 2 {
             result.push(CHARSET[(n & 0x3F) as usize] as char);
         } else {
             result.push('=');
         }
     }
-    
+
     result
 }

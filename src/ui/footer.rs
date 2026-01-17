@@ -12,37 +12,37 @@ use crate::types::{EditorMode, PaneId};
 /// Action identifiers for footer button clicks
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FooterAction {
-    FocusFiles,      // F1
-    TogglePreview,   // F2
-    Refresh,         // F3
-    FocusClaude,     // F4
-    ToggleGit,       // F5
-    ToggleTerm,      // F6
-    FileMenu,        // F9
-    FuzzyFind,       // ^P
-    OpenFile,        // o
-    OpenFinder,      // O
-    Settings,        // ^,
-    About,           // F10
-    Help,            // F12
-    Edit,            // E (Preview mode)
-    StartSelect,     // ^S (starts selection)
-    Save,            // ^S (Edit mode - save)
-    ExitEdit,        // Esc (Edit mode)
-    Undo,            // ^Z
-    Redo,            // ^Y
-    SelectDown,      // j/↓ (selection mode)
-    SelectUp,        // k/↑ (selection mode)
-    SelectCopy,      // Enter/y (selection mode)
-    SelectCancel,    // Esc (selection mode)
-    ToggleHidden,    // . (toggle hidden files)
-    ToggleBlock,     // ^F3 (MC Edit: toggle block marking)
-    CopyBlock,       // ^F5 (MC Edit: copy block)
-    MoveBlock,       // ^F6 (MC Edit: cut block)
-    DeleteBlock,     // ^F8 (MC Edit: delete block)
-    Search,          // / or ^F (Search)
-    SearchReplace,   // ^H (Search & Replace in Edit mode)
-    None,            // No action (non-clickable)
+    FocusFiles,    // F1
+    TogglePreview, // F2
+    Refresh,       // F3
+    FocusClaude,   // F4
+    ToggleGit,     // F5
+    ToggleTerm,    // F6
+    FileMenu,      // F9
+    FuzzyFind,     // ^P
+    OpenFile,      // o
+    OpenFinder,    // O
+    Settings,      // ^,
+    About,         // F10
+    Help,          // F12
+    Edit,          // E (Preview mode)
+    StartSelect,   // ^S (starts selection)
+    Save,          // ^S (Edit mode - save)
+    ExitEdit,      // Esc (Edit mode)
+    Undo,          // ^Z
+    Redo,          // ^Y
+    SelectDown,    // j/↓ (selection mode)
+    SelectUp,      // k/↑ (selection mode)
+    SelectCopy,    // Enter/y (selection mode)
+    SelectCancel,  // Esc (selection mode)
+    ToggleHidden,  // . (toggle hidden files)
+    ToggleBlock,   // ^F3 (MC Edit: toggle block marking)
+    CopyBlock,     // ^F5 (MC Edit: copy block)
+    MoveBlock,     // ^F6 (MC Edit: cut block)
+    DeleteBlock,   // ^F8 (MC Edit: delete block)
+    Search,        // / or ^F (Search)
+    SearchReplace, // ^H (Search & Replace in Edit mode)
+    None,          // No action (non-clickable)
 }
 
 pub struct Footer {
@@ -55,7 +55,9 @@ pub struct Footer {
 /// Format current date/time for footer display
 fn format_datetime() -> String {
     let now = SystemTime::now();
-    let datetime = now.duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default();
+    let datetime = now
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
     let secs = datetime.as_secs();
 
     // Convert to local time components (simplified UTC-based calculation)
@@ -68,7 +70,10 @@ fn format_datetime() -> String {
     // Calculate date from days since Unix epoch (1970-01-01)
     let (year, month, day) = days_to_date(days as i64);
 
-    format!("{:02}.{:02}.{} {:02}:{:02}:{:02}", day, month, year, hours, minutes, seconds)
+    format!(
+        "{:02}.{:02}.{} {:02}:{:02}:{:02}",
+        day, month, year, hours, minutes, seconds
+    )
 }
 
 /// Convert days since Unix epoch to (year, month, day)
@@ -76,13 +81,17 @@ fn days_to_date(days: i64) -> (i32, u32, u32) {
     // Days since epoch (1970-01-01)
     let remaining = days + 719468; // Days from year 0 to 1970-01-01
 
-    let era = if remaining >= 0 { remaining / 146097 } else { (remaining - 146096) / 146097 };
+    let era = if remaining >= 0 {
+        remaining / 146097
+    } else {
+        (remaining - 146096) / 146097
+    };
     let doe = (remaining - era * 146097) as u32;
-    let yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     let y = yoe as i64 + era * 400;
-    let doy = doe - (365*yoe + yoe/4 - yoe/100);
-    let mp = (5*doy + 2) / 153;
-    let d = doy - (153*mp + 2)/5 + 1;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
 
@@ -142,7 +151,10 @@ pub fn get_context_button_positions(
             ("^P", "Find", FooterAction::FuzzyFind),
             ("F12", "Help", FooterAction::Help),
         ]
-    } else if matches!(active_pane, PaneId::Claude | PaneId::LazyGit | PaneId::Terminal) {
+    } else if matches!(
+        active_pane,
+        PaneId::Claude | PaneId::LazyGit | PaneId::Terminal
+    ) {
         vec![
             ("^S", "Select", FooterAction::StartSelect),
             ("F1", "Files", FooterAction::FocusFiles),
@@ -227,7 +239,10 @@ impl Widget for Footer {
                 ("^P", "Find"),
                 ("F12", "Help"),
             ]
-        } else if matches!(self.active_pane, PaneId::Claude | PaneId::LazyGit | PaneId::Terminal) {
+        } else if matches!(
+            self.active_pane,
+            PaneId::Claude | PaneId::LazyGit | PaneId::Terminal
+        ) {
             // Terminal pane keys - show ^S for selection mode
             vec![
                 ("^S", "Select"),
@@ -264,18 +279,18 @@ impl Widget for Footer {
         if self.editor_mode == EditorMode::Edit && self.editor_modified {
             spans.push(Span::styled(
                 " [+] ",
-                Style::default().bg(Color::Yellow).fg(Color::Black)
+                Style::default().bg(Color::Yellow).fg(Color::Black),
             ));
         }
 
         for (key, desc) in keys {
             spans.push(Span::styled(
                 format!(" {} ", key),
-                Style::default().bg(Color::Cyan).fg(Color::Black)
+                Style::default().bg(Color::Cyan).fg(Color::Black),
             ));
             spans.push(Span::styled(
                 format!(" {} ", desc),
-                Style::default().bg(Color::Blue).fg(Color::White)
+                Style::default().bg(Color::Blue).fg(Color::White),
             ));
             spans.push(Span::raw(" "));
         }
@@ -286,8 +301,18 @@ impl Widget for Footer {
         let right_text = format!(" {} │ v{} ", datetime_text, version);
         let right_width = right_text.len() as u16;
 
-        let keys_area = Rect::new(area.x, area.y, area.width.saturating_sub(right_width), area.height);
-        let right_area = Rect::new(area.x + area.width.saturating_sub(right_width), area.y, right_width, area.height);
+        let keys_area = Rect::new(
+            area.x,
+            area.y,
+            area.width.saturating_sub(right_width),
+            area.height,
+        );
+        let right_area = Rect::new(
+            area.x + area.width.saturating_sub(right_width),
+            area.y,
+            right_width,
+            area.height,
+        );
 
         Paragraph::new(Line::from(spans))
             .style(Style::default().bg(Color::Blue))
@@ -298,4 +323,3 @@ impl Widget for Footer {
             .render(right_area, buf);
     }
 }
-

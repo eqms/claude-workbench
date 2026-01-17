@@ -4,25 +4,13 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Result of checking a single dependency
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DependencyStatus {
     pub name: String,
     pub found: bool,
     pub path: Option<PathBuf>,
     pub version: Option<String>,
     pub required: bool,
-}
-
-impl Default for DependencyStatus {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            found: false,
-            path: None,
-            version: None,
-            required: false,
-        }
-    }
 }
 
 /// All dependencies checked at startup
@@ -227,7 +215,10 @@ mod tests {
         println!("Git found: {}", report.git.found);
         println!("Claude CLI found: {}", report.claude_cli.found);
         println!("LazyGit found: {}", report.lazygit.found);
-        println!("Shells found: {:?}", report.shells.iter().map(|s| &s.name).collect::<Vec<_>>());
+        println!(
+            "Shells found: {:?}",
+            report.shells.iter().map(|s| &s.name).collect::<Vec<_>>()
+        );
     }
 
     #[test]

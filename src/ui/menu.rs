@@ -1,6 +1,6 @@
 use ratatui::{
     layout::Rect,
-    style::{Color, Style, Modifier},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -21,18 +21,10 @@ pub enum MenuAction {
     GoToPath,
 }
 
+#[derive(Default)]
 pub struct MenuBar {
     pub visible: bool,
     pub selected: usize,
-}
-
-impl Default for MenuBar {
-    fn default() -> Self {
-        Self {
-            visible: false,
-            selected: 0,
-        }
-    }
 }
 
 impl MenuBar {
@@ -108,7 +100,10 @@ pub fn render(f: &mut Frame, area: Rect, menu: &MenuBar) {
 
     for (i, (key, label)) in items.iter().enumerate() {
         let style = if i == menu.selected {
-            Style::default().bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .bg(Color::Blue)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
@@ -119,6 +114,9 @@ pub fn render(f: &mut Frame, area: Rect, menu: &MenuBar) {
         ]);
 
         let item_area = Rect::new(inner.x, inner.y + i as u16, inner.width, 1);
-        f.render_widget(Paragraph::new(line).style(Style::default().bg(Color::DarkGray)), item_area);
+        f.render_widget(
+            Paragraph::new(line).style(Style::default().bg(Color::DarkGray)),
+            item_area,
+        );
     }
 }
