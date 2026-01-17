@@ -359,6 +359,8 @@ pub struct SearchState {
     pub active: bool,
     /// Current search query
     pub query: String,
+    /// Cursor position in query (char index, not byte)
+    pub query_cursor: usize,
     /// Found matches: (line_index, start_col, end_col)
     pub matches: Vec<(usize, usize, usize)>,
     /// Index of currently highlighted match
@@ -369,6 +371,8 @@ pub struct SearchState {
     pub mode: SearchMode,
     /// Replacement text (for Replace mode)
     pub replace_text: String,
+    /// Cursor position in replace_text (char index, not byte)
+    pub replace_cursor: usize,
     /// Which field has focus: false = search, true = replace
     pub focus_on_replace: bool,
 }
@@ -378,10 +382,12 @@ impl SearchState {
     pub fn open(&mut self) {
         self.active = true;
         self.query.clear();
+        self.query_cursor = 0;
         self.matches.clear();
         self.current_match = 0;
         self.mode = SearchMode::Search;
         self.replace_text.clear();
+        self.replace_cursor = 0;
         self.focus_on_replace = false;
     }
 
@@ -389,10 +395,12 @@ impl SearchState {
     pub fn close(&mut self) {
         self.active = false;
         self.query.clear();
+        self.query_cursor = 0;
         self.matches.clear();
         self.current_match = 0;
         self.mode = SearchMode::Search;
         self.replace_text.clear();
+        self.replace_cursor = 0;
         self.focus_on_replace = false;
     }
 
@@ -415,6 +423,150 @@ impl SearchState {
         if self.mode == SearchMode::Replace {
             self.focus_on_replace = !self.focus_on_replace;
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Cursor Navigation Methods (UTF-8 safe)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Get reference to active field text
+    fn active_text(&self) -> &str {
+        if self.focus_on_replace {
+            &self.replace_text
+        } else {
+            &self.query
+        }
+    }
+
+    /// Get mutable reference to active cursor
+    fn active_cursor_mut(&mut self) -> &mut usize {
+        if self.focus_on_replace {
+            &mut self.replace_cursor
+        } else {
+            &mut self.query_cursor
+        }
+    }
+
+    /// Get active cursor position
+    pub fn active_cursor(&self) -> usize {
+        if self.focus_on_replace {
+            self.replace_cursor
+        } else {
+            self.query_cursor
+        }
+    }
+
+    /// Move cursor left in active field
+    pub fn cursor_left(&mut self) {
+        let cursor = self.active_cursor_mut();
+        if *cursor > 0 {
+            *cursor -= 1;
+        }
+    }
+
+    /// Move cursor right in active field
+    pub fn cursor_right(&mut self) {
+        let len = self.active_text().chars().count();
+        let cursor = self.active_cursor_mut();
+        if *cursor < len {
+            *cursor += 1;
+        }
+    }
+
+    /// Move cursor to start of active field
+    pub fn cursor_home(&mut self) {
+        *self.active_cursor_mut() = 0;
+    }
+
+    /// Move cursor to end of active field
+    pub fn cursor_end(&mut self) {
+        let len = self.active_text().chars().count();
+        *self.active_cursor_mut() = len;
+    }
+
+    /// Insert character at cursor position in active field
+    pub fn insert_char(&mut self, c: char) {
+        let cursor = if self.focus_on_replace {
+            self.replace_cursor
+        } else {
+            self.query_cursor
+        };
+
+        let text = if self.focus_on_replace {
+            &mut self.replace_text
+        } else {
+            &mut self.query
+        };
+
+        // Convert char index to byte index for insertion
+        let byte_pos: usize = text.chars().take(cursor).map(|c| c.len_utf8()).sum();
+        text.insert(byte_pos, c);
+
+        // Advance cursor
+        if self.focus_on_replace {
+            self.replace_cursor += 1;
+        } else {
+            self.query_cursor += 1;
+        }
+    }
+
+    /// Delete character before cursor (Backspace)
+    pub fn delete_char_before(&mut self) {
+        let cursor = if self.focus_on_replace {
+            self.replace_cursor
+        } else {
+            self.query_cursor
+        };
+
+        if cursor == 0 {
+            return;
+        }
+
+        let text = if self.focus_on_replace {
+            &mut self.replace_text
+        } else {
+            &mut self.query
+        };
+
+        // Find byte position of char to remove
+        let byte_start: usize = text.chars().take(cursor - 1).map(|c| c.len_utf8()).sum();
+        let char_to_remove = text.chars().nth(cursor - 1).unwrap();
+        let byte_end = byte_start + char_to_remove.len_utf8();
+        text.replace_range(byte_start..byte_end, "");
+
+        // Move cursor back
+        if self.focus_on_replace {
+            self.replace_cursor -= 1;
+        } else {
+            self.query_cursor -= 1;
+        }
+    }
+
+    /// Delete character at cursor (Delete key)
+    pub fn delete_char_at(&mut self) {
+        let cursor = if self.focus_on_replace {
+            self.replace_cursor
+        } else {
+            self.query_cursor
+        };
+
+        let text = if self.focus_on_replace {
+            &mut self.replace_text
+        } else {
+            &mut self.query
+        };
+
+        let len = text.chars().count();
+        if cursor >= len {
+            return;
+        }
+
+        // Find byte position of char to remove
+        let byte_start: usize = text.chars().take(cursor).map(|c| c.len_utf8()).sum();
+        let char_to_remove = text.chars().nth(cursor).unwrap();
+        let byte_end = byte_start + char_to_remove.len_utf8();
+        text.replace_range(byte_start..byte_end, "");
+        // Cursor stays in place
     }
 
     /// Move to next match (wraps around)

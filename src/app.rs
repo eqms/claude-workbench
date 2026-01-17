@@ -217,6 +217,7 @@ impl App {
                                 self.show_terminal,
                                 self.show_lazygit,
                                 self.show_preview,
+                                &self.config.layout,
                             );
 
                         let x = mouse.column;
@@ -904,6 +905,15 @@ impl App {
                                                 self.dialog.close();
                                                 self.execute_dialog_action(act, Some(val));
                                             }
+                                            // Tab: Path completion for GoToPath dialog
+                                            KeyCode::Tab => {
+                                                if matches!(
+                                                    action,
+                                                    ui::dialog::DialogAction::GoToPath
+                                                ) {
+                                                    self.dialog.try_complete_path();
+                                                }
+                                            }
                                             KeyCode::Backspace => self.dialog.delete_char_before(),
                                             KeyCode::Delete => self.dialog.delete_char_at(),
                                             KeyCode::Left => self.dialog.cursor_left(),
@@ -1324,7 +1334,7 @@ impl App {
                                                         }
                                                         continue;
                                                     }
-                                                    // Ctrl+N: Next match while typing (n/N without modifiers go to character input)
+                                                    // Ctrl+N: Next match
                                                     KeyCode::Char('n')
                                                         if key
                                                             .modifiers
@@ -1334,6 +1344,7 @@ impl App {
                                                         self.preview.jump_to_current_match();
                                                         continue;
                                                     }
+                                                    // Ctrl+P: Previous match
                                                     KeyCode::Char('p')
                                                         if key
                                                             .modifiers
@@ -1343,26 +1354,47 @@ impl App {
                                                         self.preview.jump_to_current_match();
                                                         continue;
                                                     }
-                                                    // Backspace: Delete from active field
-                                                    KeyCode::Backspace => {
-                                                        if self.preview.search.focus_on_replace {
-                                                            self.preview.search.replace_text.pop();
-                                                        } else {
-                                                            self.preview.search.query.pop();
+                                                    // ─────────────────────────────────────────
+                                                    // Cursor Navigation in Search/Replace fields
+                                                    // ─────────────────────────────────────────
+                                                    KeyCode::Left => {
+                                                        self.preview.search.cursor_left();
+                                                        continue;
+                                                    }
+                                                    KeyCode::Right => {
+                                                        self.preview.search.cursor_right();
+                                                        continue;
+                                                    }
+                                                    KeyCode::Home => {
+                                                        self.preview.search.cursor_home();
+                                                        continue;
+                                                    }
+                                                    KeyCode::End => {
+                                                        self.preview.search.cursor_end();
+                                                        continue;
+                                                    }
+                                                    // Delete: Delete character at cursor
+                                                    KeyCode::Delete => {
+                                                        self.preview.search.delete_char_at();
+                                                        if !self.preview.search.focus_on_replace {
                                                             self.preview.perform_search();
                                                             self.preview.jump_to_current_match();
                                                         }
                                                         continue;
                                                     }
-                                                    // Character input to active field
+                                                    // Backspace: Delete character before cursor
+                                                    KeyCode::Backspace => {
+                                                        self.preview.search.delete_char_before();
+                                                        if !self.preview.search.focus_on_replace {
+                                                            self.preview.perform_search();
+                                                            self.preview.jump_to_current_match();
+                                                        }
+                                                        continue;
+                                                    }
+                                                    // Character input at cursor position
                                                     KeyCode::Char(c) => {
-                                                        if self.preview.search.focus_on_replace {
-                                                            self.preview
-                                                                .search
-                                                                .replace_text
-                                                                .push(c);
-                                                        } else {
-                                                            self.preview.search.query.push(c);
+                                                        self.preview.search.insert_char(c);
+                                                        if !self.preview.search.focus_on_replace {
                                                             self.preview.perform_search();
                                                             self.preview.jump_to_current_match();
                                                         }
@@ -1821,6 +1853,7 @@ impl App {
             self.show_terminal,
             self.show_lazygit,
             self.show_preview,
+            &self.config.layout,
         );
 
         // Helper to resize PTY

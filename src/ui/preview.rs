@@ -914,7 +914,6 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
     };
 
     let search_focused = !state.search.focus_on_replace;
-    let search_cursor = if search_focused { "█" } else { "" };
     let search_label = if is_replace_mode { "Find: " } else { "/" };
 
     let search_style = if search_focused {
@@ -923,25 +922,50 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
         Style::default().fg(Color::White).bg(Color::DarkGray)
     };
 
-    let search_line = Line::from(vec![
-        Span::styled(
-            search_label,
-            Style::default().fg(Color::Cyan).bg(Color::DarkGray),
-        ),
-        Span::styled(state.search.query.clone(), search_style),
-        Span::styled(
-            search_cursor,
-            Style::default().fg(Color::White).bg(Color::DarkGray),
-        ),
-        Span::styled(
-            match_info,
-            Style::default().fg(Color::Gray).bg(Color::DarkGray),
-        ),
-        Span::styled(
-            format!(" {}", case_indicator),
-            Style::default().fg(Color::DarkGray).bg(Color::DarkGray),
-        ),
-    ]);
+    // Build search line with cursor at correct position
+    let mut search_spans = vec![Span::styled(
+        search_label,
+        Style::default().fg(Color::Cyan).bg(Color::DarkGray),
+    )];
+
+    // Split query at cursor position (UTF-8 safe)
+    let cursor_pos = state.search.query_cursor;
+    let query_chars: Vec<char> = state.search.query.chars().collect();
+    let before_cursor: String = query_chars.iter().take(cursor_pos).collect();
+    let after_cursor: String = query_chars.iter().skip(cursor_pos).collect();
+
+    search_spans.push(Span::styled(before_cursor, search_style));
+
+    if search_focused {
+        // Show cursor as inverted block
+        let cursor_char = if cursor_pos < query_chars.len() {
+            query_chars[cursor_pos].to_string()
+        } else {
+            " ".to_string()
+        };
+        search_spans.push(Span::styled(
+            cursor_char,
+            Style::default().fg(Color::Black).bg(Color::Yellow),
+        ));
+        // Text after cursor (skip the cursor char if within bounds)
+        if cursor_pos < query_chars.len() {
+            let rest: String = query_chars.iter().skip(cursor_pos + 1).collect();
+            search_spans.push(Span::styled(rest, search_style));
+        }
+    } else {
+        search_spans.push(Span::styled(after_cursor, search_style));
+    }
+
+    search_spans.push(Span::styled(
+        match_info,
+        Style::default().fg(Color::Gray).bg(Color::DarkGray),
+    ));
+    search_spans.push(Span::styled(
+        format!(" {}", case_indicator),
+        Style::default().fg(Color::DarkGray).bg(Color::DarkGray),
+    ));
+
+    let search_line = Line::from(search_spans);
 
     f.render_widget(Paragraph::new(search_line), search_line_area);
 
@@ -955,7 +979,6 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
         };
 
         let replace_focused = state.search.focus_on_replace;
-        let replace_cursor = if replace_focused { "█" } else { "" };
 
         let replace_style = if replace_focused {
             Style::default().fg(Color::Yellow).bg(Color::DarkGray)
@@ -963,17 +986,41 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
             Style::default().fg(Color::White).bg(Color::DarkGray)
         };
 
-        let replace_line = Line::from(vec![
-            Span::styled(
-                "Repl: ",
-                Style::default().fg(Color::Cyan).bg(Color::DarkGray),
-            ),
-            Span::styled(state.search.replace_text.clone(), replace_style),
-            Span::styled(
-                replace_cursor,
-                Style::default().fg(Color::White).bg(Color::DarkGray),
-            ),
-        ]);
+        // Build replace line with cursor at correct position
+        let mut replace_spans = vec![Span::styled(
+            "Repl: ",
+            Style::default().fg(Color::Cyan).bg(Color::DarkGray),
+        )];
+
+        // Split replace_text at cursor position (UTF-8 safe)
+        let replace_cursor_pos = state.search.replace_cursor;
+        let replace_chars: Vec<char> = state.search.replace_text.chars().collect();
+        let replace_before: String = replace_chars.iter().take(replace_cursor_pos).collect();
+        let replace_after: String = replace_chars.iter().skip(replace_cursor_pos).collect();
+
+        replace_spans.push(Span::styled(replace_before, replace_style));
+
+        if replace_focused {
+            // Show cursor as inverted block
+            let cursor_char = if replace_cursor_pos < replace_chars.len() {
+                replace_chars[replace_cursor_pos].to_string()
+            } else {
+                " ".to_string()
+            };
+            replace_spans.push(Span::styled(
+                cursor_char,
+                Style::default().fg(Color::Black).bg(Color::Yellow),
+            ));
+            // Text after cursor (skip the cursor char if within bounds)
+            if replace_cursor_pos < replace_chars.len() {
+                let rest: String = replace_chars.iter().skip(replace_cursor_pos + 1).collect();
+                replace_spans.push(Span::styled(rest, replace_style));
+            }
+        } else {
+            replace_spans.push(Span::styled(replace_after, replace_style));
+        }
+
+        let replace_line = Line::from(replace_spans);
 
         f.render_widget(Paragraph::new(replace_line), replace_line_area);
 
@@ -993,9 +1040,9 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
         };
 
         let hints = if edit_mode_available {
-            "Tab:Field  Enter:Replace  F6:All  n:Next  N:Prev  ^I:Case  Esc:Close"
+            "Tab:Field  Enter:Replace  ^R:All  ^N:Next  ^P:Prev  ^I:Case  Esc:Close"
         } else {
-            "[Read-only - press E to edit]  n:Next  N:Prev  Esc:Close"
+            "[Read-only - press E to edit]  ^N:Next  ^P:Prev  Esc:Close"
         };
 
         f.render_widget(Paragraph::new(hints).style(hint_style), hints_area);

@@ -217,6 +217,196 @@ impl Dialog {
             DialogType::None => None,
         }
     }
+
+    /// Set the input value and move cursor to end (used by tab-completion)
+    pub fn set_value(&mut self, new_value: String) {
+        if let DialogType::Input { value, cursor, .. } = &mut self.dialog_type {
+            let new_cursor = new_value.chars().count();
+            *value = new_value;
+            *cursor = new_cursor;
+        }
+    }
+
+    /// Try to complete path with tab completion
+    /// Returns true if completion was performed
+    pub fn try_complete_path(&mut self) -> bool {
+        let current_value = match &self.dialog_type {
+            DialogType::Input {
+                value,
+                action: DialogAction::GoToPath,
+                ..
+            } => value.clone(),
+            _ => return false,
+        };
+
+        if current_value.is_empty() {
+            return false;
+        }
+
+        use std::path::Path;
+        let path = Path::new(&current_value);
+
+        // Determine the directory to scan and the prefix to match
+        let (scan_dir, prefix) = if current_value.ends_with('/') || current_value.ends_with('\\') {
+            // Path ends with separator: scan that directory, match all entries
+            (path.to_path_buf(), String::new())
+        } else if path.is_dir() {
+            // Complete path is a directory: add separator and continue
+            let mut completed = current_value.clone();
+            completed.push('/');
+            self.set_value(completed);
+            return true;
+        } else {
+            // Partial name: scan parent directory, match entries starting with the last component
+            let parent = path.parent().unwrap_or(Path::new("/"));
+            let file_name = path
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            (parent.to_path_buf(), file_name)
+        };
+
+        // Read directory entries
+        let entries: Vec<String> = match std::fs::read_dir(&scan_dir) {
+            Ok(dir) => dir
+                .filter_map(|e| e.ok())
+                .filter_map(|e| {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    // Filter entries that start with prefix (case-insensitive)
+                    if prefix.is_empty()
+                        || name.to_lowercase().starts_with(&prefix.to_lowercase())
+                    {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            Err(_) => return false,
+        };
+
+        if entries.is_empty() {
+            return false;
+        }
+
+        // Sort entries: directories first, then files, alphabetically
+        let mut sorted_entries: Vec<(String, bool)> = entries
+            .into_iter()
+            .map(|name| {
+                let full_path = scan_dir.join(&name);
+                let is_dir = full_path.is_dir();
+                (name, is_dir)
+            })
+            .collect();
+
+        sorted_entries.sort_by(|(a_name, a_dir), (b_name, b_dir)| {
+            match (a_dir, b_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
+            }
+        });
+
+        // Find longest common prefix among all matches
+        if sorted_entries.len() == 1 {
+            // Single match: complete fully
+            let (name, is_dir) = &sorted_entries[0];
+            let mut completed = scan_dir.join(name).to_string_lossy().to_string();
+            if *is_dir {
+                completed.push('/');
+            }
+            self.set_value(completed);
+            return true;
+        }
+
+        // Multiple matches: complete to longest common prefix
+        let first = &sorted_entries[0].0;
+        let mut common_len = first.len();
+
+        for (name, _) in &sorted_entries[1..] {
+            let matching = first
+                .chars()
+                .zip(name.chars())
+                .take_while(|(a, b)| a.to_lowercase().eq(b.to_lowercase()))
+                .count();
+            common_len = common_len.min(matching);
+        }
+
+        if common_len > prefix.len() {
+            // We can extend the path
+            let common: String = first.chars().take(common_len).collect();
+            let completed = scan_dir.join(&common).to_string_lossy().to_string();
+            self.set_value(completed);
+            return true;
+        }
+
+        false
+    }
+
+    /// Get completion suggestions for current path input
+    pub fn get_path_completions(&self) -> Vec<(String, bool)> {
+        let current_value = match &self.dialog_type {
+            DialogType::Input {
+                value,
+                action: DialogAction::GoToPath,
+                ..
+            } => value.clone(),
+            _ => return Vec::new(),
+        };
+
+        if current_value.is_empty() {
+            return Vec::new();
+        }
+
+        use std::path::Path;
+        let path = Path::new(&current_value);
+
+        // Determine the directory to scan and the prefix to match
+        let (scan_dir, prefix) = if current_value.ends_with('/') || current_value.ends_with('\\') {
+            (path.to_path_buf(), String::new())
+        } else {
+            let parent = path.parent().unwrap_or(Path::new("/"));
+            let file_name = path
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            (parent.to_path_buf(), file_name)
+        };
+
+        // Read directory entries
+        let entries: Vec<(String, bool)> = match std::fs::read_dir(&scan_dir) {
+            Ok(dir) => dir
+                .filter_map(|e| e.ok())
+                .filter_map(|e| {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    if prefix.is_empty()
+                        || name.to_lowercase().starts_with(&prefix.to_lowercase())
+                    {
+                        let full_path = scan_dir.join(&name);
+                        let is_dir = full_path.is_dir();
+                        Some((name, is_dir))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            Err(_) => return Vec::new(),
+        };
+
+        // Sort: directories first, then alphabetically
+        let mut sorted = entries;
+        sorted.sort_by(|(a_name, a_dir), (b_name, b_dir)| {
+            match (a_dir, b_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
+            }
+        });
+
+        // Limit to 10 suggestions
+        sorted.truncate(10);
+        sorted
+    }
 }
 
 pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
@@ -231,10 +421,21 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
             title,
             value,
             cursor,
-            ..
+            action,
         } => {
-            let width = 50u16.min(area.width.saturating_sub(4));
-            let height = 5u16;
+            // Get completions for GoToPath dialog
+            let completions = dialog.get_path_completions();
+            let has_completions =
+                matches!(action, DialogAction::GoToPath) && !completions.is_empty();
+
+            // Dynamic height: base 5 + completion list rows (max 8)
+            let completion_rows = if has_completions {
+                completions.len().min(8) as u16
+            } else {
+                0
+            };
+            let width = 60u16.min(area.width.saturating_sub(4));
+            let height = 5u16 + completion_rows;
             let x = area.x + (area.width.saturating_sub(width)) / 2;
             let y = area.y + (area.height.saturating_sub(height)) / 2;
             let popup_area = Rect::new(x, y, width, height);
@@ -279,10 +480,37 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
                 Rect::new(inner.x, inner.y + 1, inner.width, 1),
             );
 
-            // Help text
-            let help = Paragraph::new("Enter: Confirm | Esc: Cancel")
-                .style(Style::default().fg(Color::Gray));
+            // Help text (with Tab hint for GoToPath)
+            let help_text = if matches!(action, DialogAction::GoToPath) {
+                "Tab: Complete | Enter: Confirm | Esc: Cancel"
+            } else {
+                "Enter: Confirm | Esc: Cancel"
+            };
+            let help = Paragraph::new(help_text).style(Style::default().fg(Color::Gray));
             f.render_widget(help, Rect::new(inner.x, inner.y + 2, inner.width, 1));
+
+            // Render completion list for GoToPath
+            if has_completions {
+                for (i, (name, is_dir)) in completions.iter().take(8).enumerate() {
+                    let display_name = if *is_dir {
+                        format!("📁 {}/", name)
+                    } else {
+                        format!("📄 {}", name)
+                    };
+
+                    let style = if *is_dir {
+                        Style::default().fg(Color::Cyan)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+
+                    let completion_line = Paragraph::new(display_name).style(style);
+                    f.render_widget(
+                        completion_line,
+                        Rect::new(inner.x, inner.y + 3 + i as u16, inner.width, 1),
+                    );
+                }
+            }
         }
         DialogType::Confirm { title, message, .. } => {
             let width = 50u16.min(area.width.saturating_sub(4));

@@ -1,3 +1,4 @@
+use crate::config::LayoutConfig;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn compute_layout(
@@ -5,14 +6,21 @@ pub fn compute_layout(
     show_terminal: bool,
     show_lazygit: bool,
     show_preview: bool,
+    layout_config: &LayoutConfig,
 ) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
+    // Use config values for layout percentages
+    let claude_pct = layout_config.claude_height_percent;
+    let file_pct = layout_config.file_browser_width_percent;
+    let preview_pct = layout_config.preview_width_percent;
+    let right_pct = layout_config.right_panel_width_percent;
+
     // 1. Vertical Split: Top (Work Area), Bottom (Claude Code), Footer
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),         // Top Area (dynamic)
-            Constraint::Percentage(40), // Claude Code (Bottom)
-            Constraint::Length(1),      // Footer
+            Constraint::Min(1),                // Top Area (dynamic)
+            Constraint::Percentage(claude_pct), // Claude Code (Bottom) - from config
+            Constraint::Length(1),             // Footer
         ])
         .split(area);
 
@@ -30,31 +38,35 @@ pub fn compute_layout(
             let top_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(20), // File Browser
-                    Constraint::Percentage(50), // Preview/Editor
-                    Constraint::Percentage(30), // Right Panel (Git/Term)
+                    Constraint::Percentage(file_pct),    // File Browser - from config
+                    Constraint::Percentage(preview_pct), // Preview/Editor - from config
+                    Constraint::Percentage(right_pct),   // Right Panel - from config
                 ])
                 .split(top_area);
             (top_chunks[0], top_chunks[1], top_chunks[2])
         }
         // Preview visible, no right panel: 2-column layout
         (true, false) => {
+            // File browser keeps its percentage, preview gets the rest
+            let preview_expanded = 100 - file_pct;
             let top_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(25), // File Browser
-                    Constraint::Percentage(75), // Preview/Editor (larger)
+                    Constraint::Percentage(file_pct),        // File Browser - from config
+                    Constraint::Percentage(preview_expanded), // Preview/Editor (expanded)
                 ])
                 .split(top_area);
             (top_chunks[0], top_chunks[1], Rect::default())
         }
         // Preview hidden, right panel visible: 2-column layout (Git/Term gets Preview space)
         (false, true) => {
+            // File browser keeps its percentage, right panel gets the rest
+            let right_expanded = 100 - file_pct;
             let top_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(20), // File Browser
-                    Constraint::Percentage(80), // Right Panel (Git/Term gets all remaining space)
+                    Constraint::Percentage(file_pct),       // File Browser - from config
+                    Constraint::Percentage(right_expanded), // Right Panel (expanded)
                 ])
                 .split(top_area);
             (top_chunks[0], Rect::default(), top_chunks[1])
