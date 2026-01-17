@@ -18,6 +18,7 @@ pub enum MenuAction {
     DeleteFile,
     CopyAbsolutePath,
     CopyRelativePath,
+    GoToPath,
 }
 
 pub struct MenuBar {
@@ -41,12 +42,12 @@ impl MenuBar {
     }
 
     pub fn next(&mut self) {
-        self.selected = (self.selected + 1) % 9;
+        self.selected = (self.selected + 1) % 10;
     }
 
     pub fn prev(&mut self) {
         if self.selected == 0 {
-            self.selected = 8;
+            self.selected = 9;
         } else {
             self.selected -= 1;
         }
@@ -63,6 +64,7 @@ impl MenuBar {
             6 => MenuAction::DeleteFile,
             7 => MenuAction::CopyAbsolutePath,
             8 => MenuAction::CopyRelativePath,
+            9 => MenuAction::GoToPath,
             _ => MenuAction::None,
         }
     }
@@ -83,6 +85,7 @@ pub fn render(f: &mut Frame, area: Rect, menu: &MenuBar) {
         ("d", "Delete"),
         ("y", "Copy Abs Path"),
         ("Y", "Copy Rel Path"),
+        ("g", "Go to Path"),
     ];
 
     // Menu popup in center-top

@@ -29,15 +29,15 @@ jobs:
             asset_name: claude-workbench-linux-arm64
             cross: true
 
-          # macOS Apple Silicon (M1/M2)
+          # macOS Apple Silicon (M1/M2/M3/M4)
           - target: aarch64-apple-darwin
             os: macos-latest
             binary_name: claude-workbench
             asset_name: claude-workbench-macos-arm64
 
-          # macOS Intel
+          # macOS Intel (cross-compiled from ARM64 runner)
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             binary_name: claude-workbench
             asset_name: claude-workbench-macos-x64
 
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
@@ -133,7 +133,7 @@ jobs:
             |----------|--------------|----------|
             | Linux | x64 | `claude-workbench-linux-x64` |
             | Linux | ARM64 | `claude-workbench-linux-arm64` |
-            | macOS | Apple Silicon (M1/M2) | `claude-workbench-macos-arm64` |
+            | macOS | Apple Silicon (M1/M2/M3/M4) | `claude-workbench-macos-arm64` |
             | macOS | Intel | `claude-workbench-macos-x64` |
             | Windows | x64 | `claude-workbench-windows-x64.exe` |
 

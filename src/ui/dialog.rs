@@ -28,6 +28,8 @@ pub enum DialogAction {
     EnterDirectory { target_idx: usize },
     /// Git pull confirmation (repo_root is the path to pull from)
     GitPull { repo_root: std::path::PathBuf },
+    /// Navigate to a specific path
+    GoToPath,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

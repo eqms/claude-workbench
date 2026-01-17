@@ -793,6 +793,7 @@ impl App {
                                 KeyCode::Char('d') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::DeleteFile); }
                                 KeyCode::Char('y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyAbsolutePath); }
                                 KeyCode::Char('Y') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::CopyRelativePath); }
+                                KeyCode::Char('g') => { self.menu.visible = false; self.handle_menu_action(ui::menu::MenuAction::GoToPath); }
                                 _ => {}
                             }
                             continue;
@@ -1050,19 +1051,7 @@ impl App {
                                                     }
                                                     continue;
                                                 }
-                                                // n: Next match (when not focused on replace field)
-                                                KeyCode::Char('n') if !self.preview.search.focus_on_replace && !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                                    self.preview.search.next_match();
-                                                    self.preview.jump_to_current_match();
-                                                    continue;
-                                                }
-                                                // N: Previous match (when not focused on replace field)
-                                                KeyCode::Char('N') if !self.preview.search.focus_on_replace => {
-                                                    self.preview.search.prev_match();
-                                                    self.preview.jump_to_current_match();
-                                                    continue;
-                                                }
-                                                // Ctrl+N: Next match while typing
+                                                // Ctrl+N: Next match while typing (n/N without modifiers go to character input)
                                                 KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                                                     self.preview.search.next_match();
                                                     self.preview.jump_to_current_match();
@@ -1715,6 +1704,16 @@ impl App {
                     }
                 }
             }
+            MenuAction::GoToPath => {
+                let dir_str = self.file_browser.current_dir.to_string_lossy().to_string();
+                let cursor_pos = dir_str.chars().count();
+                self.dialog.dialog_type = ui::dialog::DialogType::Input {
+                    title: "Go to Path".to_string(),
+                    value: dir_str,
+                    cursor: cursor_pos,
+                    action: ui::dialog::DialogAction::GoToPath,
+                };
+            }
             MenuAction::None => {}
         }
     }
@@ -1828,6 +1827,38 @@ impl App {
                     Err(_err) => {
                         // Pull failed - could show error dialog, but for now just ignore
                         // The user will see the error in their terminal if they run git manually
+                    }
+                }
+            }
+            DialogAction::GoToPath => {
+                if let Some(path_str) = value {
+                    if !path_str.is_empty() {
+                        let target = std::path::Path::new(&path_str);
+                        if target.is_dir() {
+                            self.file_browser.current_dir = target.to_path_buf();
+                            self.file_browser.load_directory();
+                            self.update_preview();
+                            self.sync_terminals();
+                            self.check_repo_change();
+                        } else if target.is_file() {
+                            if let Some(parent) = target.parent() {
+                                self.file_browser.current_dir = parent.to_path_buf();
+                                self.file_browser.load_directory();
+                                // Select the file
+                                if let Some(name) = target.file_name() {
+                                    let name_str = name.to_string_lossy().to_string();
+                                    for (idx, entry) in self.file_browser.entries.iter().enumerate() {
+                                        if entry.name == name_str {
+                                            self.file_browser.list_state.select(Some(idx));
+                                            break;
+                                        }
+                                    }
+                                }
+                                self.update_preview();
+                                self.sync_terminals();
+                                self.check_repo_change();
+                            }
+                        }
                     }
                 }
             }

@@ -13,6 +13,23 @@ A Rust-based TUI (Terminal User Interface) multiplexer called "claude-workbench"
 
 Built with Ratatui (TUI framework), Crossterm (terminal handling), and portable-pty (pseudo-terminal).
 
+## Git Push Strategy
+
+**IMPORTANT: This repository uses dual-remote push strategy.** Always push to both remotes:
+
+```bash
+git push origin main      # GitLab: gitlab.ownerp.io
+git push upstream main    # GitHub: github.com/eqms/claude-workbench.git
+```
+
+Both repositories must be kept in sync for all commits. This ensures the project is available as Open Source on GitHub with pre-built binaries via GitHub Actions.
+
+**Remotes:**
+| Remote | URL | Purpose |
+|--------|-----|---------|
+| origin | git@gitlab.ownerp.io:ki/workbench.git | Primary development |
+| upstream | git@github.com:eqms/claude-workbench.git | Open Source distribution |
+
 ## Development Commands
 
 ### Build and Run
