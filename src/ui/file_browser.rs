@@ -13,12 +13,19 @@ use std::time::SystemTime;
 
 /// Format file modification date for display using local timezone
 fn format_file_date(utc_secs: u64) -> String {
-    // Use libc localtime_r for proper timezone conversion
     let time_t = utc_secs as libc::time_t;
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
 
+    // Platform-specific timezone conversion
+    #[cfg(unix)]
     unsafe {
         libc::localtime_r(&time_t, &mut tm);
+    }
+
+    #[cfg(windows)]
+    unsafe {
+        // Windows uses localtime_s with swapped argument order
+        libc::localtime_s(&mut tm, &time_t);
     }
 
     // tm_year is years since 1900, tm_mon is 0-11
