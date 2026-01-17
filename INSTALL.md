@@ -68,18 +68,23 @@ claude-workbench
 - Optional: [Claude CLI](https://claude.ai/code) for AI-assisted development
 - Optional: [LazyGit](https://github.com/jesseduffield/lazygit) (`brew install lazygit`)
 
-#### Windows (x64)
+#### Windows (x64 / ARM64)
 
 **Option 1: Direct Download**
-1. Download `claude-workbench-windows-x64.exe` from the [Releases](https://github.com/eqms/claude-workbench/releases) page
+1. Download the appropriate binary from the [Releases](https://github.com/eqms/claude-workbench/releases) page:
+   - For x64: `claude-workbench-windows-x64.exe`
+   - For ARM64 (Surface Pro X, etc.): `claude-workbench-windows-arm64.exe`
 2. Move to a convenient location (e.g., `C:\Tools\`)
 3. Add the location to your PATH (optional)
 4. Run from PowerShell or Windows Terminal
 
 **Option 2: PowerShell Installation**
 ```powershell
-# Download
+# Download (x64)
 Invoke-WebRequest -Uri "https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-windows-x64.exe" -OutFile "claude-workbench.exe"
+
+# Download (ARM64)
+# Invoke-WebRequest -Uri "https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-windows-arm64.exe" -OutFile "claude-workbench.exe"
 
 # Run
 .\claude-workbench.exe
@@ -210,18 +215,23 @@ claude-workbench
 - Optional: [Claude CLI](https://claude.ai/code) für KI-gestützte Entwicklung
 - Optional: [LazyGit](https://github.com/jesseduffield/lazygit) (`brew install lazygit`)
 
-#### Windows (x64)
+#### Windows (x64 / ARM64)
 
 **Option 1: Direkter Download**
-1. Laden Sie `claude-workbench-windows-x64.exe` von der [Releases](https://github.com/eqms/claude-workbench/releases)-Seite herunter
+1. Laden Sie das passende Binary von der [Releases](https://github.com/eqms/claude-workbench/releases)-Seite herunter:
+   - Für x64: `claude-workbench-windows-x64.exe`
+   - Für ARM64 (Surface Pro X, etc.): `claude-workbench-windows-arm64.exe`
 2. Verschieben Sie die Datei an einen geeigneten Ort (z.B. `C:\Tools\`)
 3. Fügen Sie den Speicherort zu PATH hinzu (optional)
 4. Starten Sie aus PowerShell oder Windows Terminal
 
 **Option 2: PowerShell-Installation**
 ```powershell
-# Herunterladen
+# Herunterladen (x64)
 Invoke-WebRequest -Uri "https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-windows-x64.exe" -OutFile "claude-workbench.exe"
+
+# Herunterladen (ARM64)
+# Invoke-WebRequest -Uri "https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-windows-arm64.exe" -OutFile "claude-workbench.exe"
 
 # Ausführen
 .\claude-workbench.exe

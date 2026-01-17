@@ -47,6 +47,12 @@ jobs:
             binary_name: claude-workbench.exe
             asset_name: claude-workbench-windows-x64.exe
 
+          # Windows ARM64
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            binary_name: claude-workbench.exe
+            asset_name: claude-workbench-windows-arm64.exe
+
     steps:
       - uses: actions/checkout@v4
 
@@ -136,6 +142,7 @@ jobs:
             | macOS | Apple Silicon (M1/M2/M3/M4) | `claude-workbench-macos-arm64` |
             | macOS | Intel | `claude-workbench-macos-x64` |
             | Windows | x64 | `claude-workbench-windows-x64.exe` |
+            | Windows | ARM64 | `claude-workbench-windows-arm64.exe` |
 
             ### Installation
 
