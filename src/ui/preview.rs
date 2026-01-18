@@ -335,9 +335,22 @@ impl PreviewState {
         }
     }
 
-    /// Jump scroll position to current match
+    /// Jump to current match - moves cursor in Edit mode, scrolls in ReadOnly mode
     pub fn jump_to_current_match(&mut self) {
-        if let Some(line) = self.search.current_match_line() {
+        let Some((line, start_col, _end_col)) = self.search.get_current_match() else {
+            return;
+        };
+
+        if self.mode == EditorMode::Edit {
+            // In Edit mode: Move cursor to the match position
+            if let Some(editor) = &mut self.editor {
+                editor.move_cursor(tui_textarea::CursorMove::Jump(
+                    line as u16,
+                    start_col as u16,
+                ));
+            }
+        } else {
+            // In ReadOnly mode: Scroll to show the match line
             self.scroll = line as u16;
         }
     }

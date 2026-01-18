@@ -305,54 +305,70 @@ impl App {
 
                                 if is_inside(files, x, y) {
                                     self.active_pane = PaneId::FileBrowser;
-                                    // Calculate which item was clicked (account for border)
-                                    let relative_y = y.saturating_sub(files.y + 1); // +1 for border
-                                    let idx = relative_y as usize;
-                                    if idx < self.file_browser.entries.len() {
-                                        // Start drag with the file path
-                                        let entry = &self.file_browser.entries[idx];
-                                        self.drag_state.start(entry.path.clone(), x, y);
-                                        // Check for double-click (same item within 300ms)
-                                        let now = std::time::Instant::now();
-                                        let is_double_click = self.last_click_idx == Some(idx)
-                                            && now.duration_since(self.last_click_time).as_millis()
-                                                < 300;
+                                    // File browser layout: [list with borders] + [info bar (1 line)]
+                                    // List content area: after top border, before bottom border and info bar
+                                    let list_content_top = files.y + 1; // After top border
+                                    let list_content_bottom =
+                                        files.y + files.height.saturating_sub(3); // Before bottom border (1) + info bar (1)
 
-                                        // Update tracking for next click
-                                        self.last_click_time = now;
-                                        self.last_click_idx = Some(idx);
+                                    // Only handle clicks within the list content area
+                                    if y >= list_content_top && y <= list_content_bottom {
+                                        // Calculate relative position within visible list
+                                        let relative_y = y.saturating_sub(list_content_top);
 
-                                        // Check if editor has unsaved changes before switching
-                                        let has_unsaved = self.preview.mode == EditorMode::Edit
-                                            && self.preview.is_modified();
+                                        // Get scroll offset to calculate actual item index
+                                        let scroll_offset = self.file_browser.list_state.offset();
+                                        let idx = scroll_offset + relative_y as usize;
 
-                                        if is_double_click {
-                                            // Double-click: enter directory or open file
-                                            let is_dir = self
-                                                .file_browser
-                                                .entries
-                                                .get(idx)
-                                                .map(|e| e.is_dir)
-                                                .unwrap_or(false);
-                                            if is_dir {
-                                                if has_unsaved {
-                                                    self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                        if idx < self.file_browser.entries.len() {
+                                            // Start drag with the file path
+                                            let entry = &self.file_browser.entries[idx];
+                                            self.drag_state.start(entry.path.clone(), x, y);
+                                            // Check for double-click (same item within 300ms)
+                                            let now = std::time::Instant::now();
+                                            let is_double_click = self.last_click_idx == Some(idx)
+                                                && now
+                                                    .duration_since(self.last_click_time)
+                                                    .as_millis()
+                                                    < 300;
+
+                                            // Update tracking for next click
+                                            self.last_click_time = now;
+                                            self.last_click_idx = Some(idx);
+
+                                            // Check if editor has unsaved changes before switching
+                                            let has_unsaved = self.preview.mode == EditorMode::Edit
+                                                && self.preview.is_modified();
+
+                                            if is_double_click {
+                                                // Double-click: enter directory or open file
+                                                let is_dir = self
+                                                    .file_browser
+                                                    .entries
+                                                    .get(idx)
+                                                    .map(|e| e.is_dir)
+                                                    .unwrap_or(false);
+                                                if is_dir {
+                                                    if has_unsaved {
+                                                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
                                                         title: "Unsaved Changes".to_string(),
                                                         message: "Discard changes and enter directory?".to_string(),
                                                         action: ui::dialog::DialogAction::EnterDirectory { target_idx: idx },
                                                     };
-                                                } else {
-                                                    self.file_browser.list_state.select(Some(idx));
-                                                    self.file_browser.enter_selected();
-                                                    self.update_preview();
-                                                    self.sync_terminals();
-                                                    self.check_repo_change();
+                                                    } else {
+                                                        self.file_browser
+                                                            .list_state
+                                                            .select(Some(idx));
+                                                        self.file_browser.enter_selected();
+                                                        self.update_preview();
+                                                        self.sync_terminals();
+                                                        self.check_repo_change();
+                                                    }
                                                 }
-                                            }
-                                        } else {
-                                            // Single click: just select (but check for unsaved changes)
-                                            if has_unsaved {
-                                                self.dialog.dialog_type =
+                                            } else {
+                                                // Single click: just select (but check for unsaved changes)
+                                                if has_unsaved {
+                                                    self.dialog.dialog_type =
                                                     ui::dialog::DialogType::Confirm {
                                                         title: "Unsaved Changes".to_string(),
                                                         message: "Discard changes and switch file?"
@@ -362,12 +378,13 @@ impl App {
                                                                 target_idx: idx,
                                                             },
                                                     };
-                                            } else {
-                                                self.file_browser.list_state.select(Some(idx));
-                                                self.update_preview();
+                                                } else {
+                                                    self.file_browser.list_state.select(Some(idx));
+                                                    self.update_preview();
+                                                }
                                             }
                                         }
-                                    }
+                                    } // Close: if y >= list_content_top && y <= list_content_bottom
                                 } else if is_inside(preview, x, y) {
                                     // Alt+Click starts selection in Preview (Read-Only mode only)
                                     if mouse
@@ -2545,14 +2562,31 @@ impl App {
             return;
         };
 
+        let total_lines = editor.lines().len();
+
+        // Calculate gutter width (same formula as in preview.rs)
+        let gutter_width = if total_lines == 0 {
+            4u16
+        } else {
+            let digits = ((total_lines as f64).log10().floor() as u16) + 1;
+            digits + 3 // " " + digits + " │"
+        };
+
+        // Edit mode has a shortcut bar at the bottom (1 line)
+        let shortcut_bar_height = 1u16;
+        let editor_area_height = area.height.saturating_sub(shortcut_bar_height);
+
         // Account for block border (1px on each side)
         let inner_x = area.x + 1;
         let inner_y = area.y + 1;
-        let inner_width = area.width.saturating_sub(2);
-        let inner_height = area.height.saturating_sub(2);
+        let inner_height = editor_area_height.saturating_sub(2);
 
-        // Check if click is within inner content area
-        if click_x < inner_x || click_x >= inner_x + inner_width {
+        // Content area starts after the gutter
+        let content_x = inner_x + gutter_width;
+        let content_width = area.width.saturating_sub(2 + gutter_width);
+
+        // Check if click is within content area (not in gutter or outside)
+        if click_x < content_x || click_x >= content_x + content_width {
             return;
         }
         if click_y < inner_y || click_y >= inner_y + inner_height {
@@ -2560,7 +2594,7 @@ impl App {
         }
 
         // Calculate relative position within content area
-        let rel_x = (click_x - inner_x) as usize;
+        let rel_x = (click_x - content_x) as usize;
         let rel_y = (click_y - inner_y) as usize;
 
         // Calculate scroll offset based on current cursor position
@@ -2577,13 +2611,13 @@ impl App {
         let target_col = rel_x as u16;
 
         // Clamp to valid range
-        let max_row = editor.lines().len().saturating_sub(1) as u16;
+        let max_row = total_lines.saturating_sub(1) as u16;
         let clamped_row = target_row.min(max_row);
 
         let line_len = editor
             .lines()
             .get(clamped_row as usize)
-            .map(|l| l.len())
+            .map(|l| l.chars().count()) // Use char count for UTF-8 safety
             .unwrap_or(0) as u16;
         let clamped_col = target_col.min(line_len);
 

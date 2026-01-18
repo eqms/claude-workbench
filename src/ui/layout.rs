@@ -18,9 +18,9 @@ pub fn compute_layout(
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(1),                // Top Area (dynamic)
+            Constraint::Min(1),                 // Top Area (dynamic)
             Constraint::Percentage(claude_pct), // Claude Code (Bottom) - from config
-            Constraint::Length(1),             // Footer
+            Constraint::Length(1),              // Footer
         ])
         .split(area);
 
@@ -52,7 +52,7 @@ pub fn compute_layout(
             let top_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(file_pct),        // File Browser - from config
+                    Constraint::Percentage(file_pct), // File Browser - from config
                     Constraint::Percentage(preview_expanded), // Preview/Editor (expanded)
                 ])
                 .split(top_area);

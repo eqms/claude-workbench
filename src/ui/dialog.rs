@@ -273,8 +273,7 @@ impl Dialog {
                 .filter_map(|e| {
                     let name = e.file_name().to_string_lossy().to_string();
                     // Filter entries that start with prefix (case-insensitive)
-                    if prefix.is_empty()
-                        || name.to_lowercase().starts_with(&prefix.to_lowercase())
+                    if prefix.is_empty() || name.to_lowercase().starts_with(&prefix.to_lowercase())
                     {
                         Some(name)
                     } else {
@@ -299,12 +298,10 @@ impl Dialog {
             })
             .collect();
 
-        sorted_entries.sort_by(|(a_name, a_dir), (b_name, b_dir)| {
-            match (a_dir, b_dir) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
-            }
+        sorted_entries.sort_by(|(a_name, a_dir), (b_name, b_dir)| match (a_dir, b_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
         });
 
         // Find longest common prefix among all matches
@@ -379,8 +376,7 @@ impl Dialog {
                 .filter_map(|e| e.ok())
                 .filter_map(|e| {
                     let name = e.file_name().to_string_lossy().to_string();
-                    if prefix.is_empty()
-                        || name.to_lowercase().starts_with(&prefix.to_lowercase())
+                    if prefix.is_empty() || name.to_lowercase().starts_with(&prefix.to_lowercase())
                     {
                         let full_path = scan_dir.join(&name);
                         let is_dir = full_path.is_dir();
@@ -395,12 +391,10 @@ impl Dialog {
 
         // Sort: directories first, then alphabetically
         let mut sorted = entries;
-        sorted.sort_by(|(a_name, a_dir), (b_name, b_dir)| {
-            match (a_dir, b_dir) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
-            }
+        sorted.sort_by(|(a_name, a_dir), (b_name, b_dir)| match (a_dir, b_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a_name.to_lowercase().cmp(&b_name.to_lowercase()),
         });
 
         // Limit to 10 suggestions
