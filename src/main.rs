@@ -9,6 +9,7 @@ pub mod setup;
 pub mod terminal;
 pub mod types;
 pub mod ui;
+pub mod update;
 
 use anyhow::Result;
 use app::App;

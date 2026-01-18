@@ -12,4 +12,5 @@ pub mod preview;
 pub mod settings;
 pub mod syntax;
 pub mod terminal_pane;
+pub mod update_dialog;
 pub mod wizard_ui;

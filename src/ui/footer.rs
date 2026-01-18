@@ -167,19 +167,15 @@ pub fn get_context_button_positions(
             ("F12", "Help", FooterAction::Help),
         ]
     } else {
-        // Default keys (file browser)
+        // Default keys (file browser) - reduced set, more in Help (F12)
         vec![
             ("F1", "Files", FooterAction::FocusFiles),
             ("F2", "Preview", FooterAction::TogglePreview),
-            ("F3", "Refresh", FooterAction::Refresh),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
             ("F9", "Menu", FooterAction::FileMenu),
             ("^P", "Find", FooterAction::FuzzyFind),
-            (".", "Hidden", FooterAction::ToggleHidden),
-            ("o", "Open", FooterAction::OpenFile),
-            ("O", "Finder", FooterAction::OpenFinder),
             ("F12", "Help", FooterAction::Help),
         ]
     };
@@ -256,19 +252,15 @@ impl Widget for Footer {
                 ("F12", "Help"),
             ]
         } else {
-            // Default keys (file browser)
+            // Default keys (file browser) - reduced set, more in Help (F12)
             vec![
                 ("F1", "Files"),
                 ("F2", "Preview"),
-                ("F3", "Refresh"),
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
                 ("F9", "Menu"),
                 ("^P", "Find"),
-                (".", "Hidden"),
-                ("o", "Open"),
-                ("O", "Finder"),
                 ("F12", "Help"),
             ]
         };

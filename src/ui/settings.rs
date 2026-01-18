@@ -71,6 +71,7 @@ pub enum SettingsField {
     ScrollbackLines,
     ShowHiddenFiles,
     AutoRefreshMs,
+    CheckForUpdates, // Action item, not editable
     // Layout
     FileBrowserWidth,
     PreviewWidth,
@@ -204,12 +205,17 @@ impl SettingsState {
 
     pub fn item_count(&self) -> usize {
         match self.category {
-            SettingsCategory::General => 4, // shell, scrollback, hidden, auto-refresh
+            SettingsCategory::General => 5, // shell, scrollback, hidden, auto-refresh, check updates
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
             SettingsCategory::Paths => 2,   // claude, lazygit
             SettingsCategory::Templates => self.available_templates.len(),
             SettingsCategory::About => 0,
         }
+    }
+
+    /// Check if the currently selected item is the "Check for Updates" action
+    pub fn is_check_updates_selected(&self) -> bool {
+        self.category == SettingsCategory::General && self.selected_idx == 4
     }
 
     pub fn move_up(&mut self) {
@@ -262,6 +268,7 @@ impl SettingsState {
                 SettingsField::ClaudeHeight => self.claude_height.to_string(),
                 SettingsField::ClaudePath => self.claude_path.clone(),
                 SettingsField::LazygitPath => self.lazygit_path.clone(),
+                SettingsField::CheckForUpdates => unreachable!("CheckForUpdates is an action, not a field"),
             };
             self.editing = Some(f);
         }
@@ -326,6 +333,7 @@ impl SettingsState {
                 }
                 SettingsField::ClaudePath => self.claude_path = value,
                 SettingsField::LazygitPath => self.lazygit_path = value,
+                SettingsField::CheckForUpdates => {} // Action, not a field to edit
             }
             self.has_changes = true;
             self.input_buffer.clear();
@@ -443,6 +451,10 @@ fn render_general(frame: &mut Frame, area: Rect, state: &SettingsState) {
             state.selected_idx == 3,
             state.editing.as_ref() == Some(&SettingsField::AutoRefreshMs),
             &state.input_buffer,
+        ),
+        format_action_setting(
+            "Check for Updates",
+            state.selected_idx == 4,
         ),
     ];
 
@@ -618,6 +630,17 @@ fn format_bool_setting(label: &str, value: bool, selected: bool) -> ListItem<'st
 
     let marker = if value { "[✓]" } else { "[ ]" };
     let text = format!("{:<25} {}", format!("{}:", label), marker);
+    ListItem::new(Line::from(text)).style(style)
+}
+
+fn format_action_setting(label: &str, selected: bool) -> ListItem<'static> {
+    let style = if selected {
+        Style::default().fg(Color::Black).bg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::Yellow)
+    };
+
+    let text = format!("▶ {}", label);
     ListItem::new(Line::from(text)).style(style)
 }
 

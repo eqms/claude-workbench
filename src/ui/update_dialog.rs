@@ -1,0 +1,307 @@
+//! Update dialog for self-update functionality
+//!
+//! Shows update availability and allows user to trigger update.
+
+use crate::update::{UpdateState, CURRENT_VERSION};
+use ratatui::{
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, Paragraph},
+    Frame,
+};
+
+/// Cached button areas for mouse click detection
+#[derive(Debug, Clone, Default)]
+pub struct UpdateDialogAreas {
+    pub popup_area: Option<Rect>,
+    pub update_button_area: Option<Rect>,
+    pub later_button_area: Option<Rect>,
+}
+
+/// Button selection in the update dialog
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UpdateDialogButton {
+    #[default]
+    Update,
+    Later,
+}
+
+impl UpdateDialogButton {
+    pub fn toggle(&self) -> Self {
+        match self {
+            UpdateDialogButton::Update => UpdateDialogButton::Later,
+            UpdateDialogButton::Later => UpdateDialogButton::Update,
+        }
+    }
+}
+
+/// Render the update dialog
+///
+/// Returns the button areas for mouse click detection.
+pub fn render(
+    frame: &mut Frame,
+    area: Rect,
+    state: &UpdateState,
+    selected_button: UpdateDialogButton,
+) -> UpdateDialogAreas {
+    let mut areas = UpdateDialogAreas::default();
+
+    // Calculate centered popup area
+    let popup_width = 50u16.min(area.width.saturating_sub(4));
+    let popup_height = if state.updating { 8 } else { 12 };
+    let popup_height = popup_height.min(area.height.saturating_sub(4));
+
+    let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+    let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+    let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+    areas.popup_area = Some(popup_area);
+
+    // Clear background
+    frame.render_widget(Clear, popup_area);
+
+    let title = if state.updating {
+        " Updating... "
+    } else if state.available_version.is_some() {
+        " Update Available "
+    } else if state.checking {
+        " Checking for Updates... "
+    } else if state.error.is_some() {
+        " Update Check Failed "
+    } else {
+        " Update "
+    };
+
+    let block = Block::default()
+        .title(title)
+        .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    // Content layout
+    let chunks = Layout::vertical([
+        Constraint::Min(1),    // Content
+        Constraint::Length(3), // Buttons
+    ])
+    .split(inner);
+
+    // Render content based on state
+    if state.updating {
+        render_updating(frame, chunks[0], state);
+    } else if state.checking {
+        render_checking(frame, chunks[0]);
+    } else if let Some(ref error) = state.error {
+        render_error(frame, chunks[0], error);
+        render_close_button(frame, chunks[1]);
+    } else if let Some(ref new_version) = state.available_version {
+        render_update_available(frame, chunks[0], new_version);
+        areas = render_buttons(frame, chunks[1], selected_button, areas);
+    } else {
+        render_up_to_date(frame, chunks[0]);
+        render_close_button(frame, chunks[1]);
+    }
+
+    areas
+}
+
+fn render_checking(frame: &mut Frame, area: Rect) {
+    let content = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "Checking for updates...",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Please wait",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(content, area);
+}
+
+fn render_updating(frame: &mut Frame, area: Rect, state: &UpdateState) {
+    let message = state
+        .progress_message
+        .as_deref()
+        .unwrap_or("Downloading update...");
+
+    // Check if this is a success message (contains "restart")
+    let is_success = message.contains("restart");
+
+    let color = if is_success { Color::Green } else { Color::Yellow };
+    let hint = if is_success {
+        "Press Esc or Enter to close."
+    } else {
+        "Please wait, do not close the application."
+    };
+
+    let content = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            message,
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            hint,
+            Style::default().fg(Color::DarkGray),
+        )),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(content, area);
+}
+
+fn render_error(frame: &mut Frame, area: Rect, error: &str) {
+    let content = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "Failed to check for updates:",
+            Style::default().fg(Color::Red),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            error.chars().take(40).collect::<String>(),
+            Style::default().fg(Color::DarkGray),
+        )),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(content, area);
+}
+
+fn render_up_to_date(frame: &mut Frame, area: Rect) {
+    let content = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Current Version: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                CURRENT_VERSION,
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "You are running the latest version.",
+            Style::default().fg(Color::Green),
+        )),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(content, area);
+}
+
+fn render_update_available(frame: &mut Frame, area: Rect, new_version: &str) {
+    let content = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Current Version: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                CURRENT_VERSION,
+                Style::default().fg(Color::Yellow),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("New Version:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                new_version,
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "A new version is available!",
+            Style::default().fg(Color::Cyan),
+        )),
+    ])
+    .alignment(Alignment::Center);
+    frame.render_widget(content, area);
+}
+
+fn render_buttons(
+    frame: &mut Frame,
+    area: Rect,
+    selected: UpdateDialogButton,
+    mut areas: UpdateDialogAreas,
+) -> UpdateDialogAreas {
+    let button_width = 18u16;
+    let total_width = button_width * 2 + 4;
+    let start_x = area.x + (area.width.saturating_sub(total_width)) / 2;
+
+    // Update button
+    let update_style = if selected == UpdateDialogButton::Update {
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::Green)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::Green)
+    };
+
+    let update_area = Rect::new(start_x, area.y + 1, button_width, 1);
+    areas.update_button_area = Some(update_area);
+
+    let update_btn = Paragraph::new(" Update Now ")
+        .style(update_style)
+        .alignment(Alignment::Center);
+    frame.render_widget(update_btn, update_area);
+
+    // Later button
+    let later_style = if selected == UpdateDialogButton::Later {
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let later_area = Rect::new(start_x + button_width + 4, area.y + 1, button_width, 1);
+    areas.later_button_area = Some(later_area);
+
+    let later_btn = Paragraph::new(" Later ")
+        .style(later_style)
+        .alignment(Alignment::Center);
+    frame.render_widget(later_btn, later_area);
+
+    areas
+}
+
+fn render_close_button(frame: &mut Frame, area: Rect) {
+    let hint = Paragraph::new(Line::from(vec![
+        Span::styled("Press ", Style::default().fg(Color::DarkGray)),
+        Span::styled("Esc", Style::default().fg(Color::Yellow)),
+        Span::styled(" or ", Style::default().fg(Color::DarkGray)),
+        Span::styled("Enter", Style::default().fg(Color::Yellow)),
+        Span::styled(" to close", Style::default().fg(Color::DarkGray)),
+    ]))
+    .alignment(Alignment::Center);
+    frame.render_widget(hint, Rect::new(area.x, area.y + 1, area.width, 1));
+}
+
+/// Check if a point is inside a button area
+pub fn check_button_click(areas: &UpdateDialogAreas, x: u16, y: u16) -> Option<UpdateDialogButton> {
+    if let Some(area) = areas.update_button_area {
+        if x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height {
+            return Some(UpdateDialogButton::Update);
+        }
+    }
+    if let Some(area) = areas.later_button_area {
+        if x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height {
+            return Some(UpdateDialogButton::Later);
+        }
+    }
+    None
+}
+
+/// Check if a point is inside the popup area
+pub fn is_inside_popup(areas: &UpdateDialogAreas, x: u16, y: u16) -> bool {
+    if let Some(area) = areas.popup_area {
+        x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
+    } else {
+        false
+    }
+}

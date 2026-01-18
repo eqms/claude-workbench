@@ -26,6 +26,8 @@ use crate::ui::dialog::Dialog;
 use crate::ui::fuzzy_finder::FuzzyFinder;
 use crate::ui::menu::MenuBar;
 use crate::ui::settings::SettingsState;
+use crate::ui::update_dialog::{UpdateDialogAreas, UpdateDialogButton};
+use crate::update::{self, UpdateCheckResult, UpdateResult, UpdateState};
 
 pub struct App {
     pub config: Config,
@@ -65,6 +67,16 @@ pub struct App {
     pub git_remote: GitRemoteState,
     // Receiver for async git remote check results
     pub git_check_receiver: Option<std::sync::mpsc::Receiver<GitRemoteCheckResult>>,
+    // Self-update state
+    pub update_state: UpdateState,
+    // Receiver for async update check results
+    pub update_check_receiver: Option<std::sync::mpsc::Receiver<UpdateCheckResult>>,
+    // Receiver for async update results
+    pub update_receiver: Option<std::sync::mpsc::Receiver<UpdateResult>>,
+    // Update dialog button selection
+    pub update_dialog_button: UpdateDialogButton,
+    // Cached update dialog areas for mouse clicks
+    pub update_dialog_areas: UpdateDialogAreas,
 }
 
 impl App {
@@ -156,6 +168,11 @@ impl App {
             mouse_selection: MouseSelection::default(),
             git_remote: GitRemoteState::default(),
             git_check_receiver: None,
+            update_state: UpdateState::new(),
+            update_check_receiver: None,
+            update_receiver: None,
+            update_dialog_button: UpdateDialogButton::default(),
+            update_dialog_areas: UpdateDialogAreas::default(),
         };
 
         // Open wizard on first run
@@ -173,7 +190,76 @@ impl App {
             let _ = pty.write_input(b"\x0c");
         }
 
+        // Start background update check (non-blocking)
+        app.start_update_check();
+
         app
+    }
+
+    /// Start async update check
+    fn start_update_check(&mut self) {
+        self.update_state.start_check();
+        self.update_check_receiver = Some(update::check_for_update_async());
+    }
+
+    /// Poll for async update check results
+    fn poll_update_check(&mut self) {
+        if let Some(ref receiver) = self.update_check_receiver {
+            if let Ok(result) = receiver.try_recv() {
+                match result {
+                    UpdateCheckResult::UpToDate => {
+                        self.update_state.set_up_to_date();
+                    }
+                    UpdateCheckResult::UpdateAvailable { version } => {
+                        self.update_state.set_available(version);
+                    }
+                    UpdateCheckResult::Error(msg) => {
+                        // Silent fail on startup - don't show error dialog
+                        self.update_state.set_error(msg);
+                        self.update_state.show_dialog = false;
+                    }
+                }
+                self.update_check_receiver = None;
+            }
+        }
+    }
+
+    /// Poll for async update results
+    fn poll_update_result(&mut self) {
+        if let Some(ref receiver) = self.update_receiver {
+            if let Ok(result) = receiver.try_recv() {
+                match result {
+                    UpdateResult::Success { new_version, .. } => {
+                        // Set success state - the update dialog will show restart message
+                        self.update_state.updating = false;
+                        self.update_state.progress_message = Some(format!(
+                            "Updated to v{}!\nPlease restart the application.",
+                            new_version
+                        ));
+                        // Keep dialog open to show success
+                    }
+                    UpdateResult::Error(msg) => {
+                        self.update_state.set_error(msg.clone());
+                        self.update_state.updating = false;
+                        self.update_state.show_dialog = true;
+                    }
+                }
+                self.update_receiver = None;
+            }
+        }
+    }
+
+    /// Start the actual update process
+    fn start_update(&mut self) {
+        self.update_state.start_update();
+        self.update_receiver = Some(update::perform_update_async());
+    }
+
+    /// Trigger manual update check from settings menu
+    pub fn trigger_update_check(&mut self) {
+        self.update_state = UpdateState::new();
+        self.update_state.show_dialog = true;
+        self.start_update_check();
     }
 
     fn update_preview(&mut self) {
@@ -204,6 +290,10 @@ impl App {
             // Poll for async git remote check results
             self.poll_git_check();
 
+            // Poll for async update check and update results
+            self.poll_update_check();
+            self.poll_update_result();
+
             terminal.draw(|frame| self.draw(frame))?;
 
             if event::poll(std::time::Duration::from_millis(16))? {
@@ -233,6 +323,28 @@ impl App {
                                 crossterm::event::MouseButton::Left,
                             ) => {
                                 // Block all background interaction when any modal is open
+                                // Update dialog - handle before other modals
+                                if self.update_state.show_dialog {
+                                    use crate::ui::update_dialog;
+                                    if update_dialog::is_inside_popup(&self.update_dialog_areas, x, y) {
+                                        if let Some(button) = update_dialog::check_button_click(&self.update_dialog_areas, x, y) {
+                                            match button {
+                                                UpdateDialogButton::Update => {
+                                                    if !self.update_state.updating {
+                                                        self.start_update();
+                                                    }
+                                                }
+                                                UpdateDialogButton::Later => {
+                                                    self.update_state.close_dialog();
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        self.update_state.close_dialog();
+                                    }
+                                    continue;
+                                }
+
                                 // About dialog
                                 if self.about.visible {
                                     if let Some(popup) = self.about.popup_area {
@@ -893,6 +1005,33 @@ impl App {
                                     KeyCode::Down => self.fuzzy_finder.next(),
                                     KeyCode::Backspace => self.fuzzy_finder.pop_char(),
                                     KeyCode::Char(c) => self.fuzzy_finder.push_char(c),
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
+                            // Update dialog handling (high priority)
+                            if self.update_state.show_dialog {
+                                match key.code {
+                                    KeyCode::Esc => {
+                                        self.update_state.close_dialog();
+                                    }
+                                    KeyCode::Enter => {
+                                        if self.update_state.available_version.is_some() && !self.update_state.updating {
+                                            if self.update_dialog_button == UpdateDialogButton::Update {
+                                                self.start_update();
+                                            } else {
+                                                self.update_state.close_dialog();
+                                            }
+                                        } else {
+                                            self.update_state.close_dialog();
+                                        }
+                                    }
+                                    KeyCode::Tab | KeyCode::Left | KeyCode::Right => {
+                                        if self.update_state.available_version.is_some() && !self.update_state.updating {
+                                            self.update_dialog_button = self.update_dialog_button.toggle();
+                                        }
+                                    }
                                     _ => {}
                                 }
                                 continue;
@@ -1951,6 +2090,16 @@ impl App {
             ui::about::render(frame, area, &mut self.about);
         }
 
+        // Update dialog - render on top of most things
+        if self.update_state.show_dialog {
+            self.update_dialog_areas = ui::update_dialog::render(
+                frame,
+                area,
+                &self.update_state,
+                self.update_dialog_button,
+            );
+        }
+
         if self.menu.visible {
             ui::menu::render(frame, area, &self.menu);
         }
@@ -2492,11 +2641,14 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.settings.move_down();
             }
-            KeyCode::Enter => {
-                self.settings.toggle_or_select();
-            }
-            KeyCode::Char(' ') => {
-                self.settings.toggle_or_select();
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                // Check if "Check for Updates" is selected
+                if self.settings.is_check_updates_selected() {
+                    self.settings.close();
+                    self.trigger_update_check();
+                } else {
+                    self.settings.toggle_or_select();
+                }
             }
             KeyCode::Char('s') | KeyCode::Char('S') => {
                 // Save and close

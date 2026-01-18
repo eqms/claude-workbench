@@ -1,6 +1,6 @@
 [package]
 name = "claude-workbench"
-version = "0.26.1"
+version = "0.27.0"
 edition = "2021"
 
 [dependencies]
@@ -22,3 +22,8 @@ shell-escape = "0.1"
 regex = "1.10"
 lazy_static = "1.4"
 libc = "0.2"
+self_update = { version = "0.42", default-features = false, features = [
+    "archive-tar",
+    "compression-flate2",
+    "rustls"
+] }
