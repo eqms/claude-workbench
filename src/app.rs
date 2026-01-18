@@ -1066,6 +1066,19 @@ impl App {
                                 continue;
                             }
 
+                            // F11: Navigate to Claude settings directory (~/.claude)
+                            if key.code == KeyCode::F(11) {
+                                if let Some(home) = std::env::var_os("HOME") {
+                                    let claude_dir = std::path::PathBuf::from(home).join(".claude");
+                                    if claude_dir.exists() && claude_dir.is_dir() {
+                                        self.file_browser.current_dir = claude_dir;
+                                        self.file_browser.load_directory();
+                                        self.active_pane = PaneId::FileBrowser;
+                                    }
+                                }
+                                continue;
+                            }
+
                             // Context-specific shortcuts (only in non-terminal panes)
                             // '?' for help - only in FileBrowser or Preview (read-only)
                             if key.code == KeyCode::Char('?')

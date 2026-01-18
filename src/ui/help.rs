@@ -63,6 +63,10 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("About / License Info"),
         ]),
         Line::from(vec![
+            Span::styled("  F11          ", Style::default().fg(Color::Cyan)),
+            Span::raw("Claude Settings (~/.claude)"),
+        ]),
+        Line::from(vec![
             Span::styled("  F12          ", Style::default().fg(Color::Cyan)),
             Span::raw("Toggle this Help"),
         ]),
