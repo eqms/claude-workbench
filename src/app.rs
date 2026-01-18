@@ -1066,8 +1066,8 @@ impl App {
                                 continue;
                             }
 
-                            // F11: Navigate to Claude settings directory (~/.claude)
-                            if key.code == KeyCode::F(11) {
+                            // F7: Navigate to Claude settings directory (~/.claude)
+                            if key.code == KeyCode::F(7) {
                                 if let Some(home) = std::env::var_os("HOME") {
                                     let claude_dir = std::path::PathBuf::from(home).join(".claude");
                                     if claude_dir.exists() && claude_dir.is_dir() {
