@@ -53,6 +53,8 @@ pub struct UpdateState {
     pub show_dialog: bool,
     /// Progress message during update
     pub progress_message: Option<String>,
+    /// Whether this was a manual check (show errors) vs automatic (silent fail)
+    pub manual_check: bool,
 }
 
 impl UpdateState {

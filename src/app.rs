@@ -214,9 +214,11 @@ impl App {
                         self.update_state.set_available(version);
                     }
                     UpdateCheckResult::Error(msg) => {
-                        // Silent fail on startup - don't show error dialog
                         self.update_state.set_error(msg);
-                        self.update_state.show_dialog = false;
+                        // Show error dialog only for manual checks, silent fail on startup
+                        if !self.update_state.manual_check {
+                            self.update_state.show_dialog = false;
+                        }
                     }
                 }
                 self.update_check_receiver = None;
@@ -259,6 +261,7 @@ impl App {
     pub fn trigger_update_check(&mut self) {
         self.update_state = UpdateState::new();
         self.update_state.show_dialog = true;
+        self.update_state.manual_check = true; // Show errors for manual checks
         self.start_update_check();
     }
 
@@ -1266,11 +1269,12 @@ impl App {
                                 continue;
                             }
 
-                            // Ctrl+,: Open settings
+                            // Ctrl+, or Cmd+, (macOS): Open settings
                             if key.code == KeyCode::Char(',')
-                                && key
+                                && (key
                                     .modifiers
                                     .contains(crossterm::event::KeyModifiers::CONTROL)
+                                    || key.modifiers.contains(crossterm::event::KeyModifiers::META))
                             {
                                 self.settings.open(&self.config);
                                 continue;
