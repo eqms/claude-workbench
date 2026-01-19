@@ -326,8 +326,16 @@ impl App {
                                 // Update dialog - handle before other modals
                                 if self.update_state.show_dialog {
                                     use crate::ui::update_dialog;
-                                    if update_dialog::is_inside_popup(&self.update_dialog_areas, x, y) {
-                                        if let Some(button) = update_dialog::check_button_click(&self.update_dialog_areas, x, y) {
+                                    if update_dialog::is_inside_popup(
+                                        &self.update_dialog_areas,
+                                        x,
+                                        y,
+                                    ) {
+                                        if let Some(button) = update_dialog::check_button_click(
+                                            &self.update_dialog_areas,
+                                            x,
+                                            y,
+                                        ) {
                                             match button {
                                                 UpdateDialogButton::Update => {
                                                     if !self.update_state.updating {
@@ -1017,8 +1025,12 @@ impl App {
                                         self.update_state.close_dialog();
                                     }
                                     KeyCode::Enter => {
-                                        if self.update_state.available_version.is_some() && !self.update_state.updating {
-                                            if self.update_dialog_button == UpdateDialogButton::Update {
+                                        if self.update_state.available_version.is_some()
+                                            && !self.update_state.updating
+                                        {
+                                            if self.update_dialog_button
+                                                == UpdateDialogButton::Update
+                                            {
                                                 self.start_update();
                                             } else {
                                                 self.update_state.close_dialog();
@@ -1028,8 +1040,11 @@ impl App {
                                         }
                                     }
                                     KeyCode::Tab | KeyCode::Left | KeyCode::Right => {
-                                        if self.update_state.available_version.is_some() && !self.update_state.updating {
-                                            self.update_dialog_button = self.update_dialog_button.toggle();
+                                        if self.update_state.available_version.is_some()
+                                            && !self.update_state.updating
+                                        {
+                                            self.update_dialog_button =
+                                                self.update_dialog_button.toggle();
                                         }
                                     }
                                     _ => {}

@@ -5,7 +5,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::{
     buffer::Buffer,
-    widgets::{Block, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Paragraph, Widget, Wrap},
     Frame,
 };
 
@@ -33,23 +33,29 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
 
     // Check for Claude error - show red border if error
     let has_error = pane_id == PaneId::Claude && app.claude_error.is_some();
-    let border_style = if is_drop_target {
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD)
+    let (border_style, border_type) = if is_drop_target {
+        (
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+            BorderType::Double,
+        )
     } else if selection_active || mouse_selection_active {
-        Style::default().fg(Color::Yellow)
+        (Style::default().fg(Color::Yellow), BorderType::Double)
     } else if has_error {
-        Style::default().fg(Color::Red)
+        (Style::default().fg(Color::Red), BorderType::Rounded)
     } else if is_focused {
-        Style::default().fg(Color::Green)
+        (Style::default().fg(Color::Green), BorderType::Double)
     } else {
-        Style::default()
+        (Style::default(), BorderType::Rounded)
     };
 
     use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 
-    let block = Block::bordered().title(title).border_style(border_style);
+    let block = Block::bordered()
+        .title(title)
+        .border_style(border_style)
+        .border_type(border_type);
     let inner_area = block.inner(area);
 
     f.render_widget(block, area);

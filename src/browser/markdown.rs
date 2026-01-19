@@ -28,8 +28,9 @@ const HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
             pre { background: #2d2d2d; color: #e8e8e8; }
             pre code { color: #e8e8e8; }
             blockquote { border-color: #444; color: #aaa; }
-            th { background: #2d2d2d; color: #e8e8e8; }
-            th, td { border-color: #444; }
+            th { background: #3a3a3a; color: #ffffff; font-weight: 600; }
+            td { background: #2a2a2a; color: #e8e8e8; }
+            th, td { border-color: #555; }
             a { color: #6db3f2; }
             h1, h2 { border-color: #444; }
         }
@@ -69,11 +70,12 @@ const HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
             margin: 1em 0;
         }
         th, td {
-            border: 1px solid #ddd;
+            border: 1px solid #ccc;
             padding: 8px 12px;
             text-align: left;
         }
-        th { background: #f4f4f4; font-weight: 600; }
+        th { background: #e0e0e0; color: #1a1a1a; font-weight: 600; }
+        td { background: #fafafa; color: #333; }
         a { color: #0366d6; text-decoration: none; }
         a:hover { text-decoration: underline; }
         ul, ol { padding-left: 2em; }

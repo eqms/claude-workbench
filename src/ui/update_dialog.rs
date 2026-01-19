@@ -75,7 +75,11 @@ pub fn render(
 
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .title_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan));
 
@@ -134,7 +138,11 @@ fn render_updating(frame: &mut Frame, area: Rect, state: &UpdateState) {
     // Check if this is a success message (contains "restart")
     let is_success = message.contains("restart");
 
-    let color = if is_success { Color::Green } else { Color::Yellow };
+    let color = if is_success {
+        Color::Green
+    } else {
+        Color::Yellow
+    };
     let hint = if is_success {
         "Press Esc or Enter to close."
     } else {
@@ -148,10 +156,7 @@ fn render_updating(frame: &mut Frame, area: Rect, state: &UpdateState) {
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled(
-            hint,
-            Style::default().fg(Color::DarkGray),
-        )),
+        Line::from(Span::styled(hint, Style::default().fg(Color::DarkGray))),
     ])
     .alignment(Alignment::Center);
     frame.render_widget(content, area);
@@ -181,7 +186,9 @@ fn render_up_to_date(frame: &mut Frame, area: Rect) {
             Span::styled("Current Version: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 CURRENT_VERSION,
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(""),
@@ -199,16 +206,15 @@ fn render_update_available(frame: &mut Frame, area: Rect, new_version: &str) {
         Line::from(""),
         Line::from(vec![
             Span::styled("Current Version: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                CURRENT_VERSION,
-                Style::default().fg(Color::Yellow),
-            ),
+            Span::styled(CURRENT_VERSION, Style::default().fg(Color::Yellow)),
         ]),
         Line::from(vec![
             Span::styled("New Version:     ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 new_version,
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(""),

@@ -30,7 +30,10 @@ pub enum UpdateCheckResult {
 #[derive(Debug, Clone)]
 pub enum UpdateResult {
     /// Update completed successfully
-    Success { old_version: String, new_version: String },
+    Success {
+        old_version: String,
+        new_version: String,
+    },
     /// Update failed with error message
     Error(String),
 }

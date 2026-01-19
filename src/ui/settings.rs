@@ -268,7 +268,9 @@ impl SettingsState {
                 SettingsField::ClaudeHeight => self.claude_height.to_string(),
                 SettingsField::ClaudePath => self.claude_path.clone(),
                 SettingsField::LazygitPath => self.lazygit_path.clone(),
-                SettingsField::CheckForUpdates => unreachable!("CheckForUpdates is an action, not a field"),
+                SettingsField::CheckForUpdates => {
+                    unreachable!("CheckForUpdates is an action, not a field")
+                }
             };
             self.editing = Some(f);
         }
@@ -452,10 +454,7 @@ fn render_general(frame: &mut Frame, area: Rect, state: &SettingsState) {
             state.editing.as_ref() == Some(&SettingsField::AutoRefreshMs),
             &state.input_buffer,
         ),
-        format_action_setting(
-            "Check for Updates",
-            state.selected_idx == 4,
-        ),
+        format_action_setting("Check for Updates", state.selected_idx == 4),
     ];
 
     let list = create_settings_list(items);

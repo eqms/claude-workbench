@@ -3,7 +3,10 @@ use crate::types::{GitFileStatus, GitRepoInfo};
 use ratatui::{
     prelude::Rect,
     style::{Color, Modifier, Style},
-    widgets::{Block, List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{
+        Block, BorderType, List, ListItem, ListState, Scrollbar, ScrollbarOrientation,
+        ScrollbarState,
+    },
     Frame,
 };
 use std::collections::HashMap;
@@ -290,14 +293,17 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
         })
         .collect();
 
-    let border_style = if is_focused {
-        Style::default().fg(Color::Green)
+    let (border_style, border_type) = if is_focused {
+        (Style::default().fg(Color::Green), BorderType::Double)
     } else {
-        Style::default()
+        (Style::default(), BorderType::Rounded)
     };
 
     let title = format!(" {} ", state.current_dir.display());
-    let block = Block::bordered().title(title).border_style(border_style);
+    let block = Block::bordered()
+        .title(title)
+        .border_style(border_style)
+        .border_type(border_type);
 
     let list = List::new(items)
         .block(block)

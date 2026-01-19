@@ -3,7 +3,9 @@ use ratatui::{
     prelude::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
+    widgets::{
+        Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+    },
     Frame,
 };
 use std::fs;
@@ -665,11 +667,13 @@ pub fn render(
 ) {
     let title = build_title(state);
     let selection_active = selection_range.is_some();
-    let border_style = get_border_style(is_focused, state.mode, state.modified, selection_active);
+    let (border_style, border_type) =
+        get_border_style(is_focused, state.mode, state.modified, selection_active);
 
     let block = Block::bordered()
         .title(format!(" {} ", title))
-        .border_style(border_style);
+        .border_style(border_style)
+        .border_type(border_type);
 
     match state.mode {
         EditorMode::Edit => {
@@ -1279,15 +1283,19 @@ fn get_border_style(
     mode: EditorMode,
     modified: bool,
     selection_active: bool,
-) -> Style {
+) -> (Style, BorderType) {
     // Selection mode takes priority (yellow border like terminal panes)
     if selection_active {
-        return Style::default().fg(Color::Yellow);
+        return (Style::default().fg(Color::Yellow), BorderType::Double);
     }
     match (mode, modified, is_focused) {
-        (EditorMode::Edit, true, _) => Style::default().fg(Color::Yellow), // Edit + modified
-        (EditorMode::Edit, false, _) => Style::default().fg(Color::Cyan),  // Edit + saved
-        (_, _, true) => Style::default().fg(Color::Green),                 // Focused
-        _ => Style::default(),                                             // Default
+        // Edit + modified: Yellow + Double
+        (EditorMode::Edit, true, _) => (Style::default().fg(Color::Yellow), BorderType::Double),
+        // Edit + saved: Cyan + Double
+        (EditorMode::Edit, false, _) => (Style::default().fg(Color::Cyan), BorderType::Double),
+        // Focused (ReadOnly): Green + Double
+        (_, _, true) => (Style::default().fg(Color::Green), BorderType::Double),
+        // Default: no style + Rounded
+        _ => (Style::default(), BorderType::Rounded),
     }
 }
