@@ -16,15 +16,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux x64
+          # Linux x64 (ubuntu-22.04 for GLIBC 2.35 compatibility with Debian 12+)
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-22.04
             binary_name: claude-workbench
             asset_name: claude-workbench-linux-x64
 
-          # Linux ARM64 (cross-compiled)
+          # Linux ARM64 (cross-compiled, ubuntu-22.04 for GLIBC compatibility)
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-22.04
             binary_name: claude-workbench
             asset_name: claude-workbench-linux-arm64
             cross: true
