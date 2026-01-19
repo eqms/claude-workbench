@@ -573,7 +573,7 @@ fn render_about(frame: &mut Frame, area: Rect) {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from("  F1-F6: Switch panes"),
-        Line::from("  Ctrl+.: Open settings"),
+        Line::from("  F8: Open settings"),
         Line::from("  Ctrl+Q: Quit"),
     ];
 

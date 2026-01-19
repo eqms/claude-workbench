@@ -209,9 +209,25 @@ impl App {
                 match result {
                     UpdateCheckResult::UpToDate => {
                         self.update_state.set_up_to_date();
+                        // For manual checks, show "up to date" dialog
+                        if self.update_state.manual_check {
+                            self.update_state.show_dialog = true;
+                        }
                     }
                     UpdateCheckResult::UpdateAvailable { version } => {
                         self.update_state.set_available(version);
+                    }
+                    UpdateCheckResult::NoReleasesFound => {
+                        // No releases found - treat as up-to-date for auto checks
+                        // but show info for manual checks
+                        if self.update_state.manual_check {
+                            self.update_state.set_error(
+                                "No releases found for your platform.\nCheck GitHub for available downloads.".to_string()
+                            );
+                        } else {
+                            self.update_state.set_up_to_date();
+                            self.update_state.show_dialog = false;
+                        }
                     }
                     UpdateCheckResult::Error(msg) => {
                         self.update_state.set_error(msg);
@@ -1269,12 +1285,8 @@ impl App {
                                 continue;
                             }
 
-                            // Ctrl+. (period): Open settings
-                            if key.code == KeyCode::Char('.')
-                                && key
-                                    .modifiers
-                                    .contains(crossterm::event::KeyModifiers::CONTROL)
-                            {
+                            // F8: Open settings
+                            if key.code == KeyCode::F(8) {
                                 self.settings.open(&self.config);
                                 continue;
                             }

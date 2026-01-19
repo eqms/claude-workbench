@@ -22,6 +22,8 @@ pub enum UpdateCheckResult {
     UpToDate,
     /// A newer version is available
     UpdateAvailable { version: String },
+    /// No releases found (may indicate missing assets for this platform)
+    NoReleasesFound,
     /// Check failed with error message
     Error(String),
 }
@@ -131,7 +133,8 @@ pub fn check_for_update_sync() -> UpdateCheckResult {
                         UpdateCheckResult::UpdateAvailable { version: target }
                     }
                 }
-                None => UpdateCheckResult::UpToDate,
+                // None means no releases found (possibly no assets for this platform)
+                None => UpdateCheckResult::NoReleasesFound,
             }
         }
         Err(e) => UpdateCheckResult::Error(format!("{}", e)),

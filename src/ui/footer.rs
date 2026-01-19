@@ -22,7 +22,7 @@ pub enum FooterAction {
     FuzzyFind,     // ^P
     OpenFile,      // o
     OpenFinder,    // O
-    Settings,      // ^.
+    Settings,      // F8
     About,         // F10
     Help,          // F12
     Edit,          // E (Preview mode)
