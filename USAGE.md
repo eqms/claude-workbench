@@ -14,7 +14,6 @@
 |-----|--------|
 | Ctrl+Q | Quit |
 | Ctrl+P | Fuzzy Finder |
-| Ctrl+, | Settings |
 | Ctrl+Shift+W | Setup Wizard |
 | F1 | Focus File Browser |
 | F2 | Toggle Preview Pane |
@@ -22,6 +21,8 @@
 | F4 | Focus Claude Code |
 | F5 | Toggle LazyGit |
 | F6 | Toggle User Terminal |
+| F7 | Claude Settings (~/.claude) |
+| F8 | Settings |
 | F9 | File Menu |
 | F10 | About |
 | F12 | Help |
@@ -193,7 +194,6 @@ When copying to Claude, output is automatically filtered:
 |-------|--------|
 | Ctrl+Q | Beenden |
 | Ctrl+P | Fuzzy-Finder |
-| Ctrl+, | Einstellungen |
 | Ctrl+Shift+W | Setup-Assistent |
 | F1 | Dateibrowser fokussieren |
 | F2 | Vorschau-Bereich umschalten |
@@ -201,6 +201,8 @@ When copying to Claude, output is automatically filtered:
 | F4 | Claude Code fokussieren |
 | F5 | LazyGit umschalten |
 | F6 | Benutzer-Terminal umschalten |
+| F7 | Claude Einstellungen (~/.claude) |
+| F8 | Einstellungen |
 | F9 | Datei-Menü |
 | F10 | Über |
 | F12 | Hilfe |
