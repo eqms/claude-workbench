@@ -39,7 +39,7 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Fuzzy Find Files"),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+,       ", Style::default().fg(Color::Cyan)),
+            Span::styled("  Ctrl+.       ", Style::default().fg(Color::Cyan)),
             Span::raw("Open Settings Menu"),
         ]),
         Line::from(vec![

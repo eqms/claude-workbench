@@ -1269,12 +1269,11 @@ impl App {
                                 continue;
                             }
 
-                            // Ctrl+, or Cmd+, (macOS): Open settings
-                            if key.code == KeyCode::Char(',')
-                                && (key
+                            // Ctrl+. (period): Open settings
+                            if key.code == KeyCode::Char('.')
+                                && key
                                     .modifiers
                                     .contains(crossterm::event::KeyModifiers::CONTROL)
-                                    || key.modifiers.contains(crossterm::event::KeyModifiers::META))
                             {
                                 self.settings.open(&self.config);
                                 continue;
