@@ -1375,8 +1375,8 @@ impl App {
                                         self.active_pane = PaneId::Preview;
                                     }
                                 }
-                                // QUIT: Ctrl+Q
-                                KeyCode::Char('q')
+                                // QUIT: Ctrl+Q or Ctrl+C
+                                KeyCode::Char('q') | KeyCode::Char('c')
                                     if key
                                         .modifiers
                                         .contains(crossterm::event::KeyModifiers::CONTROL) =>

@@ -12,7 +12,7 @@
 #### Global (work everywhere, including terminals)
 | Key | Action |
 |-----|--------|
-| Ctrl+Q | Quit |
+| Ctrl+Q/C | Quit |
 | Ctrl+P | Fuzzy Finder |
 | Ctrl+Shift+W | Setup Wizard |
 | F1 | Focus File Browser |
@@ -192,7 +192,7 @@ When copying to Claude, output is automatically filtered:
 #### Global (funktionieren überall, auch in Terminals)
 | Taste | Aktion |
 |-------|--------|
-| Ctrl+Q | Beenden |
+| Ctrl+Q/C | Beenden |
 | Ctrl+P | Fuzzy-Finder |
 | Ctrl+Shift+W | Setup-Assistent |
 | F1 | Dateibrowser fokussieren |

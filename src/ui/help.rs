@@ -31,7 +31,7 @@ fn help_content() -> Vec<Line<'static>> {
         )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Ctrl+Q       ", Style::default().fg(Color::Cyan)),
+            Span::styled("  Ctrl+Q/C     ", Style::default().fg(Color::Cyan)),
             Span::raw("Quit Application"),
         ]),
         Line::from(vec![

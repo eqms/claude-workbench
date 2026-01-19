@@ -574,7 +574,7 @@ fn render_about(frame: &mut Frame, area: Rect) {
         )),
         Line::from("  F1-F6: Switch panes"),
         Line::from("  F8: Open settings"),
-        Line::from("  Ctrl+Q: Quit"),
+        Line::from("  Ctrl+Q/C: Quit"),
     ];
 
     let paragraph = Paragraph::new(text).alignment(Alignment::Center);
