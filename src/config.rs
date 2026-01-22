@@ -68,7 +68,7 @@ pub struct ClaudePrefix {
 }
 
 /// Claude-specific configuration
-#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ClaudeConfig {
     /// Startup prefixes shown in dialog
     #[serde(default)]
@@ -79,6 +79,16 @@ pub struct ClaudeConfig {
     /// Show permission mode selection dialog at startup (default: true)
     #[serde(default = "default_show_permission_dialog")]
     pub show_permission_dialog: bool,
+}
+
+impl Default for ClaudeConfig {
+    fn default() -> Self {
+        Self {
+            startup_prefixes: Vec::new(),
+            default_permission_mode: None,
+            show_permission_dialog: true, // Dialog is shown by default
+        }
+    }
 }
 
 fn default_show_permission_dialog() -> bool {

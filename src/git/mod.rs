@@ -47,9 +47,10 @@ pub fn get_current_branch(repo_root: &Path) -> Option<String> {
 fn parse_git_status(repo_root: &Path) -> HashMap<PathBuf, GitFileStatus> {
     let mut statuses = HashMap::new();
 
-    // Get tracked file changes (modified, staged, etc.)
+    // Get tracked file changes (modified, staged, etc.) and ignored files
+    // Using --ignored=matching to show only top-level ignored patterns (performance)
     let output = Command::new("git")
-        .args(["status", "--porcelain", "-uall"])
+        .args(["status", "--porcelain", "-uall", "--ignored=matching"])
         .current_dir(repo_root)
         .output();
 
