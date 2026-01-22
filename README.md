@@ -1,5 +1,9 @@
 # Claude Workbench
 
+<p align="center">
+  <img src="docs/Claude_Workbench.png" alt="Claude Workbench - Rust-based TUI Multiplexer for AI-Assisted Development" width="800">
+</p>
+
 **[English](#english) | [Deutsch](#deutsch)**
 
 ---
