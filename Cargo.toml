@@ -1,6 +1,6 @@
 [package]
 name = "claude-workbench"
-version = "0.34.0"
+version = "0.35.0"
 edition = "2021"
 
 [dependencies]
@@ -19,6 +19,7 @@ syntect = { version = "5.2", default-features = false, features = ["default-synt
 tui-markdown = "0.3"
 pulldown-cmark = "0.10"
 shell-escape = "0.1"
+arboard = "3.4"  # Cross-platform clipboard
 regex = "1.10"
 lazy_static = "1.4"
 libc = "0.2"

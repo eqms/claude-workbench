@@ -20,8 +20,8 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 | **File Browser** | F1 | Navigate directories, git status integration, file operations (F9) |
 | **Preview** | F2 | Syntax highlighting (500+ languages), Markdown rendering, built-in editor |
 | **Claude Code** | F4 | Embedded Claude CLI terminal with startup prefixes |
-| **LazyGit** | F5 | Integrated Git TUI for version control |
-| **Terminal** | F6 | General-purpose shell |
+| **LazyGit** | F5 | Integrated Git TUI (restarts in current directory) |
+| **Terminal** | F6 | General-purpose shell (syncs to current directory) |
 
 **Highlights:**
 - Full PTY emulation with 256-color support and 1000-line scrollback
@@ -57,6 +57,7 @@ cargo build --release
 | Ctrl+Q | Quit |
 | E | Edit file (in Preview) |
 | Ctrl+S | Selection mode (in Terminal/Preview) |
+| Ctrl+C | Copy selection to System Clipboard |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
@@ -124,8 +125,8 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer für KI-unterstütz
 | **Dateibrowser** | F1 | Verzeichnisnavigation, Git-Status-Integration, Dateioperationen (F9) |
 | **Vorschau** | F2 | Syntax-Hervorhebung (500+ Sprachen), Markdown-Rendering, Editor |
 | **Claude Code** | F4 | Eingebettetes Claude CLI Terminal mit Startup-Präfixen |
-| **LazyGit** | F5 | Integrierte Git-TUI für Versionskontrolle |
-| **Terminal** | F6 | Allgemeines Shell-Terminal |
+| **LazyGit** | F5 | Integrierte Git-TUI (startet im aktuellen Verzeichnis neu) |
+| **Terminal** | F6 | Allgemeines Shell-Terminal (wechselt ins aktuelle Verzeichnis) |
 
 **Highlights:**
 - Volle PTY-Emulation mit 256-Farben und 1000 Zeilen Scrollback
@@ -161,6 +162,7 @@ cargo build --release
 | Ctrl+Q | Beenden |
 | E | Datei bearbeiten (in Vorschau) |
 | Ctrl+S | Auswahlmodus (in Terminal/Vorschau) |
+| Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
 

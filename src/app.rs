@@ -1487,17 +1487,27 @@ impl App {
                                     }
                                 }
                                 KeyCode::F(5) => {
+                                    let was_hidden = !self.show_lazygit;
                                     self.show_lazygit = !self.show_lazygit;
                                     if self.show_lazygit {
                                         self.active_pane = PaneId::LazyGit;
+                                        // Restart LazyGit in current directory when showing
+                                        if was_hidden {
+                                            self.restart_lazygit_in_current_dir();
+                                        }
                                     } else if self.active_pane == PaneId::LazyGit {
                                         self.active_pane = PaneId::Preview;
                                     }
                                 }
                                 KeyCode::F(6) => {
+                                    let was_hidden = !self.show_terminal;
                                     self.show_terminal = !self.show_terminal;
                                     if self.show_terminal {
                                         self.active_pane = PaneId::Terminal;
+                                        // Sync directory when showing terminal
+                                        if was_hidden {
+                                            self.sync_terminal_to_current_dir(PaneId::Terminal);
+                                        }
                                     } else if self.active_pane == PaneId::Terminal {
                                         self.active_pane = PaneId::Preview;
                                     }
@@ -1949,6 +1959,19 @@ impl App {
                                                             self.terminal_selection.clear();
                                                             continue;
                                                         }
+                                                        // Ctrl+C / Cmd+C: Copy selection to system clipboard
+                                                        KeyCode::Char('c')
+                                                            if key
+                                                                .modifiers
+                                                                .contains(KeyModifiers::CONTROL)
+                                                                || key
+                                                                    .modifiers
+                                                                    .contains(KeyModifiers::SUPER) =>
+                                                        {
+                                                            self.copy_selection_to_clipboard();
+                                                            self.terminal_selection.clear();
+                                                            continue;
+                                                        }
                                                         KeyCode::Esc => {
                                                             self.terminal_selection.clear();
                                                             continue;
@@ -2060,12 +2083,25 @@ impl App {
                                                         self.terminal_selection.clear();
                                                         continue;
                                                     }
+                                                    // Ctrl+C / Cmd+C: Copy selection to system clipboard
+                                                    KeyCode::Char('c')
+                                                        if key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL)
+                                                            || key
+                                                                .modifiers
+                                                                .contains(KeyModifiers::SUPER) =>
+                                                    {
+                                                        self.copy_selection_to_clipboard();
+                                                        self.terminal_selection.clear();
+                                                        continue;
+                                                    }
                                                     KeyCode::Esc => {
                                                         self.terminal_selection.clear();
                                                         continue;
                                                     }
                                                     _ => {
-                                                        // Let other keys (like Ctrl+C) pass through to PTY
+                                                        // Let other keys pass through to PTY
                                                     }
                                                 }
                                             }
@@ -2319,6 +2355,40 @@ impl App {
         // Only sync to Terminal, not Claude (Claude should keep its initial directory)
         if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
             let _ = pty.write_input(cmd.as_bytes());
+        }
+    }
+
+    /// Send cd command to a specific terminal pane
+    fn sync_terminal_to_current_dir(&mut self, pane: PaneId) {
+        let path_str = self.file_browser.current_dir.to_string_lossy();
+        let escaped = escape(Cow::Borrowed(&path_str));
+        let cmd = format!("cd {}\r", escaped);
+
+        if let Some(pty) = self.terminals.get_mut(&pane) {
+            let _ = pty.write_input(cmd.as_bytes());
+        }
+    }
+
+    /// Restart LazyGit PTY in current directory
+    fn restart_lazygit_in_current_dir(&mut self) {
+        let cwd = self.file_browser.current_dir.clone();
+        // Use default size, will be resized on first draw
+        let rows = 24;
+        let cols = 80;
+
+        // Get lazygit command from config
+        let lazygit_cmd = if self.config.pty.lazygit_command.is_empty() {
+            vec!["lazygit".to_string()]
+        } else {
+            self.config.pty.lazygit_command.clone()
+        };
+
+        // Remove old PTY
+        self.terminals.remove(&PaneId::LazyGit);
+
+        // Create new PTY in current directory
+        if let Ok(pty) = PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
+            self.terminals.insert(PaneId::LazyGit, pty);
         }
     }
 
@@ -2961,6 +3031,43 @@ impl App {
         // Send to Claude PTY
         if let Some(claude_pty) = self.terminals.get_mut(&PaneId::Claude) {
             let _ = claude_pty.write_input(formatted.as_bytes());
+        }
+    }
+
+    /// Copy selected lines to system clipboard (from terminal or preview)
+    fn copy_selection_to_clipboard(&mut self) {
+        let Some((start, end)) = self.terminal_selection.line_range() else {
+            return;
+        };
+
+        let Some(source_pane) = self.terminal_selection.source_pane else {
+            return;
+        };
+
+        // Extract lines from source (terminal or preview)
+        let lines = if source_pane == PaneId::Preview {
+            // Extract lines from preview content
+            let content_lines: Vec<String> =
+                self.preview.content.lines().map(String::from).collect();
+            if start > content_lines.len() || end > content_lines.len() {
+                return;
+            }
+            content_lines[start..=end.min(content_lines.len().saturating_sub(1))].to_vec()
+        } else if let Some(pty) = self.terminals.get(&source_pane) {
+            pty.extract_lines(start, end)
+        } else {
+            return;
+        };
+
+        if lines.is_empty() {
+            return;
+        }
+
+        // Join lines and copy to system clipboard
+        let text = lines.join("\n");
+
+        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+            let _ = clipboard.set_text(text);
         }
     }
 

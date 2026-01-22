@@ -114,11 +114,11 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  F5           ", Style::default().fg(Color::Cyan)),
-            Span::raw("LazyGit (PTY)"),
+            Span::raw("LazyGit (PTY, restarts in current dir)"),
         ]),
         Line::from(vec![
             Span::styled("  F6           ", Style::default().fg(Color::Cyan)),
-            Span::raw("User Terminal (PTY)"),
+            Span::raw("User Terminal (PTY, syncs to current dir)"),
         ]),
         Line::from(""),
         // File Browser
@@ -428,7 +428,13 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from("━".repeat(40)),
         Line::from(""),
         Line::from(Span::styled(
-            "Select text from Terminal or Preview and copy to Claude.",
+            "Select text from Terminal or Preview and copy to",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )),
+        Line::from(Span::styled(
+            "Claude (Enter/y) or System Clipboard (Ctrl+C).",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
@@ -461,6 +467,10 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled("  Enter / y    ", Style::default().fg(Color::Green)),
             Span::raw("Copy selection to Claude"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+C       ", Style::default().fg(Color::Green)),
+            Span::raw("Copy selection to System Clipboard"),
         ]),
         Line::from(vec![
             Span::styled("  Esc          ", Style::default().fg(Color::Green)),

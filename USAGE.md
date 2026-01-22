@@ -19,8 +19,8 @@
 | F2 | Toggle Preview Pane |
 | F3 | Refresh File Browser |
 | F4 | Focus Claude Code |
-| F5 | Toggle LazyGit |
-| F6 | Toggle User Terminal |
+| F5 | Toggle LazyGit (restarts in current directory) |
+| F6 | Toggle User Terminal (syncs to current directory) |
 | F7 | Claude Settings (~/.claude) |
 | F8 | Settings |
 | F9 | File Menu |
@@ -101,6 +101,7 @@
 | Shift+Up/Down | Adjust by 5 lines |
 | g / G | Jump to buffer start/end |
 | Enter / y | Copy to Claude |
+| Ctrl+C | Copy to System Clipboard |
 | Esc | Cancel |
 
 #### Dialog Input Fields
@@ -154,13 +155,13 @@ Open files in external applications:
 2. Use j/k or arrows to adjust selection
 3. Shift+Up/Down for 5-line jumps
 4. g/G to jump to start/end of buffer
-5. Enter or y to copy to Claude
+5. Enter or y to copy to Claude, Ctrl+C to copy to System Clipboard
 6. Esc to cancel
 
 #### Mouse Selection
 1. Alt+Click and drag to select lines
 2. Release to enter selection mode
-3. Enter or y to copy to Claude
+3. Enter or y to copy to Claude, Ctrl+C to copy to System Clipboard
 
 **Note:** Regular click only focuses pane (no selection).
 
@@ -199,8 +200,8 @@ When copying to Claude, output is automatically filtered:
 | F2 | Vorschau-Bereich umschalten |
 | F3 | Dateibrowser aktualisieren |
 | F4 | Claude Code fokussieren |
-| F5 | LazyGit umschalten |
-| F6 | Benutzer-Terminal umschalten |
+| F5 | LazyGit umschalten (startet im aktuellen Verzeichnis neu) |
+| F6 | Benutzer-Terminal umschalten (wechselt ins aktuelle Verzeichnis) |
 | F7 | Claude Einstellungen (~/.claude) |
 | F8 | Einstellungen |
 | F9 | Datei-Menü |
@@ -281,6 +282,7 @@ When copying to Claude, output is automatically filtered:
 | Shift+Up/Down | Um 5 Zeilen anpassen |
 | g / G | An Buffer-Anfang/-Ende springen |
 | Enter / y | An Claude kopieren |
+| Ctrl+C | Ins System-Clipboard kopieren |
 | Esc | Abbrechen |
 
 #### Dialog-Eingabefelder
@@ -334,13 +336,13 @@ Dateien in externen Anwendungen öffnen:
 2. j/k oder Pfeiltasten zur Anpassung der Auswahl
 3. Shift+Up/Down für 5-Zeilen-Sprünge
 4. g/G zum Springen an Anfang/Ende des Buffers
-5. Enter oder y zum Kopieren an Claude
+5. Enter oder y zum Kopieren an Claude, Ctrl+C ins System-Clipboard
 6. Esc zum Abbrechen
 
 #### Maus-Auswahl
 1. Alt+Klicken und Ziehen um Zeilen auszuwählen
 2. Loslassen zum Betreten des Auswahlmodus
-3. Enter oder y zum Kopieren an Claude
+3. Enter oder y zum Kopieren an Claude, Ctrl+C ins System-Clipboard
 
 **Hinweis:** Normaler Klick fokussiert nur den Bereich (keine Auswahl).
 
