@@ -1,0 +1,10 @@
+# claude-workbench | Rust TUI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+▸ Run:       cargo run
+▸ Build:     cargo build --release
+▸ Test:      cargo test
+▸ Lint:      cargo clippy
+▸ Format:    cargo fmt
+▸ Clean:     cargo clean
+▸ Release:   target/release/claude-workbench
+▸ Docs:      USAGE.md | CLAUDE.md
