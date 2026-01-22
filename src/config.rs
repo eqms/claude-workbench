@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+use crate::types::ClaudePermissionMode;
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -71,6 +73,16 @@ pub struct ClaudeConfig {
     /// Startup prefixes shown in dialog
     #[serde(default)]
     pub startup_prefixes: Vec<ClaudePrefix>,
+    /// Default permission mode (if set, skips the dialog)
+    #[serde(default)]
+    pub default_permission_mode: Option<ClaudePermissionMode>,
+    /// Show permission mode selection dialog at startup (default: true)
+    #[serde(default = "default_show_permission_dialog")]
+    pub show_permission_dialog: bool,
+}
+
+fn default_show_permission_dialog() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

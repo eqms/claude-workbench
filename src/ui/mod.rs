@@ -8,6 +8,7 @@ pub mod fuzzy_finder;
 pub mod help;
 pub mod layout;
 pub mod menu;
+pub mod permission_mode;
 pub mod preview;
 pub mod settings;
 pub mod syntax;

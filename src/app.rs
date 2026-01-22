@@ -7,8 +7,8 @@ use crate::config::Config;
 use crate::session::SessionState;
 use crate::terminal::PseudoTerminal;
 use crate::types::{
-    DragState, EditorMode, GitRemoteCheckResult, GitRemoteState, HelpState, MouseSelection, PaneId,
-    SearchMode, TerminalSelection,
+    ClaudePermissionMode, DragState, EditorMode, GitRemoteCheckResult, GitRemoteState, HelpState,
+    MouseSelection, PaneId, SearchMode, TerminalSelection,
 };
 use crate::ui;
 use crate::ui::file_browser::FileBrowserState;
@@ -54,6 +54,12 @@ pub struct App {
     pub claude_command_used: String,
     // Startup prefix dialog
     pub claude_startup: ui::claude_startup::ClaudeStartupState,
+    // Permission mode selection dialog
+    pub permission_mode_dialog: ui::permission_mode::PermissionModeState,
+    // Selected Claude permission mode
+    pub claude_permission_mode: ClaudePermissionMode,
+    // Whether Claude PTY is pending (waiting for permission mode selection)
+    pub claude_pty_pending: bool,
     // Double-click tracking
     last_click_time: std::time::Instant,
     last_click_idx: Option<usize>,
@@ -89,27 +95,42 @@ impl App {
 
         let mut terminals = HashMap::new();
         let mut claude_error: Option<String> = None;
+        let mut claude_pty_pending = false;
+        let mut permission_mode_dialog = ui::permission_mode::PermissionModeState::default();
+        let mut claude_permission_mode = ClaudePermissionMode::Default;
 
-        // 1. Claude Pane - uses shell from pty config (same as terminal)
-        // User starts claude manually when ready
-        let claude_cmd = if config.pty.claude_command.is_empty() {
-            // Default: use the same shell as Terminal pane
-            let mut cmd = vec![config.terminal.shell_path.clone()];
-            cmd.extend(config.terminal.shell_args.clone());
-            cmd
+        // Determine if we should show permission mode dialog
+        let should_show_permission_dialog = config.claude.show_permission_dialog
+            && config.claude.default_permission_mode.is_none();
+
+        // 1. Claude Pane - delayed init if permission dialog should be shown
+        let claude_command_str;
+        if should_show_permission_dialog {
+            // Delay Claude PTY creation until permission mode is selected
+            claude_pty_pending = true;
+            permission_mode_dialog.open();
+            claude_command_str = String::new();
         } else {
-            config.pty.claude_command.clone()
-        };
-        let claude_command_str = claude_cmd.join(" ");
-        match PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
-            Ok(pty) => {
-                terminals.insert(PaneId::Claude, pty);
-            }
-            Err(e) => {
-                claude_error = Some(format!(
-                    "Failed to start shell\n\nCommand: {}\n\nError: {}",
-                    claude_command_str, e
-                ));
+            // Use configured default permission mode or Default
+            claude_permission_mode = config
+                .claude
+                .default_permission_mode
+                .unwrap_or(ClaudePermissionMode::Default);
+
+            // Build Claude command with permission mode
+            let claude_cmd = Self::build_claude_command(&config, claude_permission_mode);
+            claude_command_str = claude_cmd.join(" ");
+
+            match PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
+                Ok(pty) => {
+                    terminals.insert(PaneId::Claude, pty);
+                }
+                Err(e) => {
+                    claude_error = Some(format!(
+                        "Failed to start shell\n\nCommand: {}\n\nError: {}",
+                        claude_command_str, e
+                    ));
+                }
             }
         }
 
@@ -143,7 +164,7 @@ impl App {
             session,
             should_quit: false,
             terminals,
-            active_pane: PaneId::FileBrowser,
+            active_pane: PaneId::Claude,
             file_browser,
             preview: PreviewState::new(),
             help: HelpState::default(),
@@ -161,6 +182,9 @@ impl App {
             claude_error,
             claude_command_used: claude_command_str,
             claude_startup: ui::claude_startup::ClaudeStartupState::default(),
+            permission_mode_dialog,
+            claude_permission_mode,
+            claude_pty_pending,
             last_click_time: std::time::Instant::now(),
             last_click_idx: None,
             terminal_selection: TerminalSelection::default(),
@@ -271,6 +295,62 @@ impl App {
     fn start_update(&mut self) {
         self.update_state.start_update();
         self.update_receiver = Some(update::perform_update_async());
+    }
+
+    /// Build Claude command with permission mode flags
+    fn build_claude_command(config: &Config, mode: ClaudePermissionMode) -> Vec<String> {
+        let mut cmd = if config.pty.claude_command.is_empty() {
+            // Default: use the same shell as Terminal pane
+            let mut shell_cmd = vec![config.terminal.shell_path.clone()];
+            shell_cmd.extend(config.terminal.shell_args.clone());
+            shell_cmd
+        } else {
+            config.pty.claude_command.clone()
+        };
+
+        // Only add permission flags if using claude command (not shell)
+        if !config.pty.claude_command.is_empty() {
+            if mode.is_yolo() {
+                // YOLO mode: --dangerously-skip-permissions flag
+                if !cmd.iter().any(|a| a.contains("--dangerously-skip-permissions")) {
+                    cmd.push("--dangerously-skip-permissions".to_string());
+                }
+            } else if let Some(flag_value) = mode.cli_flag() {
+                // Normal modes: --permission-mode flag
+                if !cmd.iter().any(|a| a.contains("--permission-mode")) {
+                    cmd.push("--permission-mode".to_string());
+                    cmd.push(flag_value.to_string());
+                }
+            }
+        }
+
+        cmd
+    }
+
+    /// Initialize Claude PTY with the selected permission mode
+    fn init_claude_pty(&mut self, mode: ClaudePermissionMode) {
+        self.claude_permission_mode = mode;
+        self.claude_pty_pending = false;
+
+        let claude_cmd = Self::build_claude_command(&self.config, mode);
+        self.claude_command_used = claude_cmd.join(" ");
+
+        let cwd = self.file_browser.current_dir.clone();
+        let rows = 24;
+        let cols = 80;
+
+        match PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
+            Ok(pty) => {
+                self.terminals.insert(PaneId::Claude, pty);
+                self.claude_error = None;
+            }
+            Err(e) => {
+                self.claude_error = Some(format!(
+                    "Failed to start shell\n\nCommand: {}\n\nError: {}",
+                    self.claude_command_used, e
+                ));
+            }
+        }
     }
 
     /// Trigger manual update check from settings menu
@@ -421,6 +501,17 @@ impl App {
                                 // Fuzzy finder - click outside closes it
                                 if self.fuzzy_finder.visible {
                                     self.fuzzy_finder.close();
+                                    continue;
+                                }
+
+                                // Permission mode dialog - click outside uses default mode
+                                if self.permission_mode_dialog.visible {
+                                    let mode = ClaudePermissionMode::Default;
+                                    self.permission_mode_dialog.close();
+                                    if self.claude_pty_pending {
+                                        self.init_claude_pty(mode);
+                                    }
+                                    self.active_pane = PaneId::Claude;
                                     continue;
                                 }
 
@@ -811,6 +902,7 @@ impl App {
                                     || self.settings.visible
                                     || self.dialog.is_active()
                                     || self.fuzzy_finder.visible
+                                    || self.permission_mode_dialog.visible
                                     || self.claude_startup.visible
                                     || self.wizard.visible
                                     || self.menu.visible
@@ -834,6 +926,7 @@ impl App {
                                     || self.settings.visible
                                     || self.dialog.is_active()
                                     || self.fuzzy_finder.visible
+                                    || self.permission_mode_dialog.visible
                                     || self.claude_startup.visible
                                     || self.wizard.visible
                                     || self.menu.visible
@@ -895,6 +988,7 @@ impl App {
                                 if self.settings.visible
                                     || self.dialog.is_active()
                                     || self.fuzzy_finder.visible
+                                    || self.permission_mode_dialog.visible
                                     || self.claude_startup.visible
                                     || self.wizard.visible
                                     || self.menu.visible
@@ -953,6 +1047,7 @@ impl App {
                                 if self.settings.visible
                                     || self.dialog.is_active()
                                     || self.fuzzy_finder.visible
+                                    || self.permission_mode_dialog.visible
                                     || self.claude_startup.visible
                                     || self.wizard.visible
                                     || self.menu.visible
@@ -1302,6 +1397,38 @@ impl App {
                                 continue;
                             }
 
+                            // Permission mode dialog handling (high priority - before Claude startup)
+                            if self.permission_mode_dialog.visible {
+                                match key.code {
+                                    KeyCode::Esc => {
+                                        // Cancel: use default mode
+                                        let mode = ClaudePermissionMode::Default;
+                                        self.permission_mode_dialog.close();
+                                        if self.claude_pty_pending {
+                                            self.init_claude_pty(mode);
+                                        }
+                                        self.active_pane = PaneId::Claude;
+                                    }
+                                    KeyCode::Enter => {
+                                        // Confirm selected mode
+                                        let mode = self.permission_mode_dialog.selected_mode();
+                                        self.permission_mode_dialog.confirm();
+                                        if self.claude_pty_pending {
+                                            self.init_claude_pty(mode);
+                                        }
+                                        self.active_pane = PaneId::Claude;
+                                    }
+                                    KeyCode::Up | KeyCode::Char('k') => {
+                                        self.permission_mode_dialog.prev()
+                                    }
+                                    KeyCode::Down | KeyCode::Char('j') => {
+                                        self.permission_mode_dialog.next()
+                                    }
+                                    _ => {}
+                                }
+                                continue;
+                            }
+
                             // Claude startup dialog handling (high priority)
                             if self.claude_startup.visible {
                                 match key.code {
@@ -1451,6 +1578,14 @@ impl App {
                                                         !self.file_browser.show_hidden;
                                                     self.file_browser.refresh();
                                                     self.update_preview();
+                                                }
+                                                // Add selected file/folder to .gitignore
+                                                KeyCode::Char('i') => {
+                                                    if let Some(path) =
+                                                        self.file_browser.selected_file()
+                                                    {
+                                                        self.add_to_gitignore(&path);
+                                                    }
                                                 }
                                                 _ => {}
                                             }
@@ -2154,6 +2289,11 @@ impl App {
             ui::claude_startup::render(frame, area, &self.claude_startup);
         }
 
+        // Permission mode dialog (render on top, before drag ghost)
+        if self.permission_mode_dialog.visible {
+            ui::permission_mode::render(frame, area, &self.permission_mode_dialog);
+        }
+
         // Render drag ghost on top of everything
         ui::drag_ghost::render(frame, &self.drag_state);
     }
@@ -2209,6 +2349,81 @@ impl App {
 
         // Update last repo
         self.git_remote.last_repo_root = current_repo;
+    }
+
+    /// Add selected file/folder to .gitignore and open it in editor
+    fn add_to_gitignore(&mut self, path: &std::path::Path) {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+
+        // 1. Find .gitignore path (in Git root or current dir)
+        let gitignore_path = if let Some(repo_root) = &self.file_browser.repo_root {
+            repo_root.join(".gitignore")
+        } else {
+            self.file_browser.current_dir.join(".gitignore")
+        };
+
+        // 2. Compute relative path from repo root (or just filename)
+        let relative_path = if let Some(repo_root) = &self.file_browser.repo_root {
+            path.strip_prefix(repo_root)
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| {
+                    path.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                })
+        } else {
+            path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default()
+        };
+
+        // Skip if empty
+        if relative_path.is_empty() {
+            return;
+        }
+
+        // 3. Append entry to .gitignore
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&gitignore_path)
+        {
+            // Add newline before entry if file exists and doesn't end with newline
+            if gitignore_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&gitignore_path) {
+                    if !content.is_empty() && !content.ends_with('\n') {
+                        let _ = writeln!(file);
+                    }
+                }
+            }
+
+            // Add the path (with trailing slash for directories)
+            if path.is_dir() {
+                let _ = writeln!(file, "{}/", relative_path);
+            } else {
+                let _ = writeln!(file, "{}", relative_path);
+            }
+        }
+
+        // 4. Open .gitignore in preview and enter edit mode
+        self.preview.load_file(gitignore_path, &self.syntax_manager);
+        self.preview.enter_edit_mode();
+        self.active_pane = PaneId::Preview;
+
+        // 5. Scroll to bottom to show new entry
+        if let Some(editor) = &mut self.preview.editor {
+            let line_count = editor.lines().len();
+            if line_count > 0 {
+                editor.move_cursor(tui_textarea::CursorMove::Jump(
+                    (line_count - 1) as u16,
+                    0,
+                ));
+            }
+        }
+
+        // 6. Refresh file browser to update git status
+        self.file_browser.refresh();
     }
 
     /// Poll for git remote check results and show dialog if needed

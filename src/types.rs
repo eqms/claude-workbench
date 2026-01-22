@@ -1,5 +1,67 @@
 use serde::{Deserialize, Serialize};
 
+/// Claude Code permission mode for controlling tool access
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ClaudePermissionMode {
+    #[default]
+    Default,
+    AcceptEdits,
+    Plan,
+    BypassPermissions,
+    DangerouslySkipPermissions, // YOLO-Mode
+}
+
+impl ClaudePermissionMode {
+    /// Get the CLI flag value for --permission-mode (None for YOLO which uses separate flag)
+    pub fn cli_flag(&self) -> Option<&'static str> {
+        match self {
+            Self::DangerouslySkipPermissions => None,
+            Self::Default => Some("default"),
+            Self::AcceptEdits => Some("acceptEdits"),
+            Self::Plan => Some("plan"),
+            Self::BypassPermissions => Some("bypassPermissions"),
+        }
+    }
+
+    /// Check if this is YOLO mode (uses --dangerously-skip-permissions flag)
+    pub fn is_yolo(&self) -> bool {
+        matches!(self, Self::DangerouslySkipPermissions)
+    }
+
+    /// Get display name for the mode
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::AcceptEdits => "acceptEdits",
+            Self::Plan => "plan",
+            Self::BypassPermissions => "bypassPermissions",
+            Self::DangerouslySkipPermissions => "dangerouslySkip",
+        }
+    }
+
+    /// Get German description for the mode
+    pub fn description_de(&self) -> &'static str {
+        match self {
+            Self::Default => "Standard - fragt bei jeder Tool-Nutzung",
+            Self::AcceptEdits => "Akzeptiert Datei-Edits automatisch",
+            Self::Plan => "Nur-Lesen-Modus, keine Änderungen",
+            Self::BypassPermissions => "Voller Zugriff ohne Nachfragen",
+            Self::DangerouslySkipPermissions => "⚠️ YOLO - Alle Sicherheitsabfragen aus!",
+        }
+    }
+
+    /// Get all available modes
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::Default,
+            Self::AcceptEdits,
+            Self::Plan,
+            Self::BypassPermissions,
+            Self::DangerouslySkipPermissions,
+        ]
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EditorMode {
     #[default]

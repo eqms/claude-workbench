@@ -158,6 +158,10 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Toggle hidden files"),
         ]),
         Line::from(vec![
+            Span::styled("  i            ", Style::default().fg(Color::Cyan)),
+            Span::raw("Add to .gitignore"),
+        ]),
+        Line::from(vec![
             Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
             Span::raw("Refresh file list"),
         ]),
