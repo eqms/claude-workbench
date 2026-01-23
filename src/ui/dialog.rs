@@ -507,7 +507,7 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
             }
         }
         DialogType::Confirm { title, message, .. } => {
-            let width = 50u16.min(area.width.saturating_sub(4));
+            let width = 70u16.min(area.width.saturating_sub(4));
             let height = 7u16; // Slightly taller for better spacing
             let x = area.x + (area.width.saturating_sub(width)) / 2;
             let y = area.y + (area.height.saturating_sub(height)) / 2;

@@ -87,10 +87,6 @@ fn help_content() -> Vec<Line<'static>> {
             Span::styled("  ?            ", Style::default().fg(Color::Cyan)),
             Span::raw("Toggle Help (not in terminals)"),
         ]),
-        Line::from(vec![
-            Span::styled("  i            ", Style::default().fg(Color::Cyan)),
-            Span::raw("About (FileBrowser only)"),
-        ]),
         Line::from(""),
         // Navigation/Panes
         Line::from(Span::styled(
@@ -158,8 +154,8 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Toggle hidden files"),
         ]),
         Line::from(vec![
-            Span::styled("  i            ", Style::default().fg(Color::Cyan)),
-            Span::raw("Add to .gitignore"),
+            Span::styled("  F9 → i       ", Style::default().fg(Color::Cyan)),
+            Span::raw("Add to .gitignore (via File Menu)"),
         ]),
         Line::from(vec![
             Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
@@ -532,6 +528,87 @@ fn help_content() -> Vec<Line<'static>> {
             "Footer: Shows shortcuts, date/time, version.",
             Style::default().fg(Color::DarkGray),
         )),
+        Line::from(""),
+        Line::from("━".repeat(40)),
+        Line::from(""),
+        // Open Source Components
+        Line::from(Span::styled(
+            "Open Source Components",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ratatui       ", Style::default().fg(Color::Cyan)),
+            Span::styled("0.30.0  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  crossterm     ", Style::default().fg(Color::Cyan)),
+            Span::styled("0.28.1  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  tokio         ", Style::default().fg(Color::Cyan)),
+            Span::styled("1.42.0  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  portable-pty  ", Style::default().fg(Color::Cyan)),
+            Span::styled("0.8.1   ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  vt100         ", Style::default().fg(Color::Cyan)),
+            Span::styled("0.16    ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  syntect       ", Style::default().fg(Color::Cyan)),
+            Span::styled("5.2     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  tui-textarea  ", Style::default().fg(Color::Cyan)),
+            Span::styled("0.7.0   ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  tui-markdown  ", Style::default().fg(Color::Cyan)),
+            Span::styled("0.3     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  serde         ", Style::default().fg(Color::Cyan)),
+            Span::styled("1.0     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT/Apache-2.0", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  serde_yaml    ", Style::default().fg(Color::Cyan)),
+            Span::styled("0.9     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT/Apache-2.0", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  anyhow        ", Style::default().fg(Color::Cyan)),
+            Span::styled("1.0     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT/Apache-2.0", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  clap          ", Style::default().fg(Color::Cyan)),
+            Span::styled("4.5     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT/Apache-2.0", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  dirs          ", Style::default().fg(Color::Cyan)),
+            Span::styled("5.0     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT/Apache-2.0", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled("  pulldown-cmark", Style::default().fg(Color::Cyan)),
+            Span::styled("0.10    ", Style::default().fg(Color::DarkGray)),
+            Span::styled("MIT", Style::default().fg(Color::Green)),
+        ]),
     ]
 }
 

@@ -32,7 +32,6 @@
 | Key | Action |
 |-----|--------|
 | ? | Help (not in terminals) |
-| i | About (FileBrowser only) |
 
 #### File Browser
 | Key | Action |
@@ -139,6 +138,7 @@ The status bar shows file size, modification date, and git branch info.
 | y | Copy absolute path |
 | Y | Copy relative path |
 | g | Go to path |
+| i | Add to .gitignore |
 
 ### Browser Preview (o key)
 Open files in external applications:
@@ -213,7 +213,6 @@ When copying to Claude, output is automatically filtered:
 | Taste | Aktion |
 |-------|--------|
 | ? | Hilfe (nicht in Terminals) |
-| i | Über (nur im Dateibrowser) |
 
 #### Dateibrowser
 | Taste | Aktion |
@@ -320,6 +319,7 @@ Die Statusleiste zeigt Dateigröße, Änderungsdatum und Git-Branch-Info.
 | y | Absoluten Pfad kopieren |
 | Y | Relativen Pfad kopieren |
 | g | Zu Pfad springen |
+| i | Zur .gitignore hinzufügen |
 
 ### Browser-Vorschau (o-Taste)
 Dateien in externen Anwendungen öffnen:

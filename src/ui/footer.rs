@@ -278,11 +278,11 @@ impl Widget for Footer {
         for (key, desc) in keys {
             spans.push(Span::styled(
                 format!(" {} ", key),
-                Style::default().bg(Color::Cyan).fg(Color::Black),
+                Style::default().bg(Color::Yellow).fg(Color::Black),
             ));
             spans.push(Span::styled(
                 format!(" {} ", desc),
-                Style::default().bg(Color::Blue).fg(Color::White),
+                Style::default().bg(Color::DarkGray).fg(Color::White),
             ));
             spans.push(Span::raw(" "));
         }
@@ -307,7 +307,7 @@ impl Widget for Footer {
         );
 
         Paragraph::new(Line::from(spans))
-            .style(Style::default().bg(Color::Blue))
+            .style(Style::default().bg(Color::Black))
             .render(keys_area, buf);
 
         Paragraph::new(right_text)

@@ -108,12 +108,21 @@ pub fn markdown_to_html(md_path: &Path) -> Result<PathBuf> {
         .and_then(|s| s.to_str())
         .unwrap_or("Preview");
 
+    // Get the directory of the markdown file for resolving relative paths
+    let md_dir = md_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
     // Enable all markdown extensions
     let options = Options::all();
     let parser = Parser::new_ext(&md_content, options);
 
     let mut html_content = String::new();
     html::push_html(&mut html_content, parser);
+
+    // Convert relative image paths to absolute file:// URLs
+    let html_content = fix_image_paths(&html_content, &md_dir);
 
     let html = HTML_TEMPLATE
         .replace("{title}", title)
@@ -130,4 +139,40 @@ pub fn markdown_to_html(md_path: &Path) -> Result<PathBuf> {
 
     std::fs::write(&temp_path, html)?;
     Ok(temp_path)
+}
+
+/// Fix relative image paths in HTML by converting them to absolute file:// URLs
+fn fix_image_paths(html: &str, base_dir: &Path) -> String {
+    use regex::Regex;
+
+    // Match src="..." attributes in img tags (handles both relative and absolute paths)
+    let img_re = Regex::new(r#"<img\s+([^>]*?)src="([^"]+)"([^>]*)>"#).unwrap();
+
+    img_re
+        .replace_all(html, |caps: &regex::Captures| {
+            let before = &caps[1];
+            let src = &caps[2];
+            let after = &caps[3];
+
+            // Skip if already an absolute URL (http://, https://, file://, data:)
+            if src.starts_with("http://")
+                || src.starts_with("https://")
+                || src.starts_with("file://")
+                || src.starts_with("data:")
+            {
+                return caps[0].to_string();
+            }
+
+            // Resolve relative path to absolute
+            let abs_path = base_dir.join(src);
+            if abs_path.exists() {
+                // Convert to file:// URL
+                let file_url = format!("file://{}", abs_path.display());
+                format!(r#"<img {}src="{}"{}>"#, before, file_url, after)
+            } else {
+                // Keep original if file doesn't exist
+                caps[0].to_string()
+            }
+        })
+        .to_string()
 }

@@ -100,8 +100,10 @@ impl App {
         let mut claude_permission_mode = ClaudePermissionMode::Default;
 
         // Determine if we should show permission mode dialog
+        // Don't show if wizard needs to run first (first-time setup)
         let should_show_permission_dialog = config.claude.show_permission_dialog
-            && config.claude.default_permission_mode.is_none();
+            && config.claude.default_permission_mode.is_none()
+            && config.setup.wizard_completed;
 
         // 1. Claude Pane - delayed init if permission dialog should be shown
         let claude_command_str;
@@ -452,12 +454,10 @@ impl App {
                                     continue;
                                 }
 
-                                // About dialog
+                                // About dialog - click outside to close
                                 if self.about.visible {
                                     if let Some(popup) = self.about.popup_area {
-                                        if is_inside(popup, x, y) {
-                                            self.about.handle_click(x, y);
-                                        } else {
+                                        if !is_inside(popup, x, y) {
                                             self.about.close();
                                         }
                                     }
@@ -968,11 +968,6 @@ impl App {
                             crossterm::event::MouseEventKind::ScrollDown => {
                                 // Block all background scroll when any modal is open
                                 if self.about.visible {
-                                    if let Some(popup) = self.about.popup_area {
-                                        if is_inside(popup, x, y) {
-                                            self.about.scroll_down();
-                                        }
-                                    }
                                     continue;
                                 }
 
@@ -1027,11 +1022,6 @@ impl App {
                             crossterm::event::MouseEventKind::ScrollUp => {
                                 // Block all background scroll when any modal is open
                                 if self.about.visible {
-                                    if let Some(popup) = self.about.popup_area {
-                                        if is_inside(popup, x, y) {
-                                            self.about.scroll_up();
-                                        }
-                                    }
                                     continue;
                                 }
 
@@ -1286,6 +1276,12 @@ impl App {
                                         self.menu.visible = false;
                                         self.handle_menu_action(ui::menu::MenuAction::GoToPath);
                                     }
+                                    KeyCode::Char('i') => {
+                                        self.menu.visible = false;
+                                        self.handle_menu_action(
+                                            ui::menu::MenuAction::AddToGitignore,
+                                        );
+                                    }
                                     _ => {}
                                 }
                                 continue;
@@ -1297,8 +1293,6 @@ impl App {
                                     KeyCode::Esc | KeyCode::F(10) | KeyCode::Char('q') => {
                                         self.about.close()
                                     }
-                                    KeyCode::Up | KeyCode::Char('k') => self.about.scroll_up(),
-                                    KeyCode::Down | KeyCode::Char('j') => self.about.scroll_down(),
                                     _ => {}
                                 }
                                 continue;
@@ -1354,14 +1348,6 @@ impl App {
                                 && self.preview.mode != EditorMode::Edit
                             {
                                 self.help.open();
-                                continue;
-                            }
-
-                            // 'i' for about - only in FileBrowser (not Preview, as 'i' is common text)
-                            if key.code == KeyCode::Char('i')
-                                && self.active_pane == PaneId::FileBrowser
-                            {
-                                self.about.open();
                                 continue;
                             }
 
@@ -2676,6 +2662,11 @@ impl App {
                     action: ui::dialog::DialogAction::GoToPath,
                 };
             }
+            MenuAction::AddToGitignore => {
+                if let Some(path) = self.file_browser.selected_file() {
+                    self.add_to_gitignore(&path);
+                }
+            }
             MenuAction::None => {}
         }
     }
@@ -2783,13 +2774,28 @@ impl App {
             DialogAction::GitPull { repo_root } => {
                 // Execute git pull
                 match git::pull(&repo_root) {
-                    Ok(_output) => {
+                    Ok(output) => {
+                        // Show success dialog with first 2 lines of output
+                        let summary: String = output
+                            .lines()
+                            .take(2)
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                            title: "Git Pull".to_string(),
+                            message: format!("✓ Pull successful!\n{}", summary),
+                            action: DialogAction::GoToPath, // Dummy action - just closes on confirm
+                        };
                         // Refresh file browser to show any new/changed files
                         self.file_browser.refresh();
                     }
-                    Err(_err) => {
-                        // Pull failed - could show error dialog, but for now just ignore
-                        // The user will see the error in their terminal if they run git manually
+                    Err(err) => {
+                        // Show error dialog
+                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                            title: "Git Pull Error".to_string(),
+                            message: format!("✗ Pull failed:\n{}", err),
+                            action: DialogAction::GoToPath, // Dummy action - just closes on confirm
+                        };
                     }
                 }
             }
