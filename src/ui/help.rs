@@ -1,7 +1,7 @@
-//! Help screen with scrolling support
+//! Help screen with scrolling and search support
 
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
@@ -9,6 +9,78 @@ use ratatui::{
 };
 
 use crate::types::HelpState;
+
+/// Extract plain text from a Line for search matching
+fn line_to_text(line: &Line) -> String {
+    line.spans.iter().map(|s| s.content.as_ref()).collect()
+}
+
+/// Check if a line contains the search query (case-insensitive)
+fn line_matches(line: &Line, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+    let text = line_to_text(line).to_lowercase();
+    text.contains(&query.to_lowercase())
+}
+
+/// Filter help content based on search query
+/// Returns indices of matching lines
+fn filter_content(content: &[Line], query: &str) -> Vec<usize> {
+    if query.is_empty() {
+        return (0..content.len()).collect();
+    }
+    content
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line_matches(line, query))
+        .map(|(i, _)| i)
+        .collect()
+}
+
+/// Highlight search matches in a line
+fn highlight_line(line: &Line, query: &str) -> Line<'static> {
+    if query.is_empty() {
+        return Line::from(line.spans.iter().map(|s| Span::raw(s.content.to_string())).collect::<Vec<_>>());
+    }
+
+    let text = line_to_text(line);
+    let query_lower = query.to_lowercase();
+    let text_lower = text.to_lowercase();
+
+    // If no match in this line, return as-is
+    if !text_lower.contains(&query_lower) {
+        return Line::from(line.spans.iter().map(|s| Span::raw(s.content.to_string())).collect::<Vec<_>>());
+    }
+
+    // Build new spans with highlighted matches
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut last_end = 0;
+
+    for (start, _) in text_lower.match_indices(&query_lower) {
+        // Add text before match
+        if start > last_end {
+            spans.push(Span::raw(text[last_end..start].to_string()));
+        }
+        // Add highlighted match
+        let end = start + query.len();
+        spans.push(Span::styled(
+            text[start..end].to_string(),
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ));
+        last_end = end;
+    }
+
+    // Add remaining text
+    if last_end < text.len() {
+        spans.push(Span::raw(text[last_end..].to_string()));
+    }
+
+    Line::from(spans)
+}
 
 /// All help content lines
 fn help_content() -> Vec<Line<'static>> {
@@ -642,19 +714,33 @@ pub fn render(frame: &mut Frame, state: &mut HelpState) {
     // Store content area
     state.content_area = Some(inner);
 
-    // Layout: content area + footer
+    // Layout: search bar + content area + footer
     let chunks = Layout::vertical([
+        Constraint::Length(1), // Search bar
         Constraint::Min(1),    // Content
         Constraint::Length(1), // Footer
     ])
     .split(inner);
 
-    let content_area = chunks[0];
-    let footer_area = chunks[1];
+    let search_area = chunks[0];
+    let content_area = chunks[1];
+    let footer_area = chunks[2];
 
     // Get help content
     let content_lines = help_content();
-    let total_lines = content_lines.len();
+
+    // Filter content based on search query
+    let filtered_indices = filter_content(&content_lines, &state.search_query);
+    state.filtered_lines = filtered_indices.clone();
+    state.match_count = filtered_indices.len();
+
+    // Build filtered content with highlighting
+    let filtered_content: Vec<Line> = filtered_indices
+        .iter()
+        .map(|&i| highlight_line(&content_lines[i], &state.search_query))
+        .collect();
+
+    let total_lines = filtered_content.len();
     state.total_lines = total_lines;
 
     // Calculate visible lines
@@ -662,15 +748,49 @@ pub fn render(frame: &mut Frame, state: &mut HelpState) {
     let max_scroll = total_lines.saturating_sub(visible_height);
     let scroll = state.scroll.min(max_scroll);
 
+    // Render search bar
+    let search_style = if state.search_active {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let match_info = if !state.search_query.is_empty() {
+        format!(" {}/{}", state.match_count, content_lines.len())
+    } else {
+        String::new()
+    };
+
+    let cursor = if state.search_active { "▌" } else { "" };
+    let search_text = format!(" / {}{}{}", state.search_query, cursor, match_info);
+
+    let search_bar = Paragraph::new(Line::from(vec![
+        Span::styled("🔍", Style::default().fg(Color::Cyan)),
+        Span::styled(search_text, search_style),
+    ]));
+    frame.render_widget(search_bar, search_area);
+
     // Render content with scroll offset
-    let visible_lines: Vec<Line> = content_lines
+    let visible_lines: Vec<Line> = filtered_content
         .into_iter()
         .skip(scroll)
         .take(visible_height)
         .collect();
 
-    let paragraph = Paragraph::new(visible_lines);
-    frame.render_widget(paragraph, content_area);
+    // Show "No matches" if search has no results
+    if visible_lines.is_empty() && !state.search_query.is_empty() {
+        let no_match = Paragraph::new(Line::from(vec![Span::styled(
+            "No matches found",
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::ITALIC),
+        )]))
+        .alignment(Alignment::Center);
+        frame.render_widget(no_match, content_area);
+    } else {
+        let paragraph = Paragraph::new(visible_lines);
+        frame.render_widget(paragraph, content_area);
+    }
 
     // Render scrollbar if needed
     if total_lines > visible_height {
@@ -705,18 +825,30 @@ pub fn render(frame: &mut Frame, state: &mut HelpState) {
         );
     }
 
-    // Footer with navigation hints
-    let footer = Paragraph::new(Line::from(vec![
-        Span::styled("↑/↓ j/k", Style::default().fg(Color::Yellow)),
-        Span::styled(" Scroll  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("PgUp/PgDn", Style::default().fg(Color::Yellow)),
-        Span::styled(" Page  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("g/G", Style::default().fg(Color::Yellow)),
-        Span::styled(" Top/Bottom  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("Esc", Style::default().fg(Color::Yellow)),
-        Span::styled(" Close", Style::default().fg(Color::DarkGray)),
-    ]))
-    .alignment(ratatui::layout::Alignment::Center);
+    // Footer with navigation hints (context-sensitive)
+    let footer = if state.search_active {
+        Paragraph::new(Line::from(vec![
+            Span::styled("Type", Style::default().fg(Color::Yellow)),
+            Span::styled(" Filter  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Enter", Style::default().fg(Color::Yellow)),
+            Span::styled(" Confirm  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Ctrl+U", Style::default().fg(Color::Yellow)),
+            Span::styled(" Clear  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Esc", Style::default().fg(Color::Yellow)),
+            Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+        ]))
+    } else {
+        Paragraph::new(Line::from(vec![
+            Span::styled("/", Style::default().fg(Color::Yellow)),
+            Span::styled(" Search  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("↑↓ jk", Style::default().fg(Color::Yellow)),
+            Span::styled(" Scroll  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("g/G", Style::default().fg(Color::Yellow)),
+            Span::styled(" Top/End  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Esc", Style::default().fg(Color::Yellow)),
+            Span::styled(" Close", Style::default().fg(Color::DarkGray)),
+        ]))
+    };
 
-    frame.render_widget(footer, footer_area);
+    frame.render_widget(footer.alignment(Alignment::Center), footer_area);
 }

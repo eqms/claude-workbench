@@ -20,38 +20,45 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
             binary_name: claude-workbench
-            asset_name: claude-workbench-linux-x64
+            # Asset name follows self_update convention: {bin}-{target}.tar.gz
+            asset_name: claude-workbench-x86_64-unknown-linux-gnu.tar.gz
+            archive_type: tar.gz
 
           # Linux ARM64 (cross-compiled, ubuntu-22.04 for GLIBC compatibility)
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04
             binary_name: claude-workbench
-            asset_name: claude-workbench-linux-arm64
+            asset_name: claude-workbench-aarch64-unknown-linux-gnu.tar.gz
+            archive_type: tar.gz
             cross: true
 
           # macOS Apple Silicon (M1/M2/M3/M4)
           - target: aarch64-apple-darwin
             os: macos-latest
             binary_name: claude-workbench
-            asset_name: claude-workbench-macos-arm64
+            asset_name: claude-workbench-aarch64-apple-darwin.tar.gz
+            archive_type: tar.gz
 
           # macOS Intel (cross-compiled from ARM64 runner)
           - target: x86_64-apple-darwin
             os: macos-latest
             binary_name: claude-workbench
-            asset_name: claude-workbench-macos-x64
+            asset_name: claude-workbench-x86_64-apple-darwin.tar.gz
+            archive_type: tar.gz
 
           # Windows x64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             binary_name: claude-workbench.exe
-            asset_name: claude-workbench-windows-x64.exe
+            asset_name: claude-workbench-x86_64-pc-windows-msvc.zip
+            archive_type: zip
 
           # Windows ARM64
           - target: aarch64-pc-windows-msvc
             os: windows-latest
             binary_name: claude-workbench.exe
-            asset_name: claude-workbench-windows-arm64.exe
+            asset_name: claude-workbench-aarch64-pc-windows-msvc.zip
+            archive_type: zip
 
     steps:
       - uses: actions/checkout@v4
@@ -88,17 +95,20 @@ jobs:
         if: ${{ !matrix.cross }}
         run: cargo build --release --target ${{ matrix.target }}
 
-      # Prepare binary for upload
-      - name: Prepare binary (Unix)
-        if: runner.os != 'Windows'
+      # Create tar.gz archive (Unix)
+      - name: Create archive (Unix)
+        if: matrix.archive_type == 'tar.gz'
         run: |
-          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} ${{ matrix.asset_name }}
-          chmod +x ${{ matrix.asset_name }}
+          cd target/${{ matrix.target }}/release
+          chmod +x ${{ matrix.binary_name }}
+          tar czvf ../../../${{ matrix.asset_name }} ${{ matrix.binary_name }}
 
-      - name: Prepare binary (Windows)
-        if: runner.os == 'Windows'
+      # Create zip archive (Windows)
+      - name: Create archive (Windows)
+        if: matrix.archive_type == 'zip'
+        shell: pwsh
         run: |
-          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "${{ matrix.asset_name }}"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" -DestinationPath "${{ matrix.asset_name }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -137,18 +147,33 @@ jobs:
 
             | Platform | Architecture | Download |
             |----------|--------------|----------|
-            | Linux | x64 | `claude-workbench-linux-x64` |
-            | Linux | ARM64 | `claude-workbench-linux-arm64` |
-            | macOS | Apple Silicon (M1/M2/M3/M4) | `claude-workbench-macos-arm64` |
-            | macOS | Intel | `claude-workbench-macos-x64` |
-            | Windows | x64 | `claude-workbench-windows-x64.exe` |
-            | Windows | ARM64 | `claude-workbench-windows-arm64.exe` |
+            | Linux | x64 | `claude-workbench-x86_64-unknown-linux-gnu.tar.gz` |
+            | Linux | ARM64 | `claude-workbench-aarch64-unknown-linux-gnu.tar.gz` |
+            | macOS | Apple Silicon (M1/M2/M3/M4) | `claude-workbench-aarch64-apple-darwin.tar.gz` |
+            | macOS | Intel | `claude-workbench-x86_64-apple-darwin.tar.gz` |
+            | Windows | x64 | `claude-workbench-x86_64-pc-windows-msvc.zip` |
+            | Windows | ARM64 | `claude-workbench-aarch64-pc-windows-msvc.zip` |
 
             ### Installation
 
-            1. Download the appropriate binary for your platform
-            2. Make it executable (Unix): `chmod +x claude-workbench-*`
-            3. Run: `./claude-workbench-*`
+            **Unix (Linux/macOS):**
+            ```bash
+            # Download and extract
+            tar xzf claude-workbench-*.tar.gz
+            chmod +x claude-workbench
+            ./claude-workbench
+            ```
+
+            **Windows:**
+            ```powershell
+            # Extract zip and run
+            Expand-Archive claude-workbench-*.zip -DestinationPath .
+            .\claude-workbench.exe
+            ```
+
+            ### Auto-Update
+
+            Claude Workbench includes built-in auto-update functionality. Updates are checked automatically on startup.
 
             See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation.
           files: release/*

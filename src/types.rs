@@ -246,7 +246,7 @@ impl DragState {
     }
 }
 
-/// Help screen state with scrolling support
+/// Help screen state with scrolling and search support
 #[derive(Debug, Clone, Default)]
 pub struct HelpState {
     /// Whether help is visible
@@ -259,12 +259,25 @@ pub struct HelpState {
     pub content_area: Option<ratatui::layout::Rect>,
     /// Total number of content lines
     pub total_lines: usize,
+    // Search functionality
+    /// Current search query
+    pub search_query: String,
+    /// Whether search input is active (focused)
+    pub search_active: bool,
+    /// Indices of lines matching the search query
+    pub filtered_lines: Vec<usize>,
+    /// Number of matches found (for display)
+    pub match_count: usize,
 }
 
 impl HelpState {
     pub fn open(&mut self) {
         self.visible = true;
         self.scroll = 0;
+        self.search_query.clear();
+        self.search_active = false;
+        self.filtered_lines.clear();
+        self.match_count = 0;
     }
 
     pub fn close(&mut self) {
@@ -272,6 +285,38 @@ impl HelpState {
         self.scroll = 0;
         self.popup_area = None;
         self.content_area = None;
+        self.search_query.clear();
+        self.search_active = false;
+        self.filtered_lines.clear();
+        self.match_count = 0;
+    }
+
+    /// Activate search input field
+    pub fn start_search(&mut self) {
+        self.search_active = true;
+    }
+
+    /// Deactivate search input field (keep query for navigation)
+    pub fn stop_search(&mut self) {
+        self.search_active = false;
+    }
+
+    /// Clear search query and results
+    pub fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.filtered_lines.clear();
+        self.match_count = 0;
+        self.scroll = 0;
+    }
+
+    /// Add a character to the search query
+    pub fn search_add_char(&mut self, c: char) {
+        self.search_query.push(c);
+    }
+
+    /// Remove last character from search query
+    pub fn search_backspace(&mut self) {
+        self.search_query.pop();
     }
 
     pub fn scroll_up(&mut self, amount: usize) {

@@ -114,6 +114,19 @@ impl UpdateState {
 ///
 /// This should be called from a background thread.
 pub fn check_for_update_sync() -> UpdateCheckResult {
+    // Debug: Log current version and target platform
+    #[cfg(debug_assertions)]
+    {
+        eprintln!("[Update] Current version: {}", CURRENT_VERSION);
+        eprintln!("[Update] Checking GitHub: {}/{}", REPO_OWNER, REPO_NAME);
+        eprintln!("[Update] Binary name: {}", BIN_NAME);
+        eprintln!(
+            "[Update] Platform: {}-{}",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        );
+    }
+
     match Update::configure()
         .repo_owner(REPO_OWNER)
         .repo_name(REPO_NAME)
@@ -125,19 +138,43 @@ pub fn check_for_update_sync() -> UpdateCheckResult {
             // Get the target version (latest available)
             match updater.target_version() {
                 Some(target) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!("[Update] GitHub version: {}", target);
+
+                    // Normalize versions: strip 'v' prefix if present for comparison
+                    let current_normalized = CURRENT_VERSION
+                        .strip_prefix('v')
+                        .unwrap_or(CURRENT_VERSION);
+                    let target_normalized = target.strip_prefix('v').unwrap_or(&target);
+
                     // self_update returns the latest release version
                     // If it differs from current, an update is available
-                    if target == CURRENT_VERSION {
+                    if target_normalized == current_normalized {
+                        #[cfg(debug_assertions)]
+                        eprintln!("[Update] Already up-to-date");
                         UpdateCheckResult::UpToDate
                     } else {
+                        #[cfg(debug_assertions)]
+                        eprintln!(
+                            "[Update] Update available: {} -> {}",
+                            current_normalized, target_normalized
+                        );
                         UpdateCheckResult::UpdateAvailable { version: target }
                     }
                 }
                 // None means no releases found (possibly no assets for this platform)
-                None => UpdateCheckResult::NoReleasesFound,
+                None => {
+                    #[cfg(debug_assertions)]
+                    eprintln!("[Update] No releases found for this platform");
+                    UpdateCheckResult::NoReleasesFound
+                }
             }
         }
-        Err(e) => UpdateCheckResult::Error(format!("{}", e)),
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            eprintln!("[Update] Error: {}", e);
+            UpdateCheckResult::Error(format!("{}", e))
+        }
     }
 }
 

@@ -1299,19 +1299,65 @@ impl App {
                             }
 
                             if self.help.visible {
-                                match key.code {
-                                    KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => {
-                                        self.help.close()
+                                // Search mode active: handle text input
+                                if self.help.search_active {
+                                    match key.code {
+                                        KeyCode::Esc => {
+                                            // Cancel search, keep query visible
+                                            self.help.stop_search();
+                                        }
+                                        KeyCode::Enter => {
+                                            // Confirm search, navigate results
+                                            self.help.stop_search();
+                                            self.help.scroll = 0; // Jump to first match
+                                        }
+                                        KeyCode::Backspace => {
+                                            self.help.search_backspace();
+                                            self.help.scroll = 0; // Reset scroll on query change
+                                        }
+                                        KeyCode::Char('u')
+                                            if key
+                                                .modifiers
+                                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                                        {
+                                            // Ctrl+U: Clear search
+                                            self.help.clear_search();
+                                        }
+                                        KeyCode::Char(c) => {
+                                            self.help.search_add_char(c);
+                                            self.help.scroll = 0; // Reset scroll on query change
+                                        }
+                                        _ => {}
                                     }
-                                    KeyCode::Up | KeyCode::Char('k') => self.help.scroll_up(1),
-                                    KeyCode::Down | KeyCode::Char('j') => self.help.scroll_down(1),
-                                    KeyCode::PageUp => self.help.page_up(),
-                                    KeyCode::PageDown => self.help.page_down(),
-                                    KeyCode::Home | KeyCode::Char('g') => self.help.scroll_to_top(),
-                                    KeyCode::End | KeyCode::Char('G') => {
-                                        self.help.scroll_to_bottom()
+                                } else {
+                                    // Normal mode: navigation and search activation
+                                    match key.code {
+                                        KeyCode::Esc | KeyCode::F(12) | KeyCode::Char('q') => {
+                                            self.help.close()
+                                        }
+                                        KeyCode::Char('/') | KeyCode::Char('f')
+                                            if key.code == KeyCode::Char('/')
+                                                || key.modifiers.contains(
+                                                    crossterm::event::KeyModifiers::CONTROL,
+                                                ) =>
+                                        {
+                                            // '/' or Ctrl+F: Start search
+                                            self.help.start_search();
+                                        }
+                                        KeyCode::Up | KeyCode::Char('k') => self.help.scroll_up(1),
+                                        KeyCode::Down | KeyCode::Char('j') => {
+                                            self.help.scroll_down(1)
+                                        }
+                                        KeyCode::PageUp => self.help.page_up(),
+                                        KeyCode::PageDown => self.help.page_down(),
+                                        KeyCode::Home | KeyCode::Char('g') => {
+                                            self.help.scroll_to_top()
+                                        }
+                                        KeyCode::End | KeyCode::Char('G') => {
+                                            self.help.scroll_to_bottom()
+                                        }
+                                        _ => {}
                                     }
-                                    _ => {}
                                 }
                                 // Consume all keys while help is open
                                 continue;
