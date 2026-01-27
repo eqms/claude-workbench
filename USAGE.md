@@ -15,7 +15,7 @@
 | Ctrl+Q/C | Quit |
 | Ctrl+P | Fuzzy Finder |
 | Ctrl+Shift+W | Setup Wizard |
-| F1 | Focus File Browser |
+| F1 | Toggle File Browser |
 | F2 | Toggle Preview Pane |
 | F3 | Refresh File Browser |
 | F4 | Focus Claude Code |
@@ -113,6 +113,10 @@
 | Enter | Confirm |
 | Esc | Cancel |
 
+### Claude Fullscreen Mode
+
+When all upper panes (File Browser, Preview, LazyGit, Terminal) are hidden, Claude Code automatically uses the full screen. Toggle panes with F1, F2, F5, F6 to enter/exit fullscreen mode.
+
 ### File Browser Features
 
 #### Git Status Integration
@@ -196,7 +200,7 @@ When copying to Claude, output is automatically filtered:
 | Ctrl+Q/C | Beenden |
 | Ctrl+P | Fuzzy-Finder |
 | Ctrl+Shift+W | Setup-Assistent |
-| F1 | Dateibrowser fokussieren |
+| F1 | Dateibrowser ein-/ausblenden |
 | F2 | Vorschau-Bereich umschalten |
 | F3 | Dateibrowser aktualisieren |
 | F4 | Claude Code fokussieren |
@@ -293,6 +297,10 @@ When copying to Claude, output is automatically filtered:
 | Delete | An Cursor löschen |
 | Enter | Bestätigen |
 | Esc | Abbrechen |
+
+### Claude Vollbildmodus
+
+Wenn alle oberen Bereiche (Dateibrowser, Vorschau, LazyGit, Terminal) ausgeblendet sind, nutzt Claude Code automatisch den gesamten Bildschirm. Bereiche mit F1, F2, F5, F6 ein-/ausblenden um den Vollbildmodus zu aktivieren/deaktivieren.
 
 ### Dateibrowser-Funktionen
 

@@ -21,7 +21,7 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 
 | Pane | Key | Description |
 |------|-----|-------------|
-| **File Browser** | F1 | Navigate directories, git status integration, file operations (F9) |
+| **File Browser** | F1 | Navigate directories, git status integration, file operations (F9), toggle visibility |
 | **Preview** | F2 | Syntax highlighting (500+ languages), Markdown rendering, built-in editor |
 | **Claude Code** | F4 | Embedded Claude CLI terminal with startup prefixes |
 | **LazyGit** | F5 | Integrated Git TUI (restarts in current directory) |
@@ -33,6 +33,7 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 - Terminal selection mode (Ctrl+S or Alt+Click) with intelligent filtering
 - Drag & Drop files into terminals
 - Git remote change detection with pull prompts
+- Claude fullscreen mode when all panes hidden (F1/F2/F5/F6 toggles)
 - Mouse and keyboard navigation throughout
 
 ### Quick Start
@@ -126,7 +127,7 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer für KI-unterstütz
 
 | Bereich | Taste | Beschreibung |
 |---------|-------|--------------|
-| **Dateibrowser** | F1 | Verzeichnisnavigation, Git-Status-Integration, Dateioperationen (F9) |
+| **Dateibrowser** | F1 | Verzeichnisnavigation, Git-Status-Integration, Dateioperationen (F9), ein-/ausblenden |
 | **Vorschau** | F2 | Syntax-Hervorhebung (500+ Sprachen), Markdown-Rendering, Editor |
 | **Claude Code** | F4 | Eingebettetes Claude CLI Terminal mit Startup-Präfixen |
 | **LazyGit** | F5 | Integrierte Git-TUI (startet im aktuellen Verzeichnis neu) |
@@ -138,6 +139,7 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer für KI-unterstütz
 - Terminal-Auswahlmodus (Ctrl+S oder Alt+Klick) mit intelligentem Filtering
 - Drag & Drop von Dateien in Terminals
 - Git Remote-Änderungserkennung mit Pull-Aufforderung
+- Claude Vollbildmodus wenn alle Bereiche ausgeblendet (F1/F2/F5/F6 Umschaltung)
 - Maus- und Tastaturnavigation durchgehend
 
 ### Schnellstart
