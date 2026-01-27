@@ -350,7 +350,9 @@ build_local() {
 install_binary() {
     local source="$1"
 
-    print_step "$(( LOCAL_BUILD ? 2 : 3 ))" 3 "Installing binary..."
+    local step_num=3
+    if [[ "$LOCAL_BUILD" == true ]]; then step_num=2; fi
+    print_step "$step_num" 3 "Installing binary..."
 
     # Create install directory
     if [[ ! -d "$INSTALL_DIR" ]]; then
