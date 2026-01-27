@@ -316,7 +316,10 @@ impl App {
         if !config.pty.claude_command.is_empty() {
             if mode.is_yolo() {
                 // YOLO mode: --dangerously-skip-permissions flag
-                if !cmd.iter().any(|a| a.contains("--dangerously-skip-permissions")) {
+                if !cmd
+                    .iter()
+                    .any(|a| a.contains("--dangerously-skip-permissions"))
+                {
                     cmd.push("--dangerously-skip-permissions".to_string());
                 }
             } else if let Some(flag_value) = mode.cli_flag() {
@@ -706,10 +709,13 @@ impl App {
                                             use ui::footer::FooterAction;
                                             match action {
                                                 FooterAction::ToggleFiles => {
-                                                    self.show_file_browser = !self.show_file_browser;
+                                                    self.show_file_browser =
+                                                        !self.show_file_browser;
                                                     if self.show_file_browser {
                                                         self.active_pane = PaneId::FileBrowser;
-                                                    } else if self.active_pane == PaneId::FileBrowser {
+                                                    } else if self.active_pane
+                                                        == PaneId::FileBrowser
+                                                    {
                                                         self.active_pane = PaneId::Claude;
                                                     }
                                                 }
@@ -1348,9 +1354,9 @@ impl App {
                                             self.help.scroll = 0; // Reset scroll on query change
                                         }
                                         KeyCode::Char('u')
-                                            if key
-                                                .modifiers
-                                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                                            if key.modifiers.contains(
+                                                crossterm::event::KeyModifiers::CONTROL,
+                                            ) =>
                                         {
                                             // Ctrl+U: Clear search
                                             self.help.clear_search();
@@ -2032,12 +2038,11 @@ impl App {
                                                         }
                                                         // Ctrl+C / Cmd+C: Copy selection to system clipboard
                                                         KeyCode::Char('c')
-                                                            if key
+                                                            if key.modifiers.contains(
+                                                                KeyModifiers::CONTROL,
+                                                            ) || key
                                                                 .modifiers
-                                                                .contains(KeyModifiers::CONTROL)
-                                                                || key
-                                                                    .modifiers
-                                                                    .contains(KeyModifiers::SUPER) =>
+                                                                .contains(KeyModifiers::SUPER) =>
                                                         {
                                                             self.copy_selection_to_clipboard();
                                                             self.terminal_selection.clear();
@@ -2559,10 +2564,7 @@ impl App {
         if let Some(editor) = &mut self.preview.editor {
             let line_count = editor.lines().len();
             if line_count > 0 {
-                editor.move_cursor(tui_textarea::CursorMove::Jump(
-                    (line_count - 1) as u16,
-                    0,
-                ));
+                editor.move_cursor(tui_textarea::CursorMove::Jump((line_count - 1) as u16, 0));
             }
         }
 
@@ -2864,11 +2866,7 @@ impl App {
                 match git::pull(&repo_root) {
                     Ok(output) => {
                         // Show success dialog with first 2 lines of output
-                        let summary: String = output
-                            .lines()
-                            .take(2)
-                            .collect::<Vec<_>>()
-                            .join("\n");
+                        let summary: String = output.lines().take(2).collect::<Vec<_>>().join("\n");
                         self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
                             title: "Git Pull".to_string(),
                             message: format!("✓ Pull successful!\n{}", summary),

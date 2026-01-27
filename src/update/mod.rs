@@ -142,9 +142,8 @@ pub fn check_for_update_sync() -> UpdateCheckResult {
                     eprintln!("[Update] GitHub version: {}", target);
 
                     // Normalize versions: strip 'v' prefix if present for comparison
-                    let current_normalized = CURRENT_VERSION
-                        .strip_prefix('v')
-                        .unwrap_or(CURRENT_VERSION);
+                    let current_normalized =
+                        CURRENT_VERSION.strip_prefix('v').unwrap_or(CURRENT_VERSION);
                     let target_normalized = target.strip_prefix('v').unwrap_or(&target);
 
                     // self_update returns the latest release version

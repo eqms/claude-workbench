@@ -41,7 +41,12 @@ fn filter_content(content: &[Line], query: &str) -> Vec<usize> {
 /// Highlight search matches in a line
 fn highlight_line(line: &Line, query: &str) -> Line<'static> {
     if query.is_empty() {
-        return Line::from(line.spans.iter().map(|s| Span::raw(s.content.to_string())).collect::<Vec<_>>());
+        return Line::from(
+            line.spans
+                .iter()
+                .map(|s| Span::raw(s.content.to_string()))
+                .collect::<Vec<_>>(),
+        );
     }
 
     let text = line_to_text(line);
@@ -50,7 +55,12 @@ fn highlight_line(line: &Line, query: &str) -> Line<'static> {
 
     // If no match in this line, return as-is
     if !text_lower.contains(&query_lower) {
-        return Line::from(line.spans.iter().map(|s| Span::raw(s.content.to_string())).collect::<Vec<_>>());
+        return Line::from(
+            line.spans
+                .iter()
+                .map(|s| Span::raw(s.content.to_string()))
+                .collect::<Vec<_>>(),
+        );
     }
 
     // Build new spans with highlighted matches
