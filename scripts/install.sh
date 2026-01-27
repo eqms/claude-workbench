@@ -85,35 +85,28 @@ parse_args() {
 }
 
 print_help() {
-    cat <<EOF
-${BOLD}claude-workbench installer${NC}
-
-${BOLD}USAGE:${NC}
-    bash install.sh [OPTIONS]
-
-${BOLD}OPTIONS:${NC}
-    -h, --help           Show this help message
-    --version            Show script version
-    --local              Build from source with cargo (requires Git repo checkout)
-    --install-dir DIR    Installation directory (default: ~/.local/bin)
-    --check              Only check dependencies, don't install
-
-${BOLD}EXAMPLES:${NC}
-    # Install latest release from GitHub
-    bash install.sh
-
-    # Install to custom directory
-    bash install.sh --install-dir /usr/local/bin
-
-    # Build from local source
-    bash install.sh --local
-
-    # Check dependencies only
-    bash install.sh --check
-
-${BOLD}ONE-LINER INSTALL:${NC}
-    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh | bash
-EOF
+    echo ""
+    echo "claude-workbench installer"
+    echo ""
+    echo "USAGE:"
+    echo "    bash install.sh [OPTIONS]"
+    echo ""
+    echo "OPTIONS:"
+    echo "    -h, --help           Show this help message"
+    echo "    --version            Show script version"
+    echo "    --local              Build from source with cargo (requires Git repo checkout)"
+    echo "    --install-dir DIR    Installation directory (default: ~/.local/bin)"
+    echo "    --check              Only check dependencies, don't install"
+    echo ""
+    echo "EXAMPLES:"
+    echo "    bash install.sh                              # Install latest release"
+    echo "    bash install.sh --install-dir /usr/local/bin # Custom directory"
+    echo "    bash install.sh --local                      # Build from source"
+    echo "    bash install.sh --check                      # Check dependencies only"
+    echo ""
+    echo "ONE-LINER INSTALL:"
+    echo "    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh | bash"
+    echo ""
 }
 
 # --- UI Helpers ---
