@@ -28,15 +28,19 @@ LOCAL_BUILD=false
 CHECK_ONLY=false
 TMPDIR_CLEANUP=""
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-DIM='\033[2m'
-NC='\033[0m'
+# Colors (using printf-compatible format)
+if [ -t 1 ]; then
+    RED=$(printf '\033[0;31m')
+    GREEN=$(printf '\033[0;32m')
+    YELLOW=$(printf '\033[1;33m')
+    BLUE=$(printf '\033[0;34m')
+    CYAN=$(printf '\033[0;36m')
+    BOLD=$(printf '\033[1m')
+    DIM=$(printf '\033[2m')
+    NC=$(printf '\033[0m')
+else
+    RED="" GREEN="" YELLOW="" BLUE="" CYAN="" BOLD="" DIM="" NC=""
+fi
 
 # Cleanup handler
 cleanup() {
@@ -65,7 +69,7 @@ parse_args() {
                 ;;
             --install-dir)
                 if [[ -z "${2:-}" ]]; then
-                    echo -e "${RED}Error: --install-dir requires a path argument${NC}"
+                    printf "%sError: --install-dir requires a path argument%s\n" "$RED" "$NC"
                     exit 1
                 fi
                 INSTALL_DIR="$2"
@@ -76,7 +80,7 @@ parse_args() {
                 shift
                 ;;
             *)
-                echo -e "${RED}Error: Unknown option '$1'${NC}"
+                printf "%sError: Unknown option '%s'%s\n" "$RED" "$1" "$NC"
                 echo "Run with --help for usage information."
                 exit 1
                 ;;
@@ -105,7 +109,7 @@ print_help() {
     echo "    bash install.sh --check                      # Check dependencies only"
     echo ""
     echo "ONE-LINER INSTALL:"
-    echo "    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh | bash"
+    printf "    curl -fsSL https://raw.githubusercontent.com/%s/main/scripts/install.sh | bash\n" "$REPO"
     echo ""
 }
 
@@ -113,9 +117,9 @@ print_help() {
 
 print_banner() {
     echo ""
-    echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}        ${BOLD}Claude Workbench${NC} — Installer v${SCRIPT_VERSION}              ${BLUE}║${NC}"
-    echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
+    printf "%s╔════════════════════════════════════════════════════════════╗%s\n" "$BLUE" "$NC"
+    printf "%s║%s        %sClaude Workbench%s — Installer v%s              %s║%s\n" "$BLUE" "$NC" "$BOLD" "$NC" "$SCRIPT_VERSION" "$BLUE" "$NC"
+    printf "%s╚════════════════════════════════════════════════════════════╝%s\n" "$BLUE" "$NC"
     echo ""
 }
 
@@ -124,14 +128,14 @@ print_row() {
     local len=${#content}
     local padding=$((56 - len))
     if (( padding < 0 )); then padding=0; fi
-    printf "${BLUE}║${NC}  %s%*s${BLUE}║${NC}\n" "$content" "$padding" ""
+    printf "%s║%s  %s%*s%s║%s\n" "$BLUE" "$NC" "$content" "$padding" "" "$BLUE" "$NC"
 }
 
 print_step() {
     local step="$1"
     local total="$2"
     local msg="$3"
-    echo -e "${BLUE}[${step}/${total}]${NC} ${msg}"
+    printf "%s[%s/%s]%s %s\n" "$BLUE" "$step" "$total" "$NC" "$msg"
 }
 
 # --- Platform Detection ---
@@ -148,7 +152,7 @@ detect_platform() {
                 x86_64)  asset="${BINARY_NAME}-x86_64-unknown-linux-gnu.tar.gz" ;;
                 aarch64) asset="${BINARY_NAME}-aarch64-unknown-linux-gnu.tar.gz" ;;
                 *)
-                    echo -e "${RED}Error: Unsupported Linux architecture: ${arch}${NC}"
+                    printf "%sError: Unsupported Linux architecture: %s%s\n" "$RED" "$arch" "$NC"
                     exit 1
                     ;;
             esac
@@ -158,13 +162,13 @@ detect_platform() {
                 arm64)   asset="${BINARY_NAME}-aarch64-apple-darwin.tar.gz" ;;
                 x86_64)  asset="${BINARY_NAME}-x86_64-apple-darwin.tar.gz" ;;
                 *)
-                    echo -e "${RED}Error: Unsupported macOS architecture: ${arch}${NC}"
+                    printf "%sError: Unsupported macOS architecture: %s%s\n" "$RED" "$arch" "$NC"
                     exit 1
                     ;;
             esac
             ;;
         *)
-            echo -e "${RED}Error: Unsupported operating system: ${os}${NC}"
+            printf "%sError: Unsupported operating system: %s%s\n" "$RED" "$os" "$NC"
             echo "Use scripts/install.ps1 for Windows."
             exit 1
             ;;
@@ -174,8 +178,8 @@ detect_platform() {
     PLATFORM_ARCH="$arch"
     ASSET_NAME="$asset"
 
-    echo -e "  Platform:  ${CYAN}${os} ${arch}${NC}"
-    echo -e "  Asset:     ${DIM}${asset}${NC}"
+    printf "  Platform:  %s%s %s%s\n" "$CYAN" "$os" "$arch" "$NC"
+    printf "  Asset:     %s%s%s\n" "$DIM" "$asset" "$NC"
     echo ""
 }
 
@@ -191,13 +195,13 @@ check_dep() {
     if command -v "$name" &>/dev/null; then
         local ver
         ver="$("$name" --version 2>/dev/null | head -1 || echo "installed")"
-        echo -e "  ${GREEN}✓${NC} ${name} ${DIM}(${ver})${NC}"
+        printf "  %s✓%s %s %s(%s)%s\n" "$GREEN" "$NC" "$name" "$DIM" "$ver" "$NC"
         return 0
     else
         if [[ "$required" == "true" ]]; then
-            echo -e "  ${RED}✗${NC} ${name} ${RED}(required)${NC}"
+            printf "  %s✗%s %s %s(required)%s\n" "$RED" "$NC" "$name" "$RED" "$NC"
         else
-            echo -e "  ${YELLOW}○${NC} ${name} ${DIM}(optional)${NC}"
+            printf "  %s○%s %s %s(optional)%s\n" "$YELLOW" "$NC" "$name" "$DIM" "$NC"
         fi
 
         # Show install hint
@@ -211,7 +215,7 @@ check_dep() {
         fi
 
         if [[ -n "$hint" ]]; then
-            echo -e "           ${DIM}→ ${hint}${NC}"
+            printf "           %s→ %s%s\n" "$DIM" "$hint" "$NC"
         fi
 
         if [[ "$required" == "true" ]]; then
@@ -222,7 +226,7 @@ check_dep() {
 }
 
 check_dependencies() {
-    echo -e "${BOLD}Dependency Check:${NC}"
+    printf "%sDependency Check:%s\n" "$BOLD" "$NC"
     echo ""
 
     local has_errors=false
@@ -260,11 +264,11 @@ check_dependencies() {
     echo ""
 
     if [[ "$has_errors" == true ]]; then
-        echo -e "${RED}Missing required dependencies. Please install them first.${NC}"
+        printf "%sMissing required dependencies. Please install them first.%s\n" "$RED" "$NC"
         return 1
     fi
 
-    echo -e "${GREEN}All required dependencies are available.${NC}"
+    printf "%sAll required dependencies are available.%s\n" "$GREEN" "$NC"
     echo ""
     return 0
 }
@@ -279,18 +283,18 @@ download_release() {
     TMPDIR_CLEANUP="$tmpdir"
 
     print_step 1 3 "Downloading latest release..."
-    echo -e "  ${DIM}${url}${NC}"
+    printf "  %s%s%s\n" "$DIM" "$url" "$NC"
 
     if command -v curl &>/dev/null; then
         curl -fsSL "$url" -o "${tmpdir}/${ASSET_NAME}"
     elif command -v wget &>/dev/null; then
         wget -q "$url" -O "${tmpdir}/${ASSET_NAME}"
     else
-        echo -e "${RED}Error: Neither curl nor wget found. Cannot download.${NC}"
+        printf "%sError: Neither curl nor wget found. Cannot download.%s\n" "$RED" "$NC"
         exit 1
     fi
 
-    echo -e "  ${GREEN}✓ Download complete${NC}"
+    printf "  %s✓ Download complete%s\n" "$GREEN" "$NC"
     echo ""
 
     print_step 2 3 "Extracting archive..."
@@ -301,11 +305,11 @@ download_release() {
     binary="$(find "$tmpdir" -name "$BINARY_NAME" -type f ! -name "*.tar.gz" | head -1)"
 
     if [[ -z "$binary" ]]; then
-        echo -e "${RED}Error: Binary not found in archive${NC}"
+        printf "%sError: Binary not found in archive%s\n" "$RED" "$NC"
         exit 1
     fi
 
-    echo -e "  ${GREEN}✓ Extracted${NC}"
+    printf "  %s✓ Extracted%s\n" "$GREEN" "$NC"
     echo ""
 
     install_binary "$binary"
@@ -320,24 +324,24 @@ build_local() {
     elif [[ -f "$(dirname "$0")/../Cargo.toml" ]]; then
         project_dir="$(cd "$(dirname "$0")/.." && pwd)"
     else
-        echo -e "${RED}Error: Cargo.toml not found. Run --local from the project directory.${NC}"
+        printf "%sError: Cargo.toml not found. Run --local from the project directory.%s\n" "$RED" "$NC"
         exit 1
     fi
 
     print_step 1 3 "Building release version..."
-    echo -e "  ${DIM}cargo build --release${NC}"
+    printf "  %scargo build --release%s\n" "$DIM" "$NC"
     echo ""
 
     (cd "$project_dir" && cargo build --release 2>&1 | sed 's/^/      /')
 
     local binary="${project_dir}/target/release/${BINARY_NAME}"
     if [[ ! -f "$binary" ]]; then
-        echo -e "${RED}Error: Build failed — binary not found at ${binary}${NC}"
+        printf "%sError: Build failed — binary not found at %s%s\n" "$RED" "$binary" "$NC"
         exit 1
     fi
 
     echo ""
-    echo -e "  ${GREEN}✓ Build successful${NC}"
+    printf "  %s✓ Build successful%s\n" "$GREEN" "$NC"
     echo ""
 
     install_binary "$binary"
@@ -350,7 +354,7 @@ install_binary() {
 
     # Create install directory
     if [[ ! -d "$INSTALL_DIR" ]]; then
-        echo -e "  Creating directory: ${INSTALL_DIR}"
+        printf "  Creating directory: %s\n" "$INSTALL_DIR"
         mkdir -p "$INSTALL_DIR"
     fi
 
@@ -362,7 +366,7 @@ install_binary() {
         xattr -d com.apple.quarantine "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
     fi
 
-    echo -e "  ${GREEN}✓ Installed to ${INSTALL_DIR}/${BINARY_NAME}${NC}"
+    printf "  %s✓ Installed to %s/%s%s\n" "$GREEN" "$INSTALL_DIR" "$BINARY_NAME" "$NC"
     echo ""
 }
 
@@ -373,7 +377,7 @@ check_path() {
         return
     fi
 
-    echo -e "${YELLOW}Note: ${INSTALL_DIR} is not in your PATH${NC}"
+    printf "%sNote: %s is not in your PATH%s\n" "$YELLOW" "$INSTALL_DIR" "$NC"
     echo ""
 
     # Detect current shell for hint
@@ -382,16 +386,16 @@ check_path() {
 
     case "$shell_name" in
         fish)
-            echo -e "  Add to ${DIM}~/.config/fish/config.fish${NC}:"
-            echo -e "  ${CYAN}fish_add_path ${INSTALL_DIR}${NC}"
+            printf "  Add to %s~/.config/fish/config.fish%s:\n" "$DIM" "$NC"
+            printf "  %sfish_add_path %s%s\n" "$CYAN" "$INSTALL_DIR" "$NC"
             ;;
         zsh)
-            echo -e "  Add to ${DIM}~/.zshrc${NC}:"
-            echo -e "  ${CYAN}export PATH=\"${INSTALL_DIR}:\$PATH\"${NC}"
+            printf "  Add to %s~/.zshrc%s:\n" "$DIM" "$NC"
+            printf "  %sexport PATH=\"%s:\$PATH\"%s\n" "$CYAN" "$INSTALL_DIR" "$NC"
             ;;
         *)
-            echo -e "  Add to ${DIM}~/.bashrc${NC}:"
-            echo -e "  ${CYAN}export PATH=\"${INSTALL_DIR}:\$PATH\"${NC}"
+            printf "  Add to %s~/.bashrc%s:\n" "$DIM" "$NC"
+            printf "  %sexport PATH=\"%s:\$PATH\"%s\n" "$CYAN" "$INSTALL_DIR" "$NC"
             ;;
     esac
     echo ""
@@ -406,16 +410,16 @@ print_completion() {
     binary_size="$(ls -lh "$binary_path" | awk '{print $5}')"
     version="$("$binary_path" --version 2>/dev/null || echo "unknown")"
 
-    echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                  ${GREEN}Installation Complete${NC}                     ${BLUE}║${NC}"
-    echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
+    printf "%s╔════════════════════════════════════════════════════════════╗%s\n" "$BLUE" "$NC"
+    printf "%s║%s                  %sInstallation Complete%s                     %s║%s\n" "$BLUE" "$NC" "$GREEN" "$NC" "$BLUE" "$NC"
+    printf "%s╠════════════════════════════════════════════════════════════╣%s\n" "$BLUE" "$NC"
     print_row "Binary:    ${BINARY_NAME}"
     print_row "Version:   ${version}"
     print_row "Size:      ${binary_size}"
     print_row "Location:  ${binary_path}"
-    echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
-    printf "${BLUE}║${NC}  Run with:  ${YELLOW}%-45s${NC}${BLUE}║${NC}\n" "${BINARY_NAME}"
-    echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
+    printf "%s╠════════════════════════════════════════════════════════════╣%s\n" "$BLUE" "$NC"
+    printf "%s║%s  Run with:  %s%-45s%s%s║%s\n" "$BLUE" "$NC" "$YELLOW" "$BINARY_NAME" "$NC" "$BLUE" "$NC"
+    printf "%s╚════════════════════════════════════════════════════════════╝%s\n" "$BLUE" "$NC"
     echo ""
 }
 
