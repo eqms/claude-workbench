@@ -170,7 +170,7 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(""),
         Line::from(vec![
             Span::styled("  F1           ", Style::default().fg(Color::Cyan)),
-            Span::raw("File Browser"),
+            Span::raw("Toggle File Browser (show/hide)"),
         ]),
         Line::from(vec![
             Span::styled("  F2           ", Style::default().fg(Color::Cyan)),
@@ -202,16 +202,16 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Navigate files"),
         ]),
         Line::from(vec![
-            Span::styled("  Enter        ", Style::default().fg(Color::Cyan)),
-            Span::raw("Open file / Enter directory"),
+            Span::styled("  Enter/→/l    ", Style::default().fg(Color::Cyan)),
+            Span::raw("Expand/Collapse dir, Open file"),
         ]),
         Line::from(vec![
             Span::styled("  Double-Click ", Style::default().fg(Color::Cyan)),
-            Span::raw("Open file / Enter directory"),
+            Span::raw("Expand/Collapse dir, Open file"),
         ]),
         Line::from(vec![
-            Span::styled("  Back/←       ", Style::default().fg(Color::Cyan)),
-            Span::raw("Go to parent directory"),
+            Span::styled("  Back/←/h     ", Style::default().fg(Color::Cyan)),
+            Span::raw("Collapse dir or jump to parent"),
         ]),
         Line::from(vec![
             Span::styled("  o            ", Style::default().fg(Color::Cyan)),

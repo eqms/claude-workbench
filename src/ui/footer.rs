@@ -12,7 +12,7 @@ use crate::types::{EditorMode, PaneId};
 /// Action identifiers for footer button clicks
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FooterAction {
-    FocusFiles,    // F1
+    ToggleFiles,   // F1
     TogglePreview, // F2
     Refresh,       // F3
     FocusClaude,   // F4
@@ -130,7 +130,7 @@ pub fn get_context_button_positions(
         vec![
             ("^S", "Save", FooterAction::Save),
             ("^H", "S&R", FooterAction::SearchReplace),
-            ("F1", "Files", FooterAction::FocusFiles),
+            ("F1", "Files", FooterAction::ToggleFiles),
             ("F3", "Refresh", FooterAction::Refresh),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
@@ -143,7 +143,7 @@ pub fn get_context_button_positions(
             ("E", "Edit", FooterAction::Edit),
             ("/", "Search", FooterAction::Search),
             ("^S", "Select", FooterAction::StartSelect),
-            ("F1", "Files", FooterAction::FocusFiles),
+            ("F1", "Files", FooterAction::ToggleFiles),
             ("F3", "Refresh", FooterAction::Refresh),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
@@ -157,7 +157,7 @@ pub fn get_context_button_positions(
     ) {
         vec![
             ("^S", "Select", FooterAction::StartSelect),
-            ("F1", "Files", FooterAction::FocusFiles),
+            ("F1", "Files", FooterAction::ToggleFiles),
             ("F2", "Preview", FooterAction::TogglePreview),
             ("F3", "Refresh", FooterAction::Refresh),
             ("F4", "Claude", FooterAction::FocusClaude),
@@ -169,7 +169,7 @@ pub fn get_context_button_positions(
     } else {
         // Default keys (file browser) - reduced set, more in Help (F12)
         vec![
-            ("F1", "Files", FooterAction::FocusFiles),
+            ("F1", "Files", FooterAction::ToggleFiles),
             ("F2", "Preview", FooterAction::TogglePreview),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),

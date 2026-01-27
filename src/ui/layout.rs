@@ -3,6 +3,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn compute_layout(
     area: Rect,
+    show_file_browser: bool,
     show_terminal: bool,
     show_lazygit: bool,
     show_preview: bool,
@@ -32,9 +33,30 @@ pub fn compute_layout(
     let show_right_panel = show_terminal || show_lazygit;
 
     // 2. Horizontal Split of Top Area (FileBrowser | Preview | Right Panel)
-    let (file_area, preview_area, right_stack_area) = match (show_preview, show_right_panel) {
-        // Preview visible, right panel visible: 3-column layout
-        (true, true) => {
+    let (file_area, preview_area, right_stack_area) = match (show_file_browser, show_preview, show_right_panel) {
+        // File browser hidden: distribute space among preview and right panel
+        (false, true, true) => {
+            let top_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(preview_pct + file_pct / 2),
+                    Constraint::Percentage(right_pct + file_pct / 2),
+                ])
+                .split(top_area);
+            (Rect::default(), top_chunks[0], top_chunks[1])
+        }
+        (false, true, false) => {
+            (Rect::default(), top_area, Rect::default())
+        }
+        (false, false, true) => {
+            (Rect::default(), Rect::default(), top_area)
+        }
+        (false, false, false) => {
+            // Nothing visible in top area
+            (Rect::default(), Rect::default(), Rect::default())
+        }
+        // File browser visible: original logic
+        (true, true, true) => {
             let top_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
@@ -45,35 +67,29 @@ pub fn compute_layout(
                 .split(top_area);
             (top_chunks[0], top_chunks[1], top_chunks[2])
         }
-        // Preview visible, no right panel: 2-column layout
-        (true, false) => {
-            // File browser keeps its percentage, preview gets the rest
+        (true, true, false) => {
             let preview_expanded = 100 - file_pct;
             let top_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(file_pct), // File Browser - from config
-                    Constraint::Percentage(preview_expanded), // Preview/Editor (expanded)
+                    Constraint::Percentage(file_pct),
+                    Constraint::Percentage(preview_expanded),
                 ])
                 .split(top_area);
             (top_chunks[0], top_chunks[1], Rect::default())
         }
-        // Preview hidden, right panel visible: 2-column layout (Git/Term gets Preview space)
-        (false, true) => {
-            // File browser keeps its percentage, right panel gets the rest
+        (true, false, true) => {
             let right_expanded = 100 - file_pct;
             let top_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(file_pct),       // File Browser - from config
-                    Constraint::Percentage(right_expanded), // Right Panel (expanded)
+                    Constraint::Percentage(file_pct),
+                    Constraint::Percentage(right_expanded),
                 ])
                 .split(top_area);
             (top_chunks[0], Rect::default(), top_chunks[1])
         }
-        // Preview hidden, no right panel: Only File Browser
-        (false, false) => {
-            // File browser gets all space when nothing else is visible
+        (true, false, false) => {
             (top_area, Rect::default(), Rect::default())
         }
     };

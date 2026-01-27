@@ -38,6 +38,7 @@ pub struct App {
     pub file_browser: FileBrowserState,
     pub preview: PreviewState,
     pub help: HelpState,
+    pub show_file_browser: bool,
     pub show_terminal: bool,
     pub show_lazygit: bool,
     pub show_preview: bool,
@@ -170,6 +171,7 @@ impl App {
             file_browser,
             preview: PreviewState::new(),
             help: HelpState::default(),
+            show_file_browser: true,
             show_terminal: false,
             show_lazygit: false,
             show_preview: true,
@@ -355,6 +357,30 @@ impl App {
         }
     }
 
+    /// Initialize Claude PTY after wizard completion
+    /// Shows permission mode dialog if configured, otherwise starts Claude directly
+    fn init_claude_after_wizard(&mut self) {
+        // Remove existing Claude PTY (started with pre-wizard config)
+        self.terminals.remove(&PaneId::Claude);
+        self.claude_error = None;
+
+        let should_show_permission_dialog = self.config.claude.show_permission_dialog
+            && self.config.claude.default_permission_mode.is_none();
+
+        if should_show_permission_dialog {
+            self.claude_pty_pending = true;
+            self.permission_mode_dialog.open();
+        } else {
+            let mode = self
+                .config
+                .claude
+                .default_permission_mode
+                .unwrap_or(ClaudePermissionMode::Default);
+            self.init_claude_pty(mode);
+            self.active_pane = PaneId::Claude;
+        }
+    }
+
     /// Trigger manual update check from settings menu
     pub fn trigger_update_check(&mut self) {
         self.update_state = UpdateState::new();
@@ -405,6 +431,7 @@ impl App {
                         let (files, preview, claude, lazygit, term, footer_area) =
                             ui::layout::compute_layout(
                                 area,
+                                self.show_file_browser,
                                 self.show_terminal,
                                 self.show_lazygit,
                                 self.show_preview,
@@ -678,8 +705,13 @@ impl App {
                                         if footer_x >= start && footer_x < end {
                                             use ui::footer::FooterAction;
                                             match action {
-                                                FooterAction::FocusFiles => {
-                                                    self.active_pane = PaneId::FileBrowser
+                                                FooterAction::ToggleFiles => {
+                                                    self.show_file_browser = !self.show_file_browser;
+                                                    if self.show_file_browser {
+                                                        self.active_pane = PaneId::FileBrowser;
+                                                    } else if self.active_pane == PaneId::FileBrowser {
+                                                        self.active_pane = PaneId::Claude;
+                                                    }
                                                 }
                                                 FooterAction::TogglePreview => {
                                                     self.show_preview = !self.show_preview;
@@ -1494,7 +1526,14 @@ impl App {
 
                             // Global Focus Switching
                             match key.code {
-                                KeyCode::F(1) => self.active_pane = PaneId::FileBrowser,
+                                KeyCode::F(1) => {
+                                    self.show_file_browser = !self.show_file_browser;
+                                    if self.show_file_browser {
+                                        self.active_pane = PaneId::FileBrowser;
+                                    } else if self.active_pane == PaneId::FileBrowser {
+                                        self.active_pane = PaneId::Claude;
+                                    }
+                                }
                                 KeyCode::F(2) => {
                                     self.show_preview = !self.show_preview;
                                     if self.show_preview {
@@ -2252,6 +2291,7 @@ impl App {
         let area = frame.area();
         let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(
             area,
+            self.show_file_browser,
             self.show_terminal,
             self.show_lazygit,
             self.show_preview,
@@ -2276,12 +2316,14 @@ impl App {
         resize_pty(&mut self.terminals, PaneId::LazyGit, lazygit);
         resize_pty(&mut self.terminals, PaneId::Terminal, terminal);
 
-        ui::file_browser::render(
-            frame,
-            files,
-            &mut self.file_browser,
-            self.active_pane == PaneId::FileBrowser,
-        );
+        if self.show_file_browser {
+            ui::file_browser::render(
+                frame,
+                files,
+                &mut self.file_browser,
+                self.active_pane == PaneId::FileBrowser,
+            );
+        }
 
         // Calculate Preview selection range (keyboard or mouse selection)
         let preview_selection_range = if self.terminal_selection.active
@@ -2918,8 +2960,9 @@ impl App {
                     }
                     self.wizard.next_step(); // Go to Complete
                 } else if self.wizard.step == WizardStep::Complete {
-                    // Just close on Complete step
+                    // Close wizard and initialize Claude PTY with new config
                     self.wizard.close();
+                    self.init_claude_after_wizard();
                 } else if self.wizard.can_proceed() {
                     self.wizard.next_step();
                 }
