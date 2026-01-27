@@ -1,0 +1,456 @@
+#!/bin/bash
+#
+# install.sh - Install claude-workbench on Linux/macOS
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
+#   bash scripts/install.sh [OPTIONS]
+#
+# Options:
+#   --help, -h         Show this help message
+#   --version          Show script version
+#   --local            Build from source using cargo (requires Git repo)
+#   --install-dir DIR  Installation directory (default: ~/.local/bin)
+#   --check            Only check dependencies, don't install
+#
+
+set -euo pipefail
+
+# Script version
+SCRIPT_VERSION="1.0.0"
+
+# Configuration
+BINARY_NAME="claude-workbench"
+REPO="eqms/claude-workbench"
+GITHUB_URL="https://github.com/${REPO}"
+INSTALL_DIR="${HOME}/.local/bin"
+LOCAL_BUILD=false
+CHECK_ONLY=false
+TMPDIR_CLEANUP=""
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# Cleanup handler
+cleanup() {
+    if [[ -n "$TMPDIR_CLEANUP" && -d "$TMPDIR_CLEANUP" ]]; then
+        rm -rf "$TMPDIR_CLEANUP"
+    fi
+}
+trap cleanup EXIT
+
+# --- Argument Parsing ---
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                print_help
+                exit 0
+                ;;
+            --version)
+                echo "install.sh version ${SCRIPT_VERSION}"
+                exit 0
+                ;;
+            --local)
+                LOCAL_BUILD=true
+                shift
+                ;;
+            --install-dir)
+                if [[ -z "${2:-}" ]]; then
+                    echo -e "${RED}Error: --install-dir requires a path argument${NC}"
+                    exit 1
+                fi
+                INSTALL_DIR="$2"
+                shift 2
+                ;;
+            --check)
+                CHECK_ONLY=true
+                shift
+                ;;
+            *)
+                echo -e "${RED}Error: Unknown option '$1'${NC}"
+                echo "Run with --help for usage information."
+                exit 1
+                ;;
+        esac
+    done
+}
+
+print_help() {
+    cat <<EOF
+${BOLD}claude-workbench installer${NC}
+
+${BOLD}USAGE:${NC}
+    bash install.sh [OPTIONS]
+
+${BOLD}OPTIONS:${NC}
+    -h, --help           Show this help message
+    --version            Show script version
+    --local              Build from source with cargo (requires Git repo checkout)
+    --install-dir DIR    Installation directory (default: ~/.local/bin)
+    --check              Only check dependencies, don't install
+
+${BOLD}EXAMPLES:${NC}
+    # Install latest release from GitHub
+    bash install.sh
+
+    # Install to custom directory
+    bash install.sh --install-dir /usr/local/bin
+
+    # Build from local source
+    bash install.sh --local
+
+    # Check dependencies only
+    bash install.sh --check
+
+${BOLD}ONE-LINER INSTALL:${NC}
+    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh | bash
+EOF
+}
+
+# --- UI Helpers ---
+
+print_banner() {
+    echo ""
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}        ${BOLD}Claude Workbench${NC} — Installer v${SCRIPT_VERSION}              ${BLUE}║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+print_row() {
+    local content="$1"
+    local len=${#content}
+    local padding=$((56 - len))
+    if (( padding < 0 )); then padding=0; fi
+    printf "${BLUE}║${NC}  %s%*s${BLUE}║${NC}\n" "$content" "$padding" ""
+}
+
+print_step() {
+    local step="$1"
+    local total="$2"
+    local msg="$3"
+    echo -e "${BLUE}[${step}/${total}]${NC} ${msg}"
+}
+
+# --- Platform Detection ---
+
+detect_platform() {
+    local os arch asset
+
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os" in
+        Linux)
+            case "$arch" in
+                x86_64)  asset="${BINARY_NAME}-x86_64-unknown-linux-gnu.tar.gz" ;;
+                aarch64) asset="${BINARY_NAME}-aarch64-unknown-linux-gnu.tar.gz" ;;
+                *)
+                    echo -e "${RED}Error: Unsupported Linux architecture: ${arch}${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        Darwin)
+            case "$arch" in
+                arm64)   asset="${BINARY_NAME}-aarch64-apple-darwin.tar.gz" ;;
+                x86_64)  asset="${BINARY_NAME}-x86_64-apple-darwin.tar.gz" ;;
+                *)
+                    echo -e "${RED}Error: Unsupported macOS architecture: ${arch}${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        *)
+            echo -e "${RED}Error: Unsupported operating system: ${os}${NC}"
+            echo "Use scripts/install.ps1 for Windows."
+            exit 1
+            ;;
+    esac
+
+    PLATFORM_OS="$os"
+    PLATFORM_ARCH="$arch"
+    ASSET_NAME="$asset"
+
+    echo -e "  Platform:  ${CYAN}${os} ${arch}${NC}"
+    echo -e "  Asset:     ${DIM}${asset}${NC}"
+    echo ""
+}
+
+# --- Dependency Checking ---
+
+check_dep() {
+    local name="$1"
+    local required="$2"
+    local install_apt="${3:-}"
+    local install_brew="${4:-}"
+    local install_url="${5:-}"
+
+    if command -v "$name" &>/dev/null; then
+        local ver
+        ver="$("$name" --version 2>/dev/null | head -1 || echo "installed")"
+        echo -e "  ${GREEN}✓${NC} ${name} ${DIM}(${ver})${NC}"
+        return 0
+    else
+        if [[ "$required" == "true" ]]; then
+            echo -e "  ${RED}✗${NC} ${name} ${RED}(required)${NC}"
+        else
+            echo -e "  ${YELLOW}○${NC} ${name} ${DIM}(optional)${NC}"
+        fi
+
+        # Show install hint
+        local hint=""
+        if [[ "$PLATFORM_OS" == "Linux" && -n "$install_apt" ]]; then
+            hint="$install_apt"
+        elif [[ "$PLATFORM_OS" == "Darwin" && -n "$install_brew" ]]; then
+            hint="$install_brew"
+        elif [[ -n "$install_url" ]]; then
+            hint="$install_url"
+        fi
+
+        if [[ -n "$hint" ]]; then
+            echo -e "           ${DIM}→ ${hint}${NC}"
+        fi
+
+        if [[ "$required" == "true" ]]; then
+            return 1
+        fi
+        return 0
+    fi
+}
+
+check_dependencies() {
+    echo -e "${BOLD}Dependency Check:${NC}"
+    echo ""
+
+    local has_errors=false
+
+    # Required
+    check_dep "git" "true" \
+        "sudo apt install git" \
+        "brew install git" \
+        "https://git-scm.com" || has_errors=true
+
+    # Optional
+    check_dep "fish" "false" \
+        "sudo apt install fish" \
+        "brew install fish" \
+        "https://fishshell.com"
+
+    check_dep "lazygit" "false" \
+        "https://github.com/jesseduffield/lazygit#installation" \
+        "brew install lazygit" \
+        "https://github.com/jesseduffield/lazygit"
+
+    check_dep "claude" "false" \
+        "https://docs.anthropic.com/en/docs/claude-code" \
+        "https://docs.anthropic.com/en/docs/claude-code" \
+        "https://docs.anthropic.com/en/docs/claude-code"
+
+    # cargo only required for --local
+    if [[ "$LOCAL_BUILD" == true ]]; then
+        check_dep "cargo" "true" \
+            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh" \
+            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh" \
+            "https://rustup.rs" || has_errors=true
+    fi
+
+    echo ""
+
+    if [[ "$has_errors" == true ]]; then
+        echo -e "${RED}Missing required dependencies. Please install them first.${NC}"
+        return 1
+    fi
+
+    echo -e "${GREEN}All required dependencies are available.${NC}"
+    echo ""
+    return 0
+}
+
+# --- Download & Install ---
+
+download_release() {
+    local url="${GITHUB_URL}/releases/latest/download/${ASSET_NAME}"
+    local tmpdir
+
+    tmpdir="$(mktemp -d)"
+    TMPDIR_CLEANUP="$tmpdir"
+
+    print_step 1 3 "Downloading latest release..."
+    echo -e "  ${DIM}${url}${NC}"
+
+    if command -v curl &>/dev/null; then
+        curl -fsSL "$url" -o "${tmpdir}/${ASSET_NAME}"
+    elif command -v wget &>/dev/null; then
+        wget -q "$url" -O "${tmpdir}/${ASSET_NAME}"
+    else
+        echo -e "${RED}Error: Neither curl nor wget found. Cannot download.${NC}"
+        exit 1
+    fi
+
+    echo -e "  ${GREEN}✓ Download complete${NC}"
+    echo ""
+
+    print_step 2 3 "Extracting archive..."
+    tar xzf "${tmpdir}/${ASSET_NAME}" -C "$tmpdir"
+
+    # Find the binary (may be in a subdirectory)
+    local binary
+    binary="$(find "$tmpdir" -name "$BINARY_NAME" -type f ! -name "*.tar.gz" | head -1)"
+
+    if [[ -z "$binary" ]]; then
+        echo -e "${RED}Error: Binary not found in archive${NC}"
+        exit 1
+    fi
+
+    echo -e "  ${GREEN}✓ Extracted${NC}"
+    echo ""
+
+    install_binary "$binary"
+}
+
+build_local() {
+    local project_dir
+
+    # Try to find Cargo.toml relative to script or current dir
+    if [[ -f "Cargo.toml" ]]; then
+        project_dir="$(pwd)"
+    elif [[ -f "$(dirname "$0")/../Cargo.toml" ]]; then
+        project_dir="$(cd "$(dirname "$0")/.." && pwd)"
+    else
+        echo -e "${RED}Error: Cargo.toml not found. Run --local from the project directory.${NC}"
+        exit 1
+    fi
+
+    print_step 1 3 "Building release version..."
+    echo -e "  ${DIM}cargo build --release${NC}"
+    echo ""
+
+    (cd "$project_dir" && cargo build --release 2>&1 | sed 's/^/      /')
+
+    local binary="${project_dir}/target/release/${BINARY_NAME}"
+    if [[ ! -f "$binary" ]]; then
+        echo -e "${RED}Error: Build failed — binary not found at ${binary}${NC}"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "  ${GREEN}✓ Build successful${NC}"
+    echo ""
+
+    install_binary "$binary"
+}
+
+install_binary() {
+    local source="$1"
+
+    print_step "$(( LOCAL_BUILD ? 2 : 3 ))" 3 "Installing binary..."
+
+    # Create install directory
+    if [[ ! -d "$INSTALL_DIR" ]]; then
+        echo -e "  Creating directory: ${INSTALL_DIR}"
+        mkdir -p "$INSTALL_DIR"
+    fi
+
+    cp "$source" "${INSTALL_DIR}/${BINARY_NAME}"
+    chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+
+    # macOS: remove quarantine attribute
+    if [[ "$PLATFORM_OS" == "Darwin" ]]; then
+        xattr -d com.apple.quarantine "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
+    fi
+
+    echo -e "  ${GREEN}✓ Installed to ${INSTALL_DIR}/${BINARY_NAME}${NC}"
+    echo ""
+}
+
+# --- PATH Check ---
+
+check_path() {
+    if [[ ":${PATH}:" == *":${INSTALL_DIR}:"* ]]; then
+        return
+    fi
+
+    echo -e "${YELLOW}Note: ${INSTALL_DIR} is not in your PATH${NC}"
+    echo ""
+
+    # Detect current shell for hint
+    local shell_name
+    shell_name="$(basename "${SHELL:-bash}")"
+
+    case "$shell_name" in
+        fish)
+            echo -e "  Add to ${DIM}~/.config/fish/config.fish${NC}:"
+            echo -e "  ${CYAN}fish_add_path ${INSTALL_DIR}${NC}"
+            ;;
+        zsh)
+            echo -e "  Add to ${DIM}~/.zshrc${NC}:"
+            echo -e "  ${CYAN}export PATH=\"${INSTALL_DIR}:\$PATH\"${NC}"
+            ;;
+        *)
+            echo -e "  Add to ${DIM}~/.bashrc${NC}:"
+            echo -e "  ${CYAN}export PATH=\"${INSTALL_DIR}:\$PATH\"${NC}"
+            ;;
+    esac
+    echo ""
+}
+
+# --- Completion ---
+
+print_completion() {
+    local binary_path="${INSTALL_DIR}/${BINARY_NAME}"
+    local binary_size version
+
+    binary_size="$(ls -lh "$binary_path" | awk '{print $5}')"
+    version="$("$binary_path" --version 2>/dev/null || echo "unknown")"
+
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}                  ${GREEN}Installation Complete${NC}                     ${BLUE}║${NC}"
+    echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
+    print_row "Binary:    ${BINARY_NAME}"
+    print_row "Version:   ${version}"
+    print_row "Size:      ${binary_size}"
+    print_row "Location:  ${binary_path}"
+    echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
+    printf "${BLUE}║${NC}  Run with:  ${YELLOW}%-45s${NC}${BLUE}║${NC}\n" "${BINARY_NAME}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+# --- Main ---
+
+main() {
+    parse_args "$@"
+
+    print_banner
+    detect_platform
+
+    if ! check_dependencies; then
+        exit 1
+    fi
+
+    if [[ "$CHECK_ONLY" == true ]]; then
+        echo "Dependency check complete. Use without --check to install."
+        exit 0
+    fi
+
+    if [[ "$LOCAL_BUILD" == true ]]; then
+        build_local
+    else
+        download_release
+    fi
+
+    check_path
+    print_completion
+}
+
+main "$@"

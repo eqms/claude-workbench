@@ -5,9 +5,9 @@
 ▸ Test:      cargo test
 ▸ Lint:      cargo clippy
 ▸ Format:    cargo fmt
-▸ Clean:     cargo clean
-▸ Release:   target/release/claude-workbench
-▸ Docs:      USAGE.md | CLAUDE.md
+▸ Install:   bash scripts/install.sh --local
+▸ Check:     bash scripts/install.sh --check
+▸ Docs:      USAGE.md | INSTALL.md | CLAUDE.md
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ▸ Git Push (Dual-Remote):
   git push origin main      # GitLab

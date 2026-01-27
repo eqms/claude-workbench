@@ -1,0 +1,10 @@
+# claude-workbench/scripts | installer
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+▸ Install:   bash install.sh
+▸ Local:     bash install.sh --local
+▸ Check:     bash install.sh --check
+▸ Help:      bash install.sh --help
+▸ Custom:    bash install.sh --install-dir /usr/local/bin
+▸ Windows:   pwsh install.ps1
+▸ Win Check: pwsh install.ps1 -Check
+▸ Win Help:  pwsh install.ps1 -Help

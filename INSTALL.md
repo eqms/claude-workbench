@@ -7,16 +7,49 @@
 <a name="english"></a>
 ## English
 
-### Quick Install
+### Quick Install (Recommended)
 
-Download the latest release for your platform from the [Releases](https://github.com/eqms/claude-workbench/releases) page.
+**Linux / macOS — One-Liner:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
+```
+
+**Windows — PowerShell One-Liner:**
+```powershell
+irm https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.ps1 | iex
+```
+
+**Or download manually** from the [Releases](https://github.com/eqms/claude-workbench/releases) page.
+
+### Installer Options
+
+The install scripts support several options:
+
+**Linux / macOS (`install.sh`):**
+```bash
+bash scripts/install.sh --help           # Show help
+bash scripts/install.sh --check          # Check dependencies only
+bash scripts/install.sh --local          # Build from source with cargo
+bash scripts/install.sh --install-dir /usr/local/bin  # Custom install directory
+```
+
+**Windows (`install.ps1`):**
+```powershell
+.\scripts\install.ps1 -Help             # Show help
+.\scripts\install.ps1 -Check            # Check dependencies only
+.\scripts\install.ps1 -Local            # Build from source with cargo
+.\scripts\install.ps1 -InstallDir C:\Tools  # Custom install directory
+```
 
 ### Platform-Specific Instructions
 
 #### Linux (x64 / ARM64)
 
 ```bash
-# Download the appropriate binary
+# Recommended: Use the installer
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
+
+# Or manual download:
 # For x64:
 curl -LO https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-linux-x64
 # For ARM64:
@@ -41,7 +74,10 @@ claude-workbench
 #### macOS (Apple Silicon / Intel)
 
 ```bash
-# Download the appropriate binary
+# Recommended: Use the installer (handles quarantine automatically)
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
+
+# Or manual download:
 # For Apple Silicon (M1/M2/M3/M4):
 curl -LO https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-macos-arm64
 # For Intel:
@@ -60,7 +96,7 @@ sudo mv claude-workbench-macos-* /usr/local/bin/claude-workbench
 claude-workbench
 ```
 
-**Note:** On first run, macOS may block the application. Go to System Settings > Privacy & Security and click "Open Anyway".
+**Note:** On first run, macOS may block the application. Go to System Settings > Privacy & Security and click "Open Anyway". The installer script handles quarantine removal automatically.
 
 **Dependencies:**
 - Terminal.app, iTerm2, or another terminal emulator
@@ -70,7 +106,17 @@ claude-workbench
 
 #### Windows (x64 / ARM64)
 
-**Option 1: Direct Download**
+**Option 1: PowerShell Installer (Recommended)**
+```powershell
+# One-liner install
+irm https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.ps1 | iex
+
+# Or with options
+.\scripts\install.ps1 -Check    # Check dependencies first
+.\scripts\install.ps1            # Install latest release
+```
+
+**Option 2: Direct Download**
 1. Download the appropriate binary from the [Releases](https://github.com/eqms/claude-workbench/releases) page:
    - For x64: `claude-workbench-windows-x64.exe`
    - For ARM64 (Surface Pro X, etc.): `claude-workbench-windows-arm64.exe`
@@ -154,16 +200,47 @@ xattr -d com.apple.quarantine claude-workbench-macos-*
 <a name="deutsch"></a>
 ## Deutsch
 
-### Schnellinstallation
+### Schnellinstallation (Empfohlen)
 
-Laden Sie die neueste Version für Ihre Plattform von der [Releases](https://github.com/eqms/claude-workbench/releases)-Seite herunter.
+**Linux / macOS — Ein Befehl:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
+```
+
+**Windows — PowerShell Ein Befehl:**
+```powershell
+irm https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.ps1 | iex
+```
+
+**Oder manuell herunterladen** von der [Releases](https://github.com/eqms/claude-workbench/releases)-Seite.
+
+### Installer-Optionen
+
+**Linux / macOS (`install.sh`):**
+```bash
+bash scripts/install.sh --help           # Hilfe anzeigen
+bash scripts/install.sh --check          # Nur Abhängigkeiten prüfen
+bash scripts/install.sh --local          # Aus Quellcode mit cargo bauen
+bash scripts/install.sh --install-dir /usr/local/bin  # Eigenes Installationsverzeichnis
+```
+
+**Windows (`install.ps1`):**
+```powershell
+.\scripts\install.ps1 -Help             # Hilfe anzeigen
+.\scripts\install.ps1 -Check            # Nur Abhängigkeiten prüfen
+.\scripts\install.ps1 -Local            # Aus Quellcode mit cargo bauen
+.\scripts\install.ps1 -InstallDir C:\Tools  # Eigenes Installationsverzeichnis
+```
 
 ### Plattform-spezifische Anleitungen
 
 #### Linux (x64 / ARM64)
 
 ```bash
-# Entsprechendes Binary herunterladen
+# Empfohlen: Installer verwenden
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
+
+# Oder manueller Download:
 # Für x64:
 curl -LO https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-linux-x64
 # Für ARM64:
@@ -188,7 +265,10 @@ claude-workbench
 #### macOS (Apple Silicon / Intel)
 
 ```bash
-# Entsprechendes Binary herunterladen
+# Empfohlen: Installer verwenden (entfernt Quarantäne automatisch)
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
+
+# Oder manueller Download:
 # Für Apple Silicon (M1/M2/M3/M4):
 curl -LO https://github.com/eqms/claude-workbench/releases/latest/download/claude-workbench-macos-arm64
 # Für Intel:
@@ -207,7 +287,7 @@ sudo mv claude-workbench-macos-* /usr/local/bin/claude-workbench
 claude-workbench
 ```
 
-**Hinweis:** Beim ersten Start kann macOS die Anwendung blockieren. Gehen Sie zu Systemeinstellungen > Datenschutz & Sicherheit und klicken Sie auf "Trotzdem öffnen".
+**Hinweis:** Beim ersten Start kann macOS die Anwendung blockieren. Gehen Sie zu Systemeinstellungen > Datenschutz & Sicherheit und klicken Sie auf "Trotzdem öffnen". Das Installer-Skript entfernt das Quarantäne-Attribut automatisch.
 
 **Abhängigkeiten:**
 - Terminal.app, iTerm2 oder ein anderer Terminal-Emulator
@@ -217,7 +297,17 @@ claude-workbench
 
 #### Windows (x64 / ARM64)
 
-**Option 1: Direkter Download**
+**Option 1: PowerShell-Installer (Empfohlen)**
+```powershell
+# Ein-Befehl-Installation
+irm https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.ps1 | iex
+
+# Oder mit Optionen
+.\scripts\install.ps1 -Check    # Erst Abhängigkeiten prüfen
+.\scripts\install.ps1            # Neueste Version installieren
+```
+
+**Option 2: Direkter Download**
 1. Laden Sie das passende Binary von der [Releases](https://github.com/eqms/claude-workbench/releases)-Seite herunter:
    - Für x64: `claude-workbench-windows-x64.exe`
    - Für ARM64 (Surface Pro X, etc.): `claude-workbench-windows-arm64.exe`
