@@ -997,6 +997,7 @@ impl App {
                                     if let Some(target_pane) = drop_target {
                                         if let Some(path) = self.drag_state.finish() {
                                             self.insert_path_at_cursor(target_pane, &path);
+                                            self.active_pane = target_pane;
                                         }
                                     } else {
                                         self.drag_state.clear();
