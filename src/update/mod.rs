@@ -3,7 +3,7 @@
 //! Uses GitHub Releases as backend via the `self_update` crate.
 //! Provides non-blocking update checks and update execution.
 
-use self_update::backends::github::Update;
+use self_update::backends::github::{ReleaseList, Update};
 use std::sync::mpsc;
 use std::thread;
 
@@ -21,7 +21,11 @@ pub enum UpdateCheckResult {
     /// Currently running the latest version
     UpToDate,
     /// A newer version is available
-    UpdateAvailable { version: String },
+    UpdateAvailable {
+        version: String,
+        /// Release notes (body) from GitHub Release
+        release_notes: Option<String>,
+    },
     /// No releases found (may indicate missing assets for this platform)
     NoReleasesFound,
     /// Check failed with error message
@@ -49,6 +53,10 @@ pub struct UpdateState {
     pub updating: bool,
     /// Result of the last check (if any)
     pub available_version: Option<String>,
+    /// Release notes for the available version
+    pub release_notes: Option<String>,
+    /// Scroll position for viewing release notes
+    pub release_notes_scroll: u16,
     /// Error from last check (if any)
     pub error: Option<String>,
     /// Whether to show the update dialog
@@ -65,17 +73,33 @@ impl UpdateState {
     }
 
     /// Mark update as available
-    pub fn set_available(&mut self, version: String) {
+    pub fn set_available(&mut self, version: String, release_notes: Option<String>) {
         self.checking = false;
         self.available_version = Some(version);
+        self.release_notes = release_notes;
+        self.release_notes_scroll = 0;
         self.error = None;
         self.show_dialog = true;
+    }
+
+    /// Scroll release notes up
+    pub fn scroll_release_notes_up(&mut self) {
+        self.release_notes_scroll = self.release_notes_scroll.saturating_sub(1);
+    }
+
+    /// Scroll release notes down
+    pub fn scroll_release_notes_down(&mut self, max_scroll: u16) {
+        if self.release_notes_scroll < max_scroll {
+            self.release_notes_scroll += 1;
+        }
     }
 
     /// Mark as up-to-date
     pub fn set_up_to_date(&mut self) {
         self.checking = false;
         self.available_version = None;
+        self.release_notes = None;
+        self.release_notes_scroll = 0;
         self.error = None;
     }
 
@@ -110,14 +134,56 @@ impl UpdateState {
     }
 }
 
-/// Check for updates synchronously (blocking)
+/// Fetch release notes for a specific version from GitHub
 ///
-/// This should be called from a background thread.
-pub fn check_for_update_sync() -> UpdateCheckResult {
-    // Debug: Log current version and target platform
+/// Returns the body text of the release if available.
+pub fn fetch_release_notes(version: &str) -> Option<String> {
+    let releases = ReleaseList::configure()
+        .repo_owner(REPO_OWNER)
+        .repo_name(REPO_NAME)
+        .build()
+        .ok()?
+        .fetch()
+        .ok()?;
+
+    // Normalize version: strip 'v' prefix for comparison
+    let version_normalized = version.strip_prefix('v').unwrap_or(version);
+
+    releases
+        .into_iter()
+        .find(|r| {
+            let release_version = r.version.strip_prefix('v').unwrap_or(&r.version);
+            release_version == version_normalized
+        })
+        .and_then(|r| r.body)
+}
+
+/// Compare two semver versions, returns true if `new` is newer than `current`
+pub fn version_newer(new: &str, current: &str) -> bool {
+    let new_normalized = new.strip_prefix('v').unwrap_or(new);
+    let current_normalized = current.strip_prefix('v').unwrap_or(current);
+
+    let parse_version = |s: &str| -> (u32, u32, u32) {
+        let parts: Vec<&str> = s.split('.').collect();
+        let major = parts.first().and_then(|p| p.parse().ok()).unwrap_or(0);
+        let minor = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
+        let patch = parts.get(2).and_then(|p| p.parse().ok()).unwrap_or(0);
+        (major, minor, patch)
+    };
+
+    let new_v = parse_version(new_normalized);
+    let current_v = parse_version(current_normalized);
+
+    new_v > current_v
+}
+
+/// Check for updates synchronously with a specific version (for testing)
+///
+/// Allows overriding the current version for testing purposes.
+pub fn check_for_update_with_version(current_version: &str) -> UpdateCheckResult {
     #[cfg(debug_assertions)]
     {
-        eprintln!("[Update] Current version: {}", CURRENT_VERSION);
+        eprintln!("[Update] Current version: {}", current_version);
         eprintln!("[Update] Checking GitHub: {}/{}", REPO_OWNER, REPO_NAME);
         eprintln!("[Update] Binary name: {}", BIN_NAME);
         eprintln!(
@@ -127,54 +193,72 @@ pub fn check_for_update_sync() -> UpdateCheckResult {
         );
     }
 
-    match Update::configure()
+    // Use ReleaseList directly to get full release info including body
+    match ReleaseList::configure()
         .repo_owner(REPO_OWNER)
         .repo_name(REPO_NAME)
-        .bin_name(BIN_NAME)
-        .current_version(CURRENT_VERSION)
         .build()
     {
-        Ok(updater) => {
-            // Get the target version (latest available)
-            match updater.target_version() {
-                Some(target) => {
+        Ok(release_list) => match release_list.fetch() {
+            Ok(releases) => {
+                if releases.is_empty() {
                     #[cfg(debug_assertions)]
-                    eprintln!("[Update] GitHub version: {}", target);
-
-                    // Normalize versions: strip 'v' prefix if present for comparison
-                    let current_normalized =
-                        CURRENT_VERSION.strip_prefix('v').unwrap_or(CURRENT_VERSION);
-                    let target_normalized = target.strip_prefix('v').unwrap_or(&target);
-
-                    // self_update returns the latest release version
-                    // If it differs from current, an update is available
-                    if target_normalized == current_normalized {
-                        #[cfg(debug_assertions)]
-                        eprintln!("[Update] Already up-to-date");
-                        UpdateCheckResult::UpToDate
-                    } else {
-                        #[cfg(debug_assertions)]
-                        eprintln!(
-                            "[Update] Update available: {} -> {}",
-                            current_normalized, target_normalized
-                        );
-                        UpdateCheckResult::UpdateAvailable { version: target }
-                    }
+                    eprintln!("[Update] No releases found");
+                    return UpdateCheckResult::NoReleasesFound;
                 }
-                // None means no releases found (possibly no assets for this platform)
-                None => {
+
+                // Find the latest release (first one is usually latest)
+                let latest = &releases[0];
+                let target_version = &latest.version;
+
+                #[cfg(debug_assertions)]
+                eprintln!("[Update] GitHub version: {}", target_version);
+
+                // Normalize versions
+                let current_normalized =
+                    current_version.strip_prefix('v').unwrap_or(current_version);
+                let target_normalized = target_version.strip_prefix('v').unwrap_or(target_version);
+
+                if target_normalized == current_normalized {
                     #[cfg(debug_assertions)]
-                    eprintln!("[Update] No releases found for this platform");
-                    UpdateCheckResult::NoReleasesFound
+                    eprintln!("[Update] Already up-to-date");
+                    UpdateCheckResult::UpToDate
+                } else if version_newer(target_version, current_version) {
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "[Update] Update available: {} -> {}",
+                        current_normalized, target_normalized
+                    );
+                    UpdateCheckResult::UpdateAvailable {
+                        version: target_version.clone(),
+                        release_notes: latest.body.clone(),
+                    }
+                } else {
+                    // Current is newer (development version)
+                    #[cfg(debug_assertions)]
+                    eprintln!("[Update] Current version is newer than latest release");
+                    UpdateCheckResult::UpToDate
                 }
             }
-        }
+            Err(e) => {
+                #[cfg(debug_assertions)]
+                eprintln!("[Update] Error fetching releases: {}", e);
+                UpdateCheckResult::Error(format!("{}", e))
+            }
+        },
         Err(e) => {
             #[cfg(debug_assertions)]
             eprintln!("[Update] Error: {}", e);
             UpdateCheckResult::Error(format!("{}", e))
         }
     }
+}
+
+/// Check for updates synchronously (blocking)
+///
+/// This should be called from a background thread.
+pub fn check_for_update_sync() -> UpdateCheckResult {
+    check_for_update_with_version(CURRENT_VERSION)
 }
 
 /// Start an async update check
@@ -262,13 +346,216 @@ mod tests {
         assert!(state.checking);
 
         // Set available
-        state.set_available("1.0.0".to_string());
+        state.set_available("1.0.0".to_string(), Some("Release notes".to_string()));
         assert!(!state.checking);
         assert_eq!(state.available_version, Some("1.0.0".to_string()));
+        assert_eq!(state.release_notes, Some("Release notes".to_string()));
         assert!(state.show_dialog);
 
         // Close dialog
         state.close_dialog();
         assert!(!state.show_dialog);
+    }
+
+    #[test]
+    fn test_version_newer_basic() {
+        // Basic version comparisons
+        assert!(version_newer("0.37.2", "0.37.1"));
+        assert!(version_newer("0.38.0", "0.37.2"));
+        assert!(version_newer("1.0.0", "0.99.99"));
+        assert!(!version_newer("0.37.1", "0.37.2"));
+        assert!(!version_newer("0.37.2", "0.37.2"));
+    }
+
+    #[test]
+    fn test_version_newer_with_v_prefix() {
+        // Versions with 'v' prefix should be handled correctly
+        assert!(version_newer("v0.37.2", "0.37.1"));
+        assert!(version_newer("0.37.2", "v0.37.1"));
+        assert!(version_newer("v0.37.2", "v0.37.1"));
+        assert!(!version_newer("v0.37.1", "v0.37.2"));
+        assert!(!version_newer("v0.37.2", "v0.37.2"));
+    }
+
+    #[test]
+    fn test_version_newer_edge_cases() {
+        // Edge cases
+        assert!(version_newer("1.0.0", "0.0.0"));
+        assert!(version_newer("0.1.0", "0.0.0"));
+        assert!(version_newer("0.0.1", "0.0.0"));
+        assert!(!version_newer("0.0.0", "0.0.0"));
+        // Two-part versions
+        assert!(version_newer("0.38", "0.37"));
+        // Development versions (current newer than release)
+        assert!(!version_newer("0.37.0", "0.37.2"));
+    }
+
+    #[test]
+    fn test_release_notes_scroll() {
+        let mut state = UpdateState::new();
+        state.set_available(
+            "1.0.0".to_string(),
+            Some("Line 1\nLine 2\nLine 3".to_string()),
+        );
+
+        assert_eq!(state.release_notes_scroll, 0);
+
+        // Scroll down
+        state.scroll_release_notes_down(10);
+        assert_eq!(state.release_notes_scroll, 1);
+
+        state.scroll_release_notes_down(10);
+        assert_eq!(state.release_notes_scroll, 2);
+
+        // Scroll up
+        state.scroll_release_notes_up();
+        assert_eq!(state.release_notes_scroll, 1);
+
+        // Can't scroll past 0
+        state.scroll_release_notes_up();
+        state.scroll_release_notes_up();
+        assert_eq!(state.release_notes_scroll, 0);
+
+        // Can't scroll past max
+        for _ in 0..20 {
+            state.scroll_release_notes_down(5);
+        }
+        assert_eq!(state.release_notes_scroll, 5);
+    }
+
+    #[test]
+    fn test_platform_identification() {
+        // Verify platform detection works
+        let os = std::env::consts::OS;
+        let arch = std::env::consts::ARCH;
+
+        assert!(!os.is_empty(), "OS should be detected");
+        assert!(!arch.is_empty(), "Architecture should be detected");
+
+        // Common expected values
+        let valid_os = ["linux", "macos", "darwin", "windows"];
+
+        // At least one should match (platform-dependent)
+        assert!(
+            valid_os.iter().any(|&v| os.to_lowercase().contains(v))
+                || os == "macos"
+                || os == "darwin",
+            "Unknown OS: {}",
+            os
+        );
+    }
+
+    // ==========================================================================
+    // Integration tests - require network access, run manually with:
+    // cargo test --lib update -- --ignored --nocapture
+    // ==========================================================================
+
+    #[test]
+    #[ignore]
+    fn test_github_release_accessible() {
+        eprintln!("Testing GitHub API accessibility...");
+        eprintln!("Current version: {}", CURRENT_VERSION);
+
+        let result = check_for_update_with_version(CURRENT_VERSION);
+
+        match result {
+            UpdateCheckResult::Error(e) => {
+                panic!("GitHub API error: {}", e);
+            }
+            UpdateCheckResult::NoReleasesFound => {
+                panic!(
+                    "No releases found for platform: {}-{}",
+                    std::env::consts::ARCH,
+                    std::env::consts::OS
+                );
+            }
+            UpdateCheckResult::UpToDate => {
+                eprintln!("✅ GitHub API accessible - current version is up-to-date");
+            }
+            UpdateCheckResult::UpdateAvailable {
+                version,
+                release_notes,
+            } => {
+                eprintln!("✅ GitHub API accessible - update available: {}", version);
+                if release_notes.is_some() {
+                    eprintln!("   Release notes available");
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_release_notes_fetchable() {
+        eprintln!("Testing release notes fetching...");
+
+        // Get the latest version from GitHub
+        let result = check_for_update_with_version("0.0.0");
+
+        let version_to_test = match result {
+            UpdateCheckResult::UpdateAvailable { version, .. } => version,
+            UpdateCheckResult::UpToDate => CURRENT_VERSION.to_string(),
+            UpdateCheckResult::NoReleasesFound => {
+                eprintln!("⚠️  No releases found, skipping test");
+                return;
+            }
+            UpdateCheckResult::Error(e) => {
+                panic!("Cannot test: {}", e);
+            }
+        };
+
+        eprintln!("Fetching release notes for version: {}", version_to_test);
+
+        if let Some(body) = fetch_release_notes(&version_to_test) {
+            eprintln!("✅ Release notes fetched successfully");
+            eprintln!("───────────────────────────────────");
+            for line in body.lines().take(10) {
+                eprintln!("  {}", line);
+            }
+            if body.lines().count() > 10 {
+                eprintln!("  ... ({} more lines)", body.lines().count() - 10);
+            }
+            eprintln!("───────────────────────────────────");
+        } else {
+            eprintln!("⚠️  No release notes body for version {}", version_to_test);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_update_check_with_fake_version() {
+        eprintln!("Testing update check with simulated older version...");
+
+        let fake_version = "0.1.0";
+        eprintln!("Fake version: {}", fake_version);
+        eprintln!("Real version: {}", CURRENT_VERSION);
+
+        let result = check_for_update_with_version(fake_version);
+
+        match result {
+            UpdateCheckResult::UpdateAvailable {
+                version,
+                release_notes,
+            } => {
+                eprintln!("✅ Update found: {} -> {}", fake_version, version);
+                assert!(
+                    version_newer(&version, fake_version),
+                    "New version should be newer than fake version"
+                );
+
+                if let Some(notes) = release_notes {
+                    eprintln!("   Release notes: {} chars", notes.len());
+                }
+            }
+            UpdateCheckResult::UpToDate => {
+                panic!("Expected update available for version {}", fake_version);
+            }
+            UpdateCheckResult::NoReleasesFound => {
+                panic!("No releases found");
+            }
+            UpdateCheckResult::Error(e) => {
+                panic!("Error: {}", e);
+            }
+        }
     }
 }

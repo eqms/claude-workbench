@@ -242,8 +242,11 @@ impl App {
                             self.update_state.show_dialog = true;
                         }
                     }
-                    UpdateCheckResult::UpdateAvailable { version } => {
-                        self.update_state.set_available(version);
+                    UpdateCheckResult::UpdateAvailable {
+                        version,
+                        release_notes,
+                    } => {
+                        self.update_state.set_available(version, release_notes);
                     }
                     UpdateCheckResult::NoReleasesFound => {
                         // No releases found - treat as up-to-date for auto checks
@@ -1189,6 +1192,21 @@ impl App {
                                             self.update_dialog_button =
                                                 self.update_dialog_button.toggle();
                                         }
+                                    }
+                                    KeyCode::Up | KeyCode::Char('k') => {
+                                        // Scroll release notes up
+                                        self.update_state.scroll_release_notes_up();
+                                    }
+                                    KeyCode::Down | KeyCode::Char('j') => {
+                                        // Scroll release notes down
+                                        // Max scroll = number of lines - visible area (estimate ~10)
+                                        let max = self
+                                            .update_state
+                                            .release_notes
+                                            .as_ref()
+                                            .map(|n| n.lines().count().saturating_sub(10) as u16)
+                                            .unwrap_or(0);
+                                        self.update_state.scroll_release_notes_down(max);
                                     }
                                     _ => {}
                                 }

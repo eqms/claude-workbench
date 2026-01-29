@@ -1,6 +1,6 @@
 [package]
 name = "claude-workbench"
-version = "0.37.2"
+version = "0.38.0"
 edition = "2021"
 
 [dependencies]
@@ -13,7 +13,7 @@ serde_yaml = "0.9.33"
 dirs = "5.0"
 tui-textarea = { git = "https://github.com/0xferrous/tui-textarea.git", branch = "update-ratatui" }
 portable-pty = "0.8.1"
-clap = { version = "4.5.21", features = ["derive"] }
+clap = { version = "4.5.21", features = ["derive", "env"] }
 vt100 = "0.16"
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
 tui-markdown = "0.3"

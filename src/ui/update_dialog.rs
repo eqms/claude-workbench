@@ -48,8 +48,20 @@ pub fn render(
     let mut areas = UpdateDialogAreas::default();
 
     // Calculate centered popup area
-    let popup_width = 50u16.min(area.width.saturating_sub(4));
-    let popup_height = if state.updating { 8 } else { 12 };
+    // Make dialog larger when release notes are available
+    let has_notes = state.release_notes.is_some();
+    let popup_width = if has_notes {
+        60u16.min(area.width.saturating_sub(4))
+    } else {
+        50u16.min(area.width.saturating_sub(4))
+    };
+    let popup_height = if state.updating {
+        8
+    } else if has_notes {
+        20 // Larger dialog for release notes
+    } else {
+        12
+    };
     let popup_height = popup_height.min(area.height.saturating_sub(4));
 
     let popup_x = (area.width.saturating_sub(popup_width)) / 2;
@@ -102,7 +114,13 @@ pub fn render(
         render_error(frame, chunks[0], error);
         render_close_button(frame, chunks[1]);
     } else if let Some(ref new_version) = state.available_version {
-        render_update_available(frame, chunks[0], new_version);
+        render_update_available(
+            frame,
+            chunks[0],
+            new_version,
+            state.release_notes.as_deref(),
+            state.release_notes_scroll,
+        );
         areas = render_buttons(frame, chunks[1], selected_button, areas);
     } else {
         render_up_to_date(frame, chunks[0]);
@@ -201,15 +219,28 @@ fn render_up_to_date(frame: &mut Frame, area: Rect) {
     frame.render_widget(content, area);
 }
 
-fn render_update_available(frame: &mut Frame, area: Rect, new_version: &str) {
-    let content = Paragraph::new(vec![
-        Line::from(""),
+fn render_update_available(
+    frame: &mut Frame,
+    area: Rect,
+    new_version: &str,
+    release_notes: Option<&str>,
+    scroll: u16,
+) {
+    // Calculate layout: header info, separator, scrollable release notes
+    let chunks = Layout::vertical([
+        Constraint::Length(4), // Version info
+        Constraint::Min(1),    // Release notes
+    ])
+    .split(area);
+
+    // Version info section
+    let version_content = Paragraph::new(vec![
         Line::from(vec![
-            Span::styled("Current Version: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Current: ", Style::default().fg(Color::DarkGray)),
             Span::styled(CURRENT_VERSION, Style::default().fg(Color::Yellow)),
         ]),
         Line::from(vec![
-            Span::styled("New Version:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("New:     ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 new_version,
                 Style::default()
@@ -218,13 +249,39 @@ fn render_update_available(frame: &mut Frame, area: Rect, new_version: &str) {
             ),
         ]),
         Line::from(""),
-        Line::from(Span::styled(
-            "A new version is available!",
-            Style::default().fg(Color::Cyan),
-        )),
     ])
     .alignment(Alignment::Center);
-    frame.render_widget(content, area);
+    frame.render_widget(version_content, chunks[0]);
+
+    // Release notes section
+    if let Some(notes) = release_notes {
+        let notes_lines: Vec<Line> = notes
+            .lines()
+            .map(|line| Line::from(Span::styled(line, Style::default().fg(Color::White))))
+            .collect();
+
+        let notes_block = Block::default()
+            .title(" What's New ")
+            .title_style(Style::default().fg(Color::Cyan))
+            .borders(Borders::TOP)
+            .border_style(Style::default().fg(Color::DarkGray));
+
+        let notes_inner = notes_block.inner(chunks[1]);
+        frame.render_widget(notes_block, chunks[1]);
+
+        let notes_widget = Paragraph::new(notes_lines)
+            .scroll((scroll, 0))
+            .style(Style::default().fg(Color::Gray));
+
+        frame.render_widget(notes_widget, notes_inner);
+    } else {
+        let no_notes = Paragraph::new(Line::from(Span::styled(
+            "A new version is available!",
+            Style::default().fg(Color::Cyan),
+        )))
+        .alignment(Alignment::Center);
+        frame.render_widget(no_notes, chunks[1]);
+    }
 }
 
 fn render_buttons(
