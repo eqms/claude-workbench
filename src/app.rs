@@ -84,10 +84,12 @@ pub struct App {
     pub update_dialog_button: UpdateDialogButton,
     // Cached update dialog areas for mouse clicks
     pub update_dialog_areas: UpdateDialogAreas,
+    // Fake version for testing updates (--fake-version CLI arg)
+    pub fake_version: Option<String>,
 }
 
 impl App {
-    pub fn new(config: Config, session: SessionState) -> Self {
+    pub fn new(config: Config, session: SessionState, fake_version: Option<String>) -> Self {
         let rows = 24;
         let cols = 80;
 
@@ -201,6 +203,7 @@ impl App {
             update_receiver: None,
             update_dialog_button: UpdateDialogButton::default(),
             update_dialog_areas: UpdateDialogAreas::default(),
+            fake_version,
         };
 
         // Open wizard on first run
@@ -227,7 +230,8 @@ impl App {
     /// Start async update check
     fn start_update_check(&mut self) {
         self.update_state.start_check();
-        self.update_check_receiver = Some(update::check_for_update_async());
+        self.update_check_receiver =
+            Some(update::check_for_update_async_with_version(self.fake_version.clone()));
     }
 
     /// Poll for async update check results
@@ -301,7 +305,22 @@ impl App {
     /// Start the actual update process
     fn start_update(&mut self) {
         self.update_state.start_update();
-        self.update_receiver = Some(update::perform_update_async());
+
+        // If fake_version is set, simulate the update instead of downloading
+        if self.fake_version.is_some() {
+            // Simulate update with a short delay
+            let (tx, rx) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                let _ = tx.send(update::UpdateResult::Success {
+                    old_version: "simulated".to_string(),
+                    new_version: "simulated".to_string(),
+                });
+            });
+            self.update_receiver = Some(rx);
+        } else {
+            self.update_receiver = Some(update::perform_update_async());
+        }
     }
 
     /// Build Claude command with permission mode flags
@@ -538,7 +557,10 @@ impl App {
                                 }
 
                                 // Permission mode dialog - click outside uses default mode
-                                if self.permission_mode_dialog.visible {
+                                // Skip if update dialog is visible - update takes priority
+                                if self.permission_mode_dialog.visible
+                                    && !self.update_state.show_dialog
+                                {
                                     let mode = ClaudePermissionMode::Default;
                                     self.permission_mode_dialog.close();
                                     if self.claude_pty_pending {
@@ -1487,7 +1509,10 @@ impl App {
                             }
 
                             // Permission mode dialog handling (high priority - before Claude startup)
-                            if self.permission_mode_dialog.visible {
+                            // Skip if update dialog is visible - update takes priority
+                            if self.permission_mode_dialog.visible
+                                && !self.update_state.show_dialog
+                            {
                                 match key.code {
                                     KeyCode::Esc => {
                                         // Cancel: use default mode
@@ -2424,7 +2449,8 @@ impl App {
         }
 
         // Permission mode dialog (render on top, before drag ghost)
-        if self.permission_mode_dialog.visible {
+        // Don't show if update dialog is visible - update takes priority
+        if self.permission_mode_dialog.visible && !self.update_state.show_dialog {
             ui::permission_mode::render(frame, area, &self.permission_mode_dialog);
         }
 

@@ -158,6 +158,62 @@ pub fn fetch_release_notes(version: &str) -> Option<String> {
         .and_then(|r| r.body)
 }
 
+/// Filter release notes to show only downloads for the current platform
+///
+/// This helps users see relevant download links instead of all platform variants.
+pub fn filter_release_notes_for_platform(notes: &str) -> String {
+    let current_os = std::env::consts::OS; // "macos", "linux", "windows"
+    let current_arch = std::env::consts::ARCH; // "aarch64", "x86_64"
+
+    // Platform-specific labels used in release notes
+    let platform_label = match (current_os, current_arch) {
+        ("macos", "aarch64") => "Apple Silicon",
+        ("macos", "x86_64") => "macOS Intel",
+        ("linux", "aarch64") => "Linux ARM64",
+        ("linux", "x86_64") => "Linux x64",
+        ("windows", "x86_64") => "Windows x64",
+        ("windows", "aarch64") => "Windows ARM64",
+        _ => return notes.to_string(), // Unknown platform: show all
+    };
+
+    let mut result = Vec::new();
+    let mut in_table = false;
+
+    for line in notes.lines() {
+        // Detect table start (line starts with | and contains header-like content)
+        if line.starts_with('|') && !in_table {
+            in_table = true;
+            result.push(line);
+            continue;
+        }
+
+        // Detect table separator (|---|---|)
+        if in_table && line.starts_with('|') && line.contains("---") {
+            result.push(line);
+            continue;
+        }
+
+        // In table: filter rows
+        if in_table && line.starts_with('|') {
+            if line.contains(platform_label) {
+                result.push(line);
+            }
+            // Skip other platform rows
+            continue;
+        }
+
+        // Table ends when line doesn't start with |
+        if in_table && !line.starts_with('|') {
+            in_table = false;
+        }
+
+        // Outside table: keep all content
+        result.push(line);
+    }
+
+    result.join("\n")
+}
+
 /// Compare two semver versions, returns true if `new` is newer than `current`
 pub fn version_newer(new: &str, current: &str) -> bool {
     let new_normalized = new.strip_prefix('v').unwrap_or(new);
@@ -231,7 +287,10 @@ pub fn check_for_update_with_version(current_version: &str) -> UpdateCheckResult
                     );
                     UpdateCheckResult::UpdateAvailable {
                         version: target_version.clone(),
-                        release_notes: latest.body.clone(),
+                        release_notes: latest
+                            .body
+                            .as_ref()
+                            .map(|n| filter_release_notes_for_platform(n)),
                     }
                 } else {
                     // Current is newer (development version)
@@ -265,9 +324,19 @@ pub fn check_for_update_sync() -> UpdateCheckResult {
 ///
 /// Returns a receiver that will receive the result when the check is complete.
 pub fn check_for_update_async() -> mpsc::Receiver<UpdateCheckResult> {
+    check_for_update_async_with_version(None)
+}
+
+/// Start an async update check with optional fake version for testing
+///
+/// If fake_version is provided, it will be used instead of CURRENT_VERSION.
+pub fn check_for_update_async_with_version(
+    fake_version: Option<String>,
+) -> mpsc::Receiver<UpdateCheckResult> {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        let result = check_for_update_sync();
+        let version = fake_version.as_deref().unwrap_or(CURRENT_VERSION);
+        let result = check_for_update_with_version(version);
         let _ = tx.send(result);
     });
     rx
@@ -284,6 +353,8 @@ pub fn perform_update_sync() -> UpdateResult {
         .bin_name(BIN_NAME)
         .current_version(CURRENT_VERSION)
         .show_download_progress(false) // We show our own UI
+        .show_output(false) // Suppress all output messages (TUI handles display)
+        .no_confirm(true) // Skip Y/n prompt (TUI already confirmed)
         .build()
     {
         Ok(updater) => match updater.update() {
@@ -443,6 +514,74 @@ mod tests {
             "Unknown OS: {}",
             os
         );
+    }
+
+    #[test]
+    fn test_filter_release_notes_no_table() {
+        // Release notes without a downloads table should pass through unchanged
+        let notes = "## What's New\n\n- Feature 1\n- Feature 2\n\n## Bug Fixes\n\n- Fix 1";
+        let filtered = filter_release_notes_for_platform(notes);
+        assert_eq!(filtered, notes);
+    }
+
+    #[test]
+    fn test_filter_release_notes_preserves_non_table_content() {
+        // Non-table content should be preserved
+        let notes = r#"## What's New
+
+- Enhanced update check with CLI mode
+- Better release notes display
+
+### Downloads
+
+| Platform | Download |
+|---|---|
+| Apple Silicon | [link1] |
+| macOS Intel | [link2] |
+| Linux x64 | [link3] |
+| Windows x64 | [link4] |
+
+### Installation
+
+Run `./install.sh` to install."#;
+
+        let filtered = filter_release_notes_for_platform(notes);
+
+        // Should always contain the intro and installation sections
+        assert!(filtered.contains("## What's New"));
+        assert!(filtered.contains("Enhanced update check"));
+        assert!(filtered.contains("### Installation"));
+        assert!(filtered.contains("Run `./install.sh`"));
+
+        // Should contain Downloads header
+        assert!(filtered.contains("### Downloads"));
+    }
+
+    #[test]
+    fn test_filter_release_notes_filters_table_rows() {
+        let notes = r#"### Downloads
+
+| Platform | Download |
+|---|---|
+| Apple Silicon | [arm64.tar.gz] |
+| macOS Intel | [amd64.tar.gz] |
+| Linux x64 | [linux-x64.tar.gz] |
+
+Done."#;
+
+        let filtered = filter_release_notes_for_platform(notes);
+
+        // On any platform, we should see "Done." at the end
+        assert!(filtered.contains("Done."));
+
+        // The table header row should be present
+        assert!(filtered.contains("### Downloads"));
+    }
+
+    #[test]
+    fn test_filter_release_notes_empty_input() {
+        let filtered = filter_release_notes_for_platform("");
+        assert_eq!(filtered, "");
     }
 
     // ==========================================================================

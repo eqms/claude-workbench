@@ -115,10 +115,10 @@ fn main() -> Result<()> {
         .enable_all()
         .build()
         .expect("Failed to create tokio runtime")
-        .block_on(async_main())
+        .block_on(async_main(args.fake_version))
 }
 
-async fn async_main() -> Result<()> {
+async fn async_main(fake_version: Option<String>) -> Result<()> {
     // Set up panic hook to restore terminal on crash
     let original_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {
@@ -143,7 +143,7 @@ async fn async_main() -> Result<()> {
         crossterm::event::EnableBracketedPaste
     )?;
 
-    let app = App::new(config, session);
+    let app = App::new(config, session, fake_version);
 
     let app_result = app.run(terminal);
 
