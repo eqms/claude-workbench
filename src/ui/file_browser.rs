@@ -102,6 +102,20 @@ impl FileBrowserState {
         self.git_statuses = statuses;
         self.git_info = git_info;
 
+        // Add ".." entry if root has a parent directory
+        if self.root_dir.parent().is_some() {
+            self.entries.push(FileEntry {
+                path: self.root_dir.clone(), // Special marker - path points to current root
+                name: "..".to_string(),
+                is_dir: true,
+                size: 0,
+                modified: None,
+                git_status: GitFileStatus::Clean,
+                depth: 0,
+                expanded: false,
+            });
+        }
+
         // Build tree recursively from root
         self.build_tree_recursive(&self.root_dir.clone(), 0);
 
@@ -212,6 +226,12 @@ impl FileBrowserState {
     pub fn enter_selected(&mut self) -> Option<PathBuf> {
         if let Some(i) = self.list_state.selected() {
             if let Some(entry) = self.entries.get(i).cloned() {
+                // Special handling for ".." entry - navigate to parent
+                if entry.name == ".." {
+                    self.navigate_root_up();
+                    return None;
+                }
+
                 if entry.is_dir {
                     self.toggle_expand(&entry.path);
                     // Update current_dir to the selected directory
@@ -238,10 +258,11 @@ impl FileBrowserState {
     /// Collapse current directory or navigate to parent
     ///
     /// Behavior:
-    /// 1. If selected is an expanded directory → collapse it
-    /// 2. If parent is above root_dir → navigate root_dir up one level
-    /// 3. If parent exists in entries → select it
-    /// 4. Fallback → navigate root_dir up one level
+    /// 1. If selected is ".." entry → navigate root_dir up one level
+    /// 2. If selected is an expanded directory → collapse it
+    /// 3. If parent is above root_dir → navigate root_dir up one level
+    /// 4. If parent exists in entries → select it
+    /// 5. Fallback → navigate root_dir up one level
     pub fn go_parent(&mut self) {
         let Some(i) = self.list_state.selected() else {
             return;
@@ -250,7 +271,13 @@ impl FileBrowserState {
             return;
         };
 
-        // Case 1: Collapse expanded directory
+        // Case 1: If ".." entry is selected, navigate up
+        if entry.name == ".." {
+            self.navigate_root_up();
+            return;
+        }
+
+        // Case 2: Collapse expanded directory
         if entry.is_dir && self.expanded_dirs.contains(&entry.path) {
             self.expanded_dirs.remove(&entry.path);
             self.rebuild_tree();
@@ -262,14 +289,14 @@ impl FileBrowserState {
             return;
         };
 
-        // Case 2: If we're at or below root_dir and parent would be root_dir,
+        // Case 3: If we're at or below root_dir and parent would be root_dir,
         // navigate the entire view up one level
         if parent_path == self.root_dir || entry.path == self.root_dir {
             self.navigate_root_up();
             return;
         }
 
-        // Case 3: Find parent in entries list and select it
+        // Case 4: Find parent in entries list and select it
         if let Some(parent_idx) = self
             .entries
             .iter()
@@ -280,7 +307,7 @@ impl FileBrowserState {
             return;
         }
 
-        // Case 4: Parent not in list, navigate root up
+        // Case 5: Parent not in list, navigate root up
         self.navigate_root_up();
     }
 
@@ -304,16 +331,34 @@ impl FileBrowserState {
             .list_state
             .selected()
             .and_then(|i| self.entries.get(i))
-            .map(|e| e.path.clone());
+            .map(|e| (e.path.clone(), e.name.clone()));
 
         self.entries.clear();
         self.list_state.select(None);
 
+        // Add ".." entry if root has a parent directory
+        if self.root_dir.parent().is_some() {
+            self.entries.push(FileEntry {
+                path: self.root_dir.clone(),
+                name: "..".to_string(),
+                is_dir: true,
+                size: 0,
+                modified: None,
+                git_status: GitFileStatus::Clean,
+                depth: 0,
+                expanded: false,
+            });
+        }
+
         self.build_tree_recursive(&self.root_dir.clone(), 0);
 
-        // Restore selection by path
-        if let Some(path) = selected_path {
-            if let Some(idx) = self.entries.iter().position(|e| e.path == path) {
+        // Restore selection by path and name (to distinguish ".." from regular entries)
+        if let Some((path, name)) = selected_path {
+            if let Some(idx) = self
+                .entries
+                .iter()
+                .position(|e| e.path == path && e.name == name)
+            {
                 self.list_state.select(Some(idx));
             } else if !self.entries.is_empty() {
                 self.list_state.select(Some(0));
@@ -392,8 +437,10 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
             // Tree indentation
             let indent = "    ".repeat(entry.depth);
 
-            // Tree icon: expanded/collapsed for dirs, file icon for files
-            let tree_icon = if entry.is_dir {
+            // Tree icon: special icon for "..", expanded/collapsed for dirs, file icon for files
+            let tree_icon = if entry.name == ".." {
+                "↑ 📁 " // Special icon for parent directory navigation
+            } else if entry.is_dir {
                 if entry.expanded {
                     "▼ 📁 "
                 } else {
