@@ -235,50 +235,66 @@ impl FileBrowserState {
         self.rebuild_tree();
     }
 
-    /// Collapse current directory or jump to parent entry
+    /// Collapse current directory or navigate to parent
+    ///
+    /// Behavior:
+    /// 1. If selected is an expanded directory → collapse it
+    /// 2. If parent is above root_dir → navigate root_dir up one level
+    /// 3. If parent exists in entries → select it
+    /// 4. Fallback → navigate root_dir up one level
     pub fn go_parent(&mut self) {
-        if let Some(i) = self.list_state.selected() {
-            if let Some(entry) = self.entries.get(i).cloned() {
-                if entry.is_dir && self.expanded_dirs.contains(&entry.path) {
-                    // Collapse current directory
-                    self.expanded_dirs.remove(&entry.path);
-                    self.rebuild_tree();
-                    return;
-                }
-                // Jump to parent directory entry
-                let parent = entry.path.parent().map(|p| p.to_path_buf());
-                if let Some(parent_path) = parent {
-                    // Find parent in entries list
-                    if let Some(parent_idx) = self
-                        .entries
-                        .iter()
-                        .position(|e| e.path == parent_path && e.is_dir)
-                    {
-                        self.list_state.select(Some(parent_idx));
-                        self.current_dir = parent_path;
-                        return;
-                    }
-                    // If parent is root_dir itself, navigate UP from root
-                    if parent_path == self.root_dir {
-                        if let Some(grandparent) = self.root_dir.parent() {
-                            self.root_dir = grandparent.to_path_buf();
-                            self.current_dir = self.root_dir.clone();
-                            self.expanded_dirs.clear();
-                            self.expanded_dirs.insert(self.root_dir.clone());
-                            self.load_tree();
-                        }
-                        return;
-                    }
-                }
-                // Fallback: go up one root level
-                if let Some(parent) = self.root_dir.parent() {
-                    self.root_dir = parent.to_path_buf();
-                    self.current_dir = self.root_dir.clone();
-                    self.expanded_dirs.clear();
-                    self.expanded_dirs.insert(self.root_dir.clone());
-                    self.load_tree();
-                }
-            }
+        let Some(i) = self.list_state.selected() else {
+            return;
+        };
+        let Some(entry) = self.entries.get(i).cloned() else {
+            return;
+        };
+
+        // Case 1: Collapse expanded directory
+        if entry.is_dir && self.expanded_dirs.contains(&entry.path) {
+            self.expanded_dirs.remove(&entry.path);
+            self.rebuild_tree();
+            return;
+        }
+
+        // Get parent path
+        let Some(parent_path) = entry.path.parent().map(|p| p.to_path_buf()) else {
+            return;
+        };
+
+        // Case 2: If we're at or below root_dir and parent would be root_dir,
+        // navigate the entire view up one level
+        if parent_path == self.root_dir || entry.path == self.root_dir {
+            self.navigate_root_up();
+            return;
+        }
+
+        // Case 3: Find parent in entries list and select it
+        if let Some(parent_idx) = self
+            .entries
+            .iter()
+            .position(|e| e.path == parent_path && e.is_dir)
+        {
+            self.list_state.select(Some(parent_idx));
+            self.current_dir = parent_path;
+            return;
+        }
+
+        // Case 4: Parent not in list, navigate root up
+        self.navigate_root_up();
+    }
+
+    /// Navigate the root directory up one level
+    fn navigate_root_up(&mut self) {
+        if let Some(parent) = self.root_dir.parent() {
+            let old_root = self.root_dir.clone();
+            self.root_dir = parent.to_path_buf();
+            self.current_dir = self.root_dir.clone();
+            self.expanded_dirs.clear();
+            self.expanded_dirs.insert(self.root_dir.clone());
+            // Keep old root expanded so we can see where we came from
+            self.expanded_dirs.insert(old_root);
+            self.load_tree();
         }
     }
 
