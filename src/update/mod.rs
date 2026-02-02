@@ -342,29 +342,77 @@ pub fn check_for_update_async_with_version(
     rx
 }
 
+/// Get the target triple for the current platform
+fn get_target() -> &'static str {
+    // Map OS/ARCH to Rust target triple
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        ("macos", "x86_64") => "x86_64-apple-darwin",
+        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
+        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+        ("windows", "aarch64") => "aarch64-pc-windows-msvc",
+        _ => "unknown",
+    }
+}
+
 /// Perform the actual update (blocking)
 ///
 /// This downloads and replaces the current binary.
 /// The application should be restarted after this completes.
 pub fn perform_update_sync() -> UpdateResult {
+    let target = get_target();
+
+    #[cfg(debug_assertions)]
+    {
+        eprintln!("[Update] Starting update process...");
+        eprintln!("[Update] Current version: {}", CURRENT_VERSION);
+        eprintln!("[Update] Target: {}", target);
+        eprintln!("[Update] Repo: {}/{}", REPO_OWNER, REPO_NAME);
+        eprintln!("[Update] Binary name: {}", BIN_NAME);
+    }
+
     match Update::configure()
         .repo_owner(REPO_OWNER)
         .repo_name(REPO_NAME)
         .bin_name(BIN_NAME)
+        .target(target)
         .current_version(CURRENT_VERSION)
         .show_download_progress(false) // We show our own UI
         .show_output(false) // Suppress all output messages (TUI handles display)
         .no_confirm(true) // Skip Y/n prompt (TUI already confirmed)
         .build()
     {
-        Ok(updater) => match updater.update() {
-            Ok(status) => UpdateResult::Success {
-                old_version: CURRENT_VERSION.to_string(),
-                new_version: status.version().to_string(),
-            },
-            Err(e) => UpdateResult::Error(format!("Update failed: {}", e)),
-        },
-        Err(e) => UpdateResult::Error(format!("Failed to configure update: {}", e)),
+        Ok(updater) => {
+            #[cfg(debug_assertions)]
+            eprintln!("[Update] Updater configured, starting download...");
+
+            match updater.update() {
+                Ok(status) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!("[Update] Success! New version: {}", status.version());
+
+                    UpdateResult::Success {
+                        old_version: CURRENT_VERSION.to_string(),
+                        new_version: status.version().to_string(),
+                    }
+                }
+                Err(e) => {
+                    let error_msg = format!("Update failed: {}", e);
+                    #[cfg(debug_assertions)]
+                    eprintln!("[Update] {}", error_msg);
+
+                    UpdateResult::Error(error_msg)
+                }
+            }
+        }
+        Err(e) => {
+            let error_msg = format!("Failed to configure update: {}", e);
+            #[cfg(debug_assertions)]
+            eprintln!("[Update] {}", error_msg);
+
+            UpdateResult::Error(error_msg)
+        }
     }
 }
 

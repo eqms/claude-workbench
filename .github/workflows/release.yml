@@ -136,12 +136,45 @@ jobs:
           find artifacts -type f -exec mv {} release/ \;
           ls -la release/
 
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          # Get the tag before the current one
+          PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+          echo "Previous tag: $PREV_TAG"
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          CURRENT_TAG="${{ github.ref_name }}"
+
+          echo "Generating changelog from $PREV_TAG to $CURRENT_TAG"
+
+          if [ -n "$PREV_TAG" ]; then
+            # Get commits between tags, format nicely
+            CHANGELOG=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"- %s" --no-merges | head -20)
+          else
+            # First release, get recent commits
+            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges -10)
+          fi
+
+          # Escape for GitHub Actions multiline output
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           name: Claude Workbench ${{ github.ref_name }}
           body: |
             ## Claude Workbench ${{ github.ref_name }}
+
+            ### What's Changed
+
+            ${{ steps.changelog.outputs.changelog }}
 
             ### Downloads
 
