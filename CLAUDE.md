@@ -240,3 +240,89 @@ Select and copy terminal output lines to Claude as code blocks.
 
 ### Environment Inheritance
 PTY processes now inherit all parent environment variables (critical for Claude CLI which needs HOME, PATH, LANG, etc.).
+
+## Update-System Testing
+
+The application includes a self-update mechanism that downloads new versions from GitHub Releases. This section documents how to test the update system.
+
+### CLI Options for Update Testing
+
+```bash
+# Check for updates without starting the TUI
+./claude-workbench --check-update
+
+# Simulate older version to trigger update availability
+./claude-workbench --check-update --fake-version 0.37.0
+
+# Update to a specific version (for testing/downgrade)
+./claude-workbench --update-to v0.38.5
+
+# Or without 'v' prefix - both formats work
+./claude-workbench --update-to 0.38.5
+```
+
+### Testing Methods
+
+**Method 1: Downgrade and Re-update (Recommended)**
+
+This tests the full update flow without releasing new versions:
+
+```bash
+# 1. Check current version
+./target/release/claude-workbench --check-update
+
+# 2. Downgrade to an older version
+./target/release/claude-workbench --update-to v0.38.5
+
+# 3. Start app - should detect newer version available
+./target/release/claude-workbench
+
+# 4. In Help screen (F12), press 'u' to trigger update
+```
+
+**Method 2: Fake Version (Simulated)**
+
+Tests update detection without actual download:
+
+```bash
+# Simulates running an older version
+./target/release/claude-workbench --fake-version 0.37.0
+
+# Update check will find "newer" version, but binary isn't actually older
+```
+
+### TUI Update Triggers
+
+- **Automatic**: Update check runs at startup (errors are silent)
+- **Manual**: Press `u` in the Help screen (F12) to trigger check
+- **Dialog**: If update available, shows version and release notes
+
+### Log File
+
+Update operations write detailed logs for debugging:
+
+```bash
+# View update log
+cat /tmp/claude-workbench-update.log
+
+# Watch log in real-time
+tail -f /tmp/claude-workbench-update.log
+```
+
+### Troubleshooting
+
+1. **"No releases found"**: Check that GitHub Release has assets for your platform
+2. **Network errors**: Check internet connectivity and GitHub API accessibility
+3. **Permission denied**: The binary must be writable for self-update to work
+4. **Version mismatch**: Use `--check-update` to verify GitHub release versions
+
+### GitHub Release Requirements
+
+For updates to work, GitHub Releases must include:
+- Tag format: `vX.Y.Z` (e.g., `v0.38.6`)
+- Binary assets named: `claude-workbench-{target}.tar.gz`
+- Supported targets:
+  - `aarch64-apple-darwin` (macOS Apple Silicon)
+  - `x86_64-apple-darwin` (macOS Intel)
+  - `aarch64-unknown-linux-gnu` (Linux ARM64)
+  - `x86_64-unknown-linux-gnu` (Linux x64)

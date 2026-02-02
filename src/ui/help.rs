@@ -855,6 +855,8 @@ pub fn render(frame: &mut Frame, state: &mut HelpState) {
             Span::styled(" Scroll  ", Style::default().fg(Color::DarkGray)),
             Span::styled("g/G", Style::default().fg(Color::Yellow)),
             Span::styled(" Top/End  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("u", Style::default().fg(Color::Yellow)),
+            Span::styled(" Update  ", Style::default().fg(Color::DarkGray)),
             Span::styled("Esc", Style::default().fg(Color::Yellow)),
             Span::styled(" Close", Style::default().fg(Color::DarkGray)),
         ]))

@@ -76,7 +76,9 @@ pub fn render(
     // Clear background
     frame.render_widget(Clear, popup_area);
 
-    let title = if state.updating {
+    let title = if state.update_success {
+        " Update Complete "
+    } else if state.updating {
         " Updating... "
     } else if state.available_version.is_some() {
         " Update Available "
@@ -85,7 +87,7 @@ pub fn render(
     } else if state.error.is_some() {
         " Update Check Failed "
     } else {
-        " Update "
+        " Up to Date "
     };
 
     let block = Block::default()
@@ -108,8 +110,12 @@ pub fn render(
     ])
     .split(inner);
 
-    // Render content based on state
-    if state.updating {
+    // Render content based on state (order matters!)
+    if state.update_success {
+        // Update completed successfully - show success message
+        render_success(frame, chunks[0], state.installed_version.as_deref());
+        render_close_button(frame, chunks[1]);
+    } else if state.updating {
         render_updating(frame, chunks[0], state);
     } else if state.checking {
         render_checking(frame, chunks[0]);
@@ -156,35 +162,34 @@ fn render_updating(frame: &mut Frame, area: Rect, state: &UpdateState) {
         .as_deref()
         .unwrap_or("Downloading update...");
 
-    // Check if this is a success message (contains "restart")
-    let is_success = message.contains("restart");
     // Check if this is an error (contains "failed" or "error")
     let is_error = message.to_lowercase().contains("failed")
         || message.to_lowercase().contains("error");
 
-    let color = if is_success {
-        Color::Green
-    } else if is_error {
-        Color::Red
-    } else {
-        Color::Yellow
-    };
+    let color = if is_error { Color::Red } else { Color::Yellow };
 
-    let hint = if is_success {
-        "Press Esc or Enter to close."
-    } else if is_error {
+    let hint = if is_error {
         "Press Esc to close and try again later."
     } else {
         "Please wait, do not close the application."
     };
 
-    // Build progress indicator
-    let progress_indicator = if !is_success && !is_error {
-        "⏳ "
-    } else if is_success {
-        "✓ "
+    // Animated spinner based on current time (cycles every 100ms)
+    let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let spinner_index = if !is_error {
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        (millis / 100) as usize % spinner_chars.len()
     } else {
-        "✗ "
+        0
+    };
+
+    let progress_indicator = if is_error {
+        "✗ ".to_string()
+    } else {
+        format!("{} ", spinner_chars[spinner_index])
     };
 
     let mut lines = vec![
@@ -196,18 +201,37 @@ fn render_updating(frame: &mut Frame, area: Rect, state: &UpdateState) {
         Line::from(""),
     ];
 
-    // Show log messages if any (for debugging)
-    if !state.log_messages.is_empty() && !is_success {
-        lines.push(Line::from(Span::styled(
-            "─── Details ───",
-            Style::default().fg(Color::DarkGray),
-        )));
-        for log_msg in state.log_messages.iter().rev().take(3) {
-            lines.push(Line::from(Span::styled(
-                log_msg.clone(),
-                Style::default().fg(Color::DarkGray),
-            )));
+    // Show animated progress bar for downloads
+    if !is_error {
+        let bar_width = 30;
+        let progress_millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        // Moving highlight effect (cycles through the bar)
+        let pos = ((progress_millis / 50) % (bar_width as u128 * 2)) as usize;
+        let mut bar = String::new();
+        for i in 0..bar_width {
+            let dist = if pos < bar_width {
+                (i as i32 - pos as i32).unsigned_abs() as usize
+            } else {
+                let rev_pos = bar_width * 2 - pos;
+                (i as i32 - rev_pos as i32).unsigned_abs() as usize
+            };
+            if dist == 0 {
+                bar.push('█');
+            } else if dist == 1 {
+                bar.push('▓');
+            } else if dist == 2 {
+                bar.push('▒');
+            } else {
+                bar.push('░');
+            }
         }
+        lines.push(Line::from(Span::styled(
+            format!("[{}]", bar),
+            Style::default().fg(Color::Cyan),
+        )));
         lines.push(Line::from(""));
     }
 
@@ -276,6 +300,41 @@ fn render_error(frame: &mut Frame, area: Rect, error: &str) {
     )));
 
     let content = Paragraph::new(lines).alignment(Alignment::Center);
+    frame.render_widget(content, area);
+}
+
+fn render_success(frame: &mut Frame, area: Rect, new_version: Option<&str>) {
+    let version_text = new_version.unwrap_or("latest");
+
+    let content = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "✓ Update Successful!",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Installed Version: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("v{}", version_text),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Please restart the application",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(Span::styled(
+            "to use the new version.",
+            Style::default().fg(Color::Yellow),
+        )),
+    ])
+    .alignment(Alignment::Center);
     frame.render_widget(content, area);
 }
 

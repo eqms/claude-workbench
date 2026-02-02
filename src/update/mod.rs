@@ -6,6 +6,25 @@
 use self_update::backends::github::{ReleaseList, Update};
 use std::sync::mpsc;
 use std::thread;
+use std::io::Write;
+
+/// Log file path for update debugging
+pub const LOG_FILE: &str = "/tmp/claude-workbench-update.log";
+
+/// Write a log message to the update log file
+pub fn log_update(msg: &str) {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(LOG_FILE)
+    {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let _ = writeln!(file, "[{}] {}", timestamp, msg);
+    }
+}
 
 /// Current version from Cargo.toml
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -67,6 +86,10 @@ pub struct UpdateState {
     pub manual_check: bool,
     /// Log messages from the update process (for debugging in UI)
     pub log_messages: Vec<String>,
+    /// Whether update completed successfully (show success message)
+    pub update_success: bool,
+    /// Version that was installed (for success message)
+    pub installed_version: Option<String>,
 }
 
 impl UpdateState {
@@ -114,6 +137,9 @@ impl UpdateState {
     /// Close the update dialog
     pub fn close_dialog(&mut self) {
         self.show_dialog = false;
+        // Also clear success state when dialog is closed
+        self.update_success = false;
+        self.installed_version = None;
     }
 
     /// Start checking for updates
@@ -143,6 +169,25 @@ impl UpdateState {
     pub fn finish_update(&mut self) {
         self.updating = false;
         self.progress_message = None;
+        self.show_dialog = false;
+    }
+
+    /// Set update success state
+    pub fn set_success(&mut self, new_version: String) {
+        self.updating = false;
+        self.update_success = true;
+        self.installed_version = Some(new_version);
+        self.available_version = None;  // Clear to prevent showing "Update Available" again
+        self.release_notes = None;
+        self.error = None;
+        self.progress_message = None;
+        self.show_dialog = true;  // Keep dialog open to show success
+    }
+
+    /// Reset success state (when dialog is closed)
+    pub fn clear_success(&mut self) {
+        self.update_success = false;
+        self.installed_version = None;
         self.show_dialog = false;
     }
 }
@@ -374,6 +419,8 @@ fn get_target() -> &'static str {
 /// This downloads and replaces the current binary.
 /// The application should be restarted after this completes.
 pub fn perform_update_sync() -> UpdateResult {
+    log_update("=== perform_update_sync() STARTED ===");
+
     let target = get_target();
     let os = std::env::consts::OS;
     let arch = std::env::consts::ARCH;
@@ -383,6 +430,12 @@ pub fn perform_update_sync() -> UpdateResult {
         "Version: {} | Target: {} | Platform: {}-{}",
         CURRENT_VERSION, target, os, arch
     );
+
+    log_update(&format!("Context: {}", context));
+    log_update(&format!("Repo: {}/{}", REPO_OWNER, REPO_NAME));
+    log_update(&format!("Binary name: {}", BIN_NAME));
+
+    log_update("Creating Update configuration...");
 
     match Update::configure()
         .repo_owner(REPO_OWNER)
@@ -396,14 +449,19 @@ pub fn perform_update_sync() -> UpdateResult {
         .build()
     {
         Ok(updater) => {
+            log_update("Update configuration OK, calling updater.update()...");
             match updater.update() {
-                Ok(status) => UpdateResult::Success {
-                    old_version: CURRENT_VERSION.to_string(),
-                    new_version: status.version().to_string(),
+                Ok(status) => {
+                    log_update(&format!("UPDATE SUCCESS: {} -> {}", CURRENT_VERSION, status.version()));
+                    UpdateResult::Success {
+                        old_version: CURRENT_VERSION.to_string(),
+                        new_version: status.version().to_string(),
+                    }
                 },
                 Err(e) => {
                     // Detailed error with context for troubleshooting
                     let error_msg = format!("{}\n\n[{}]", e, context);
+                    log_update(&format!("UPDATE FAILED: {}", error_msg));
                     UpdateResult::Error(error_msg)
                 }
             }
@@ -411,6 +469,72 @@ pub fn perform_update_sync() -> UpdateResult {
         Err(e) => {
             // Configuration error with full context
             let error_msg = format!("Configuration failed: {}\n\n[{}]", e, context);
+            log_update(&format!("CONFIG FAILED: {}", error_msg));
+            UpdateResult::Error(error_msg)
+        }
+    }
+}
+
+/// Perform update to a specific version (for testing/downgrade)
+///
+/// This allows updating to any version, including older ones.
+/// Useful for testing the update mechanism without releasing new versions.
+pub fn perform_update_to_version_sync(target_version: &str) -> UpdateResult {
+    log_update(&format!("=== perform_update_to_version_sync({}) STARTED ===", target_version));
+
+    let target = get_target();
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+
+    // Build detailed context for error messages
+    let context = format!(
+        "Current: {} | Target: {} | Platform target: {} | OS-Arch: {}-{}",
+        CURRENT_VERSION, target_version, target, os, arch
+    );
+
+    log_update(&format!("Context: {}", context));
+
+    // Normalize target version (ensure it has 'v' prefix for GitHub tags)
+    let target_tag = if target_version.starts_with('v') {
+        target_version.to_string()
+    } else {
+        format!("v{}", target_version)
+    };
+
+    log_update(&format!("Target tag: {}", target_tag));
+
+    match Update::configure()
+        .repo_owner(REPO_OWNER)
+        .repo_name(REPO_NAME)
+        .bin_name(BIN_NAME)
+        .target(target)
+        .target_version_tag(&target_tag)  // Specific version instead of latest
+        .current_version(CURRENT_VERSION)
+        .show_download_progress(false)
+        .show_output(false)
+        .no_confirm(true)
+        .build()
+    {
+        Ok(updater) => {
+            log_update(&format!("Update configuration OK, updating to {}...", target_tag));
+            match updater.update() {
+                Ok(status) => {
+                    log_update(&format!("UPDATE TO VERSION SUCCESS: {} -> {}", CURRENT_VERSION, status.version()));
+                    UpdateResult::Success {
+                        old_version: CURRENT_VERSION.to_string(),
+                        new_version: status.version().to_string(),
+                    }
+                },
+                Err(e) => {
+                    let error_msg = format!("{}\n\n[{}]", e, context);
+                    log_update(&format!("UPDATE TO VERSION FAILED: {}", error_msg));
+                    UpdateResult::Error(error_msg)
+                }
+            }
+        }
+        Err(e) => {
+            let error_msg = format!("Configuration failed: {}\n\n[{}]", e, context);
+            log_update(&format!("CONFIG FAILED: {}", error_msg));
             UpdateResult::Error(error_msg)
         }
     }
@@ -420,11 +544,19 @@ pub fn perform_update_sync() -> UpdateResult {
 ///
 /// Returns a receiver that will receive the result when the update is complete.
 pub fn perform_update_async() -> mpsc::Receiver<UpdateResult> {
+    log_update("=== perform_update_async() CALLED ===");
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
+        log_update("Update thread STARTED");
         let result = perform_update_sync();
-        let _ = tx.send(result);
+        log_update(&format!("Update result: {:?}", result));
+        match tx.send(result) {
+            Ok(_) => log_update("Result SENT through channel"),
+            Err(e) => log_update(&format!("FAILED to send result: {}", e)),
+        }
+        log_update("Update thread FINISHED");
     });
+    log_update("perform_update_async() returning receiver");
     rx
 }
 

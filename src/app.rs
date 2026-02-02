@@ -280,34 +280,47 @@ impl App {
     /// Poll for async update results
     fn poll_update_result(&mut self) {
         if let Some(ref receiver) = self.update_receiver {
-            if let Ok(result) = receiver.try_recv() {
-                match result {
-                    UpdateResult::Success { new_version, .. } => {
-                        // Set success state - the update dialog will show restart message
-                        self.update_state.updating = false;
-                        self.update_state.progress_message = Some(format!(
-                            "Updated to v{}!\nPlease restart the application.",
-                            new_version
-                        ));
-                        // Keep dialog open to show success
+            update::log_update("[app] poll_update_result: checking receiver...");
+            match receiver.try_recv() {
+                Ok(result) => {
+                    update::log_update(&format!("[app] poll_update_result: GOT RESULT {:?}", result));
+                    match result {
+                        UpdateResult::Success { new_version, .. } => {
+                            update::log_update(&format!("[app] SUCCESS: {}", new_version));
+                            // Set success state - shows dedicated success screen
+                            self.update_state.set_success(new_version);
+                        }
+                        UpdateResult::Error(msg) => {
+                            update::log_update(&format!("[app] ERROR: {}", msg));
+                            self.update_state.set_error(msg.clone());
+                            self.update_state.updating = false;
+                            self.update_state.show_dialog = true;
+                        }
                     }
-                    UpdateResult::Error(msg) => {
-                        self.update_state.set_error(msg.clone());
-                        self.update_state.updating = false;
-                        self.update_state.show_dialog = true;
-                    }
+                    self.update_receiver = None;
                 }
-                self.update_receiver = None;
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    // No result yet, keep waiting
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    update::log_update("[app] poll_update_result: CHANNEL DISCONNECTED!");
+                    self.update_state.set_error("Update channel disconnected unexpectedly".to_string());
+                    self.update_state.updating = false;
+                    self.update_state.show_dialog = true;
+                    self.update_receiver = None;
+                }
             }
         }
     }
 
     /// Start the actual update process
     fn start_update(&mut self) {
+        update::log_update("[app] start_update() CALLED");
         self.update_state.start_update();
 
         // If fake_version is set, simulate the update instead of downloading
         if self.fake_version.is_some() {
+            update::log_update("[app] Using FAKE update (simulated)");
             // Simulate update with a short delay
             let (tx, rx) = std::sync::mpsc::channel();
             std::thread::spawn(move || {
@@ -319,7 +332,9 @@ impl App {
             });
             self.update_receiver = Some(rx);
         } else {
+            update::log_update("[app] Calling perform_update_async()...");
             self.update_receiver = Some(update::perform_update_async());
+            update::log_update("[app] update_receiver is now Some");
         }
     }
 
@@ -1434,6 +1449,12 @@ impl App {
                                         }
                                         KeyCode::End | KeyCode::Char('G') => {
                                             self.help.scroll_to_bottom()
+                                        }
+                                        KeyCode::Char('u') => {
+                                            // Trigger manual update check from Help screen
+                                            self.help.close();
+                                            self.update_state.manual_check = true;
+                                            self.start_update_check();
                                         }
                                         _ => {}
                                     }

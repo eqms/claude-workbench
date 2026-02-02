@@ -19,7 +19,7 @@ use session::load_session;
 use std::io::Write;
 use std::panic;
 use std::path::PathBuf;
-use update::{check_for_update_with_version, UpdateCheckResult};
+use update::{check_for_update_with_version, perform_update_to_version_sync, UpdateCheckResult, UpdateResult};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -37,6 +37,10 @@ struct Args {
     /// Fake current version for testing (e.g., "0.37.0")
     #[arg(long, env = "WORKBENCH_FAKE_VERSION")]
     fake_version: Option<String>,
+
+    /// Update to a specific version (for testing/downgrade, e.g., "v0.38.5" or "0.38.5")
+    #[arg(long)]
+    update_to: Option<String>,
 }
 
 /// Run update check from CLI and exit
@@ -88,6 +92,30 @@ fn run_update_check_cli(fake_version: Option<String>) -> Result<()> {
     Ok(())
 }
 
+/// Run update to a specific version from CLI and exit
+fn run_update_to_version_cli(target_version: &str) -> Result<()> {
+    println!("Current version: {}", update::CURRENT_VERSION);
+    println!("Target version:  {}", target_version);
+    println!();
+    println!("Downloading and installing...");
+    println!();
+
+    match perform_update_to_version_sync(target_version) {
+        UpdateResult::Success { old_version, new_version } => {
+            println!("✅ Update successful: {} -> {}", old_version, new_version);
+            println!();
+            println!("Please restart the application to use the new version.");
+        }
+        UpdateResult::Error(msg) => {
+            println!("❌ Update failed: {}", msg);
+            println!();
+            println!("Check the log file for details: {}", update::LOG_FILE);
+        }
+    }
+
+    Ok(())
+}
+
 /// Restore terminal to normal state - called on exit, panic, or signal
 fn restore_terminal() {
     let _ = crossterm::execute!(
@@ -108,6 +136,11 @@ fn main() -> Result<()> {
     // Handle --check-update CLI mode (exit without starting TUI or tokio)
     if args.check_update {
         return run_update_check_cli(args.fake_version);
+    }
+
+    // Handle --update-to CLI mode (update to specific version and exit)
+    if let Some(target_version) = args.update_to {
+        return run_update_to_version_cli(&target_version);
     }
 
     // Run the async main with tokio runtime
