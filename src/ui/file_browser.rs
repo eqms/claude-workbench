@@ -258,14 +258,15 @@ impl FileBrowserState {
                         self.current_dir = parent_path;
                         return;
                     }
-                    // If parent is root_dir itself, navigate up
+                    // If parent is root_dir itself, navigate UP from root
                     if parent_path == self.root_dir {
-                        // Collapse root's children and navigate to parent
-                        self.root_dir = parent_path.clone();
-                        self.current_dir = parent_path;
-                        self.expanded_dirs.clear();
-                        self.expanded_dirs.insert(self.root_dir.clone());
-                        self.load_tree();
+                        if let Some(grandparent) = self.root_dir.parent() {
+                            self.root_dir = grandparent.to_path_buf();
+                            self.current_dir = self.root_dir.clone();
+                            self.expanded_dirs.clear();
+                            self.expanded_dirs.insert(self.root_dir.clone());
+                            self.load_tree();
+                        }
                         return;
                     }
                 }
