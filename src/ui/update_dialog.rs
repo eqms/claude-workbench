@@ -48,19 +48,22 @@ pub fn render(
     let mut areas = UpdateDialogAreas::default();
 
     // Calculate centered popup area
-    // Make dialog larger when release notes are available
+    // Make dialog larger for better readability of versions and error messages
     let has_notes = state.release_notes.is_some();
-    let popup_width = if has_notes {
-        60u16.min(area.width.saturating_sub(4))
+    let has_error = state.error.is_some();
+    let popup_width = if has_notes || has_error {
+        80u16.min(area.width.saturating_sub(4)) // 80 chars for notes/errors
     } else {
-        50u16.min(area.width.saturating_sub(4))
+        70u16.min(area.width.saturating_sub(4)) // 70 chars default
     };
     let popup_height = if state.updating {
-        8
+        12 // More space for progress messages
+    } else if has_error {
+        18 // Space for detailed error + context
     } else if has_notes {
-        20 // Larger dialog for release notes
+        25 // Larger dialog for release notes
     } else {
-        12
+        15
     };
     let popup_height = popup_height.min(area.height.saturating_sub(4));
 
@@ -155,45 +158,124 @@ fn render_updating(frame: &mut Frame, area: Rect, state: &UpdateState) {
 
     // Check if this is a success message (contains "restart")
     let is_success = message.contains("restart");
+    // Check if this is an error (contains "failed" or "error")
+    let is_error = message.to_lowercase().contains("failed")
+        || message.to_lowercase().contains("error");
 
     let color = if is_success {
         Color::Green
+    } else if is_error {
+        Color::Red
     } else {
         Color::Yellow
     };
+
     let hint = if is_success {
         "Press Esc or Enter to close."
+    } else if is_error {
+        "Press Esc to close and try again later."
     } else {
         "Please wait, do not close the application."
     };
 
-    let content = Paragraph::new(vec![
+    // Build progress indicator
+    let progress_indicator = if !is_success && !is_error {
+        "⏳ "
+    } else if is_success {
+        "✓ "
+    } else {
+        "✗ "
+    };
+
+    let mut lines = vec![
         Line::from(""),
         Line::from(Span::styled(
-            message,
+            format!("{}{}", progress_indicator, message),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled(hint, Style::default().fg(Color::DarkGray))),
-    ])
-    .alignment(Alignment::Center);
+    ];
+
+    // Show log messages if any (for debugging)
+    if !state.log_messages.is_empty() && !is_success {
+        lines.push(Line::from(Span::styled(
+            "─── Details ───",
+            Style::default().fg(Color::DarkGray),
+        )));
+        for log_msg in state.log_messages.iter().rev().take(3) {
+            lines.push(Line::from(Span::styled(
+                log_msg.clone(),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+        lines.push(Line::from(""));
+    }
+
+    lines.push(Line::from(Span::styled(
+        hint,
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let content = Paragraph::new(lines).alignment(Alignment::Center);
     frame.render_widget(content, area);
 }
 
 fn render_error(frame: &mut Frame, area: Rect, error: &str) {
-    let content = Paragraph::new(vec![
+    // Split error by newlines for multi-line display
+    let mut lines: Vec<Line> = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "Failed to check for updates:",
-            Style::default().fg(Color::Red),
+            "Update failed:",
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled(
-            error.chars().take(40).collect::<String>(),
-            Style::default().fg(Color::DarkGray),
-        )),
-    ])
-    .alignment(Alignment::Center);
+    ];
+
+    // Add each line of the error message (no truncation)
+    for line in error.lines() {
+        // Wrap long lines at word boundaries or force-wrap if needed
+        let max_width = area.width.saturating_sub(4) as usize;
+        if line.len() <= max_width {
+            lines.push(Line::from(Span::styled(
+                line.to_string(),
+                Style::default().fg(Color::Yellow),
+            )));
+        } else {
+            // Word-wrap long lines
+            let mut current = String::new();
+            for word in line.split_whitespace() {
+                if current.is_empty() {
+                    current = word.to_string();
+                } else if current.len() + 1 + word.len() <= max_width {
+                    current.push(' ');
+                    current.push_str(word);
+                } else {
+                    lines.push(Line::from(Span::styled(
+                        current,
+                        Style::default().fg(Color::Yellow),
+                    )));
+                    current = word.to_string();
+                }
+            }
+            if !current.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    current,
+                    Style::default().fg(Color::Yellow),
+                )));
+            }
+        }
+    }
+
+    // Add hint at the bottom
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Check network connection and try again.",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let content = Paragraph::new(lines).alignment(Alignment::Center);
     frame.render_widget(content, area);
 }
 

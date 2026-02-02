@@ -65,6 +65,8 @@ pub struct UpdateState {
     pub progress_message: Option<String>,
     /// Whether this was a manual check (show errors) vs automatic (silent fail)
     pub manual_check: bool,
+    /// Log messages from the update process (for debugging in UI)
+    pub log_messages: Vec<String>,
 }
 
 impl UpdateState {
@@ -123,7 +125,18 @@ impl UpdateState {
     /// Start updating
     pub fn start_update(&mut self) {
         self.updating = true;
-        self.progress_message = Some("Downloading update...".to_string());
+        self.progress_message = Some("Connecting to GitHub...".to_string());
+        self.log_messages.clear();
+    }
+
+    /// Add a log message for debugging
+    pub fn add_log(&mut self, msg: String) {
+        self.log_messages.push(msg);
+    }
+
+    /// Set progress message during update
+    pub fn set_progress(&mut self, msg: String) {
+        self.progress_message = Some(msg);
     }
 
     /// Update completed
@@ -362,15 +375,14 @@ fn get_target() -> &'static str {
 /// The application should be restarted after this completes.
 pub fn perform_update_sync() -> UpdateResult {
     let target = get_target();
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
 
-    #[cfg(debug_assertions)]
-    {
-        eprintln!("[Update] Starting update process...");
-        eprintln!("[Update] Current version: {}", CURRENT_VERSION);
-        eprintln!("[Update] Target: {}", target);
-        eprintln!("[Update] Repo: {}/{}", REPO_OWNER, REPO_NAME);
-        eprintln!("[Update] Binary name: {}", BIN_NAME);
-    }
+    // Build detailed context for error messages (always available, not just debug)
+    let context = format!(
+        "Version: {} | Target: {} | Platform: {}-{}",
+        CURRENT_VERSION, target, os, arch
+    );
 
     match Update::configure()
         .repo_owner(REPO_OWNER)
@@ -384,33 +396,21 @@ pub fn perform_update_sync() -> UpdateResult {
         .build()
     {
         Ok(updater) => {
-            #[cfg(debug_assertions)]
-            eprintln!("[Update] Updater configured, starting download...");
-
             match updater.update() {
-                Ok(status) => {
-                    #[cfg(debug_assertions)]
-                    eprintln!("[Update] Success! New version: {}", status.version());
-
-                    UpdateResult::Success {
-                        old_version: CURRENT_VERSION.to_string(),
-                        new_version: status.version().to_string(),
-                    }
-                }
+                Ok(status) => UpdateResult::Success {
+                    old_version: CURRENT_VERSION.to_string(),
+                    new_version: status.version().to_string(),
+                },
                 Err(e) => {
-                    let error_msg = format!("Update failed: {}", e);
-                    #[cfg(debug_assertions)]
-                    eprintln!("[Update] {}", error_msg);
-
+                    // Detailed error with context for troubleshooting
+                    let error_msg = format!("{}\n\n[{}]", e, context);
                     UpdateResult::Error(error_msg)
                 }
             }
         }
         Err(e) => {
-            let error_msg = format!("Failed to configure update: {}", e);
-            #[cfg(debug_assertions)]
-            eprintln!("[Update] {}", error_msg);
-
+            // Configuration error with full context
+            let error_msg = format!("Configuration failed: {}\n\n[{}]", e, context);
             UpdateResult::Error(error_msg)
         }
     }
