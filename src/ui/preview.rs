@@ -510,18 +510,49 @@ impl PreviewState {
     }
 
     /// Copy selection to clipboard (MC F5)
+    /// Copies to both tui-textarea internal buffer AND system clipboard
     pub fn copy_block(&mut self) {
         if let Some(editor) = &mut self.editor {
+            // First, copy to internal buffer
             editor.copy();
+
+            // Also copy to system clipboard
+            // Get the selected text from the yank buffer (which was just populated by editor.copy())
+            let yank_text = editor.yank_text();
+            if !yank_text.is_empty() {
+                if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                    let _ = clipboard.set_text(yank_text.to_string());
+                }
+            }
             // Don't cancel selection after copy - user might want to see what was copied
         }
     }
 
     /// Move (cut) selection (MC F6)
     /// User should position cursor and paste (Ctrl+V) to complete move
+    /// Copies to both tui-textarea internal buffer AND system clipboard
     pub fn move_block(&mut self) {
         if let Some(editor) = &mut self.editor {
+            // First copy to clipboard before cutting
+            let yank_text = editor.yank_text();
             editor.cut();
+
+            // Copy to system clipboard (use yank_text from before cut, or get it from cut result)
+            let cut_text = editor.yank_text();
+            let text_to_copy = if !cut_text.is_empty() {
+                cut_text.to_string()
+            } else if !yank_text.is_empty() {
+                yank_text.to_string()
+            } else {
+                String::new()
+            };
+
+            if !text_to_copy.is_empty() {
+                if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                    let _ = clipboard.set_text(text_to_copy);
+                }
+            }
+
             self.block_marking = false;
             self.selection_start = None;
         }
@@ -664,9 +695,10 @@ pub fn render(
     state: &PreviewState,
     is_focused: bool,
     selection_range: Option<(usize, usize)>,
+    char_selection: Option<((usize, usize), (usize, usize))>,
 ) {
     let title = build_title(state);
-    let selection_active = selection_range.is_some();
+    let selection_active = selection_range.is_some() || char_selection.is_some();
     let (border_style, border_type) =
         get_border_style(is_focused, state.mode, state.modified, selection_active);
 
@@ -820,7 +852,31 @@ pub fn render(
             // Apply selection highlighting if active
             // NOTE: selection_range is in SCREEN coordinates (0 = first visible line)
             // We need to adjust by scroll offset to get content line indices
-            let lines = if let Some((start, end)) = selection_range {
+            let lines = if let Some(((start_row, start_col), (end_row, end_col))) = char_selection {
+                // Character-level mouse selection
+                let adjusted_start_row = start_row + scroll_offset;
+                let adjusted_end_row = end_row + scroll_offset;
+                state
+                    .highlighted_lines
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, line)| {
+                        if idx < adjusted_start_row || idx > adjusted_end_row {
+                            return line.clone();
+                        }
+                        // This line is in selection range - apply char-level highlighting
+                        apply_char_selection_to_line(
+                            line,
+                            idx,
+                            adjusted_start_row,
+                            start_col,
+                            adjusted_end_row,
+                            end_col,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            } else if let Some((start, end)) = selection_range {
+                // Line-based keyboard selection
                 let adjusted_start = start + scroll_offset;
                 let adjusted_end = end + scroll_offset;
                 state
@@ -1064,6 +1120,92 @@ fn render_search_bar(f: &mut Frame, area: Rect, state: &PreviewState) {
 
         f.render_widget(Paragraph::new(hints).style(hint_style), hints_area);
     }
+}
+
+/// Apply character-level mouse selection highlighting to a line (ReadOnly mode)
+/// For mouse selection in preview pane - uses LightYellow background for visibility
+fn apply_char_selection_to_line(
+    line: &Line<'static>,
+    line_idx: usize,
+    start_row: usize,
+    start_col: usize,
+    end_row: usize,
+    end_col: usize,
+) -> Line<'static> {
+    let selection_style = Style::default().bg(Color::LightYellow).fg(Color::Black);
+
+    // Flatten the line into a single string to get accurate character positions
+    let full_text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+    let line_chars: Vec<char> = full_text.chars().collect();
+    let line_len = line_chars.len();
+
+    // Determine selection range for this line
+    let (sel_start, sel_end) = if start_row == end_row {
+        // Single line selection
+        (start_col, end_col + 1) // +1 to include end_col
+    } else if line_idx == start_row {
+        // First line of multi-line selection
+        (start_col, line_len)
+    } else if line_idx == end_row {
+        // Last line of multi-line selection
+        (0, end_col + 1) // +1 to include end_col
+    } else {
+        // Middle line - entire line selected
+        (0, line_len)
+    };
+
+    // If nothing to select, return as-is
+    if sel_start >= line_len {
+        return line.clone();
+    }
+
+    // Build new spans with selection highlighting
+    let mut result_spans: Vec<Span<'static>> = Vec::new();
+    let mut current_col = 0;
+
+    for span in line.spans.iter() {
+        let span_text = span.content.as_ref();
+        let span_chars: Vec<char> = span_text.chars().collect();
+        let span_len = span_chars.len();
+        let span_end = current_col + span_len;
+
+        // Check overlap with selection
+        let overlap_start = sel_start.max(current_col);
+        let overlap_end = sel_end.min(span_end);
+
+        if overlap_start < overlap_end && overlap_start < span_end && overlap_end > current_col {
+            // This span has some overlap with selection
+
+            // Part before selection (if any)
+            if current_col < overlap_start {
+                let before_len = overlap_start - current_col;
+                let before: String = span_chars[..before_len].iter().collect();
+                result_spans.push(Span::styled(before, span.style));
+            }
+
+            // Selected part
+            let sel_start_in_span = overlap_start.saturating_sub(current_col);
+            let sel_end_in_span = (overlap_end - current_col).min(span_len);
+            let selected: String = span_chars[sel_start_in_span..sel_end_in_span]
+                .iter()
+                .collect();
+            result_spans.push(Span::styled(selected, selection_style));
+
+            // Part after selection (if any)
+            if overlap_end < span_end {
+                let after_start = overlap_end - current_col;
+                let after: String = span_chars[after_start..].iter().collect();
+                result_spans.push(Span::styled(after, span.style));
+            }
+        } else {
+            // No overlap - keep span as-is
+            result_spans.push(span.clone());
+        }
+
+        current_col = span_end;
+    }
+
+    Line::from(result_spans)
 }
 
 /// Insert a cursor (reversed style) into a line at the given column

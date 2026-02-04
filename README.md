@@ -30,7 +30,8 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 **Highlights:**
 - Full PTY emulation with 256-color support and 1000-line scrollback
 - Search & Replace (MC Edit style) with regex support
-- Terminal selection mode (Ctrl+S or Alt+Click) with intelligent filtering
+- **Character-level mouse selection** - click and drag to select text, auto-copies to clipboard
+- Keyboard selection mode (Ctrl+S) with intelligent filtering
 - Drag & Drop files into terminals
 - Git remote change detection with pull prompts
 - Claude fullscreen mode when all panes hidden (F1/F2/F5/F6 toggles)
@@ -136,7 +137,8 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer für KI-unterstütz
 **Highlights:**
 - Volle PTY-Emulation mit 256-Farben und 1000 Zeilen Scrollback
 - Suchen & Ersetzen (MC Edit Stil) mit Regex-Unterstützung
-- Terminal-Auswahlmodus (Ctrl+S oder Alt+Klick) mit intelligentem Filtering
+- **Zeichenweise Mausauswahl** - Klicken und Ziehen zum Markieren, kopiert automatisch ins Clipboard
+- Tastatur-Auswahlmodus (Ctrl+S) mit intelligentem Filtering
 - Drag & Drop von Dateien in Terminals
 - Git Remote-Änderungserkennung mit Pull-Aufforderung
 - Claude Vollbildmodus wenn alle Bereiche ausgeblendet (F1/F2/F5/F6 Umschaltung)

@@ -498,7 +498,7 @@ fn help_content() -> Vec<Line<'static>> {
         // IMPORTANT: Selection Mode (highlighted section)
         Line::from("━".repeat(40)),
         Line::from(Span::styled(
-            "★ Selection Mode (Ctrl+S / Alt+Click) ★",
+            "★ Keyboard Selection Mode (Ctrl+S) ★",
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -506,13 +506,13 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from("━".repeat(40)),
         Line::from(""),
         Line::from(Span::styled(
-            "Select text from Terminal or Preview and copy to",
+            "Line-based selection from Terminal or Preview.",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
         )),
         Line::from(Span::styled(
-            "Claude (Enter/y) or System Clipboard (Ctrl+C).",
+            "Copy to Claude (Enter/y) or Clipboard (Ctrl+C).",
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::ITALIC),
@@ -566,17 +566,28 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(""),
         // Mouse Selection
         Line::from(Span::styled(
-            "Mouse Selection (Alt+Click)",
+            "Mouse Selection (Click & Drag)",
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from("  Alt+Click and drag in Terminal or Preview panes"),
-        Line::from("  to select text. Release to enter Selection Mode,"),
-        Line::from("  then press Enter/y to copy to Claude."),
+        Line::from("  Click and drag in Terminal or Preview panes"),
+        Line::from("  to select text character-by-character."),
         Line::from(""),
-        Line::from("  Note: Regular click only focuses pane (no selection)."),
+        Line::from(vec![
+            Span::styled("  Release      ", Style::default().fg(Color::Green)),
+            Span::raw("Copy selection to System Clipboard"),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Selection is constrained to pane boundaries.",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(Span::styled(
+            "  Yellow highlight shows selected characters.",
+            Style::default().fg(Color::DarkGray),
+        )),
         Line::from(""),
         Line::from("━".repeat(40)),
         Line::from(""),

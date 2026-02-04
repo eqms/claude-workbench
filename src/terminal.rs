@@ -166,6 +166,59 @@ impl PseudoTerminal {
         lines
     }
 
+    /// Extract text content from character-level selection range
+    /// (start_row, start_col) to (end_row, end_col) - all 0-based
+    /// For multi-line selections:
+    /// - First line: from start_col to end of line
+    /// - Middle lines: entire line
+    /// - Last line: from start to end_col
+    pub fn extract_char_range(
+        &self,
+        start_row: usize,
+        start_col: usize,
+        end_row: usize,
+        end_col: usize,
+    ) -> String {
+        let parser = self.parser.lock().unwrap();
+        let screen = parser.screen();
+        let (rows, cols) = screen.size();
+
+        let mut result = String::new();
+
+        for row in start_row..=end_row {
+            if row >= rows as usize {
+                break;
+            }
+
+            let col_start = if row == start_row { start_col } else { 0 };
+            let col_end = if row == end_row {
+                end_col.min(cols as usize)
+            } else {
+                cols as usize
+            };
+
+            let mut line = String::new();
+            for col in col_start..col_end {
+                if col >= cols as usize {
+                    break;
+                }
+                if let Some(cell) = screen.cell(row as u16, col as u16) {
+                    line.push_str(cell.contents());
+                }
+            }
+
+            // Trim trailing whitespace for middle/last lines, but not leading
+            if row == end_row {
+                result.push_str(line.trim_end());
+            } else {
+                result.push_str(line.trim_end());
+                result.push('\n');
+            }
+        }
+
+        result
+    }
+
     /// Get the current visible cursor row (0-based)
     pub fn cursor_row(&self) -> u16 {
         let parser = self.parser.lock().unwrap();

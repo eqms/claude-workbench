@@ -169,6 +169,7 @@ Session persistence is stubbed (`src/session/mod.rs`). Currently returns default
 **Mouse**
 - Click pane to focus
 - Scroll wheel to scroll content
+- Click and drag in Terminal/Preview panes for character-level text selection (auto-copies to clipboard on release)
 
 ## PTY Initialization
 
@@ -240,6 +241,19 @@ Select and copy terminal output lines to Claude as code blocks.
 
 ### Environment Inheritance
 PTY processes now inherit all parent environment variables (critical for Claude CLI which needs HOME, PATH, LANG, etc.).
+
+## Recent Features (v0.41.0)
+
+### Character-Level Mouse Selection
+- Click and drag in Terminal or Preview panes to select text character-by-character
+- Selection is constrained to pane boundaries (prevents overflow into adjacent panes)
+- Selection automatically copies to system clipboard on mouse release
+- Yellow highlight (`LightYellow` background with `Black` text) shows selected characters
+- Works in both Terminal panes (Claude, LazyGit, Terminal) and Preview pane (ReadOnly mode)
+
+### Edit Mode Clipboard Integration
+- Block operations (Ctrl+F5 copy, Ctrl+F6 cut) now copy to system clipboard in addition to internal buffer
+- Text can be pasted into external applications after copying in edit mode
 
 ## Update-System Testing
 

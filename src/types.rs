@@ -359,7 +359,7 @@ impl HelpState {
     }
 }
 
-/// Mouse-based text selection in terminal panes
+/// Mouse-based text selection in terminal panes (character-level)
 #[derive(Debug, Clone, Default)]
 pub struct MouseSelection {
     /// Whether mouse selection is in progress
@@ -370,29 +370,39 @@ pub struct MouseSelection {
     pub start_y: u16,
     /// Current Y position (screen coordinate)
     pub current_y: u16,
+    /// Starting X position (screen coordinate) for character-level selection
+    pub start_x: u16,
+    /// Current X position (screen coordinate) for character-level selection
+    pub current_x: u16,
     /// Pane area for coordinate conversion
     pub pane_area: Option<ratatui::layout::Rect>,
 }
 
 impl MouseSelection {
-    /// Start a new mouse selection
-    pub fn start(&mut self, pane: PaneId, y: u16, area: ratatui::layout::Rect) {
+    /// Start a new mouse selection with character-level coordinates
+    pub fn start(&mut self, pane: PaneId, x: u16, y: u16, area: ratatui::layout::Rect) {
         self.selecting = true;
         self.source_pane = Some(pane);
+        self.start_x = x;
         self.start_y = y;
+        self.current_x = x;
         self.current_y = y;
         self.pane_area = Some(area);
     }
 
-    /// Update selection during drag
-    pub fn update(&mut self, y: u16) {
+    /// Update selection during drag with character-level coordinates
+    pub fn update(&mut self, x: u16, y: u16) {
         if self.selecting {
-            // Clamp Y to pane boundaries to prevent selection overflow
+            // Clamp coordinates to pane boundaries to prevent selection overflow
             if let Some(area) = self.pane_area {
+                let min_x = area.x + 1; // Account for left border
+                let max_x = area.x + area.width.saturating_sub(2); // Account for right border
                 let min_y = area.y + 1; // Account for top border
                 let max_y = area.y + area.height.saturating_sub(2); // Account for bottom border
+                self.current_x = x.clamp(min_x, max_x);
                 self.current_y = y.clamp(min_y, max_y);
             } else {
+                self.current_x = x;
                 self.current_y = y;
             }
         }
@@ -406,6 +416,60 @@ impl MouseSelection {
             return None;
         }
         Some((y - area.y - 1) as usize)
+    }
+
+    /// Convert screen X to column index within pane (0-based, accounting for border)
+    fn screen_x_to_col(&self, x: u16) -> Option<usize> {
+        let area = self.pane_area?;
+        // Account for left border (1 pixel)
+        if x <= area.x || x >= area.x + area.width - 1 {
+            return None;
+        }
+        Some((x - area.x - 1) as usize)
+    }
+
+    /// Get the character-level selection range: ((start_row, start_col), (end_row, end_col))
+    /// Returns coordinates normalized so start is always before end
+    pub fn char_range(&self) -> Option<((usize, usize), (usize, usize))> {
+        if !self.selecting {
+            return None;
+        }
+        let start_line = self.screen_y_to_line(self.start_y)?;
+        let end_line = self.screen_y_to_line(self.current_y)?;
+        let start_col = self.screen_x_to_col(self.start_x)?;
+        let end_col = self.screen_x_to_col(self.current_x)?;
+
+        // Normalize: ensure start is before end (by row, then by column)
+        if start_line < end_line || (start_line == end_line && start_col <= end_col) {
+            Some(((start_line, start_col), (end_line, end_col)))
+        } else {
+            Some(((end_line, end_col), (start_line, start_col)))
+        }
+    }
+
+    /// Get character selection for a specific line
+    /// Returns Option<(start_col, end_col)> for the selected portion of this line
+    pub fn get_line_selection(&self, line: usize) -> Option<(usize, usize)> {
+        let ((start_row, start_col), (end_row, end_col)) = self.char_range()?;
+
+        if line < start_row || line > end_row {
+            // Line not in selection
+            return None;
+        }
+
+        if start_row == end_row {
+            // Single-line selection
+            Some((start_col, end_col))
+        } else if line == start_row {
+            // First line of multi-line selection: from start_col to end of line (use large value)
+            Some((start_col, usize::MAX))
+        } else if line == end_row {
+            // Last line of multi-line selection: from start to end_col
+            Some((0, end_col))
+        } else {
+            // Middle line: entire line selected
+            Some((0, usize::MAX))
+        }
     }
 
     /// Get the selected line range (min, max) as terminal line indices
@@ -427,8 +491,21 @@ impl MouseSelection {
         }
     }
 
-    /// Finish selection and return (start_line, end_line, pane)
-    pub fn finish(&mut self) -> Option<(usize, usize, PaneId)> {
+    /// Finish selection and return character-level range with pane
+    /// Returns ((start_row, start_col), (end_row, end_col), pane)
+    pub fn finish(&mut self) -> Option<((usize, usize), (usize, usize), PaneId)> {
+        if !self.selecting {
+            return None;
+        }
+        let char_range = self.char_range()?;
+        let pane = self.source_pane?;
+        self.clear();
+        Some((char_range.0, char_range.1, pane))
+    }
+
+    /// Finish selection and return line-level range (for backwards compatibility)
+    /// Returns (start_line, end_line, pane)
+    pub fn finish_lines(&mut self) -> Option<(usize, usize, PaneId)> {
         if !self.selecting {
             return None;
         }
@@ -442,6 +519,10 @@ impl MouseSelection {
     pub fn clear(&mut self) {
         self.selecting = false;
         self.source_pane = None;
+        self.start_x = 0;
+        self.start_y = 0;
+        self.current_x = 0;
+        self.current_y = 0;
         self.pane_area = None;
     }
 

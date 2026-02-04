@@ -686,13 +686,10 @@ impl App {
                                         }
                                     } // Close: if y >= list_content_top && y <= list_content_bottom
                                 } else if is_inside(preview, x, y) {
-                                    // Alt+Click starts selection in Preview (Read-Only mode only)
-                                    if mouse
-                                        .modifiers
-                                        .contains(crossterm::event::KeyModifiers::ALT)
-                                        && self.preview.mode == crate::types::EditorMode::ReadOnly
-                                    {
-                                        self.mouse_selection.start(PaneId::Preview, y, preview);
+                                    // Mouse selection in Preview (Read-Only mode only)
+                                    // Alt+Click OR normal click starts character-level selection
+                                    if self.preview.mode == crate::types::EditorMode::ReadOnly {
+                                        self.mouse_selection.start(PaneId::Preview, x, y, preview);
                                     }
                                     // Click-to-position cursor in Edit mode
                                     else if self.preview.mode == crate::types::EditorMode::Edit {
@@ -707,32 +704,17 @@ impl App {
                                         self.claude_startup
                                             .open(self.config.claude.startup_prefixes.clone());
                                     } else {
-                                        // Alt+Click starts mouse text selection
-                                        if mouse
-                                            .modifiers
-                                            .contains(crossterm::event::KeyModifiers::ALT)
-                                        {
-                                            self.mouse_selection.start(PaneId::Claude, y, claude);
-                                        }
+                                        // Normal click starts character-level mouse text selection
+                                        self.mouse_selection.start(PaneId::Claude, x, y, claude);
                                         self.active_pane = PaneId::Claude;
                                     }
                                 } else if is_inside(lazygit, x, y) {
-                                    // Alt+Click starts mouse text selection
-                                    if mouse
-                                        .modifiers
-                                        .contains(crossterm::event::KeyModifiers::ALT)
-                                    {
-                                        self.mouse_selection.start(PaneId::LazyGit, y, lazygit);
-                                    }
+                                    // Normal click starts character-level mouse text selection
+                                    self.mouse_selection.start(PaneId::LazyGit, x, y, lazygit);
                                     self.active_pane = PaneId::LazyGit;
                                 } else if is_inside(term, x, y) {
-                                    // Alt+Click starts mouse text selection
-                                    if mouse
-                                        .modifiers
-                                        .contains(crossterm::event::KeyModifiers::ALT)
-                                    {
-                                        self.mouse_selection.start(PaneId::Terminal, y, term);
-                                    }
+                                    // Normal click starts character-level mouse text selection
+                                    self.mouse_selection.start(PaneId::Terminal, x, y, term);
                                     self.active_pane = PaneId::Terminal;
                                 } else if is_inside(footer_area, x, y) {
                                     // Use context-aware button positions
@@ -987,9 +969,9 @@ impl App {
                                 {
                                     continue;
                                 }
-                                // Handle mouse text selection in terminal panes
+                                // Handle character-level mouse text selection in terminal panes
                                 if self.mouse_selection.selecting {
-                                    self.mouse_selection.update(y);
+                                    self.mouse_selection.update(x, y);
                                 } else if self.drag_state.dragging {
                                     self.drag_state.update_position(x, y);
                                 }
@@ -1011,17 +993,11 @@ impl App {
                                 {
                                     continue;
                                 }
-                                // Handle mouse text selection finish - convert to terminal selection
+                                // Handle mouse text selection finish - copy to clipboard
                                 if self.mouse_selection.selecting {
-                                    if let Some((start, end, pane)) = self.mouse_selection.finish()
-                                    {
-                                        // Enter keyboard selection mode with the mouse-selected range
-                                        self.terminal_selection.active = true;
-                                        self.terminal_selection.start_line = Some(start);
-                                        self.terminal_selection.end_line = Some(end);
-                                        self.terminal_selection.source_pane = Some(pane);
-                                        self.active_pane = pane;
-                                    }
+                                    // Copy selected text directly to system clipboard
+                                    self.copy_mouse_selection_to_clipboard();
+                                    self.mouse_selection.clear();
                                 } else if self.drag_state.dragging {
                                     // Determine drop target
                                     let drop_target = if is_inside(claude, x, y) {
@@ -2396,12 +2372,17 @@ impl App {
         }
 
         // Calculate Preview selection range (keyboard or mouse selection)
+        // Keyboard selection is line-based
         let preview_selection_range = if self.terminal_selection.active
             && self.terminal_selection.source_pane == Some(PaneId::Preview)
         {
             self.terminal_selection.line_range()
-        } else if self.mouse_selection.is_selecting_in(PaneId::Preview) {
-            self.mouse_selection.line_range()
+        } else {
+            None
+        };
+        // Mouse selection is character-based
+        let preview_char_selection = if self.mouse_selection.is_selecting_in(PaneId::Preview) {
+            self.mouse_selection.char_range()
         } else {
             None
         };
@@ -2412,6 +2393,7 @@ impl App {
                 &self.preview,
                 self.active_pane == PaneId::Preview,
                 preview_selection_range,
+                preview_char_selection,
             );
         }
 
@@ -3225,6 +3207,68 @@ impl App {
         // Join lines and copy to system clipboard
         let text = lines.join("\n");
 
+        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+            let _ = clipboard.set_text(text);
+        }
+    }
+
+    /// Copy character-level mouse selection to system clipboard
+    fn copy_mouse_selection_to_clipboard(&mut self) {
+        let Some(((start_row, start_col), (end_row, end_col))) = self.mouse_selection.char_range()
+        else {
+            return;
+        };
+
+        let Some(source_pane) = self.mouse_selection.source_pane else {
+            return;
+        };
+
+        // Extract text based on source pane type
+        let text = if source_pane == PaneId::Preview {
+            // Extract from preview content with character-level selection
+            let content_lines: Vec<&str> = self.preview.content.lines().collect();
+            if start_row >= content_lines.len() {
+                return;
+            }
+
+            let mut result = String::new();
+            for row in start_row..=end_row.min(content_lines.len().saturating_sub(1)) {
+                let line = content_lines[row];
+                let line_chars: Vec<char> = line.chars().collect();
+
+                let col_start = if row == start_row {
+                    start_col.min(line_chars.len())
+                } else {
+                    0
+                };
+                let col_end = if row == end_row {
+                    (end_col + 1).min(line_chars.len()) // +1 because end_col is inclusive
+                } else {
+                    line_chars.len()
+                };
+
+                let selected: String = line_chars[col_start..col_end].iter().collect();
+
+                if row == end_row {
+                    result.push_str(selected.trim_end());
+                } else {
+                    result.push_str(selected.trim_end());
+                    result.push('\n');
+                }
+            }
+            result
+        } else if let Some(pty) = self.terminals.get(&source_pane) {
+            // Extract from terminal with character-level selection
+            pty.extract_char_range(start_row, start_col, end_row, end_col + 1) // +1 for inclusive end
+        } else {
+            return;
+        };
+
+        if text.is_empty() {
+            return;
+        }
+
+        // Copy to system clipboard
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
             let _ = clipboard.set_text(text);
         }

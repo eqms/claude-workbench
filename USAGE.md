@@ -162,12 +162,13 @@ Open files in external applications:
 5. Enter or y to copy to Claude, Ctrl+C to copy to System Clipboard
 6. Esc to cancel
 
-#### Mouse Selection
-1. Alt+Click and drag to select lines
-2. Release to enter selection mode
-3. Enter or y to copy to Claude, Ctrl+C to copy to System Clipboard
+#### Mouse Selection (Click & Drag)
+1. Click and drag in Terminal or Preview panes to select text character-by-character
+2. Release to automatically copy selection to System Clipboard
+3. Selection is constrained to pane boundaries
+4. Yellow highlight shows selected characters
 
-**Note:** Regular click only focuses pane (no selection).
+**Note:** Mouse selection is character-level (not line-based like keyboard selection).
 
 #### Intelligent Filtering
 When copying to Claude, output is automatically filtered:
@@ -347,12 +348,13 @@ Dateien in externen Anwendungen öffnen:
 5. Enter oder y zum Kopieren an Claude, Ctrl+C ins System-Clipboard
 6. Esc zum Abbrechen
 
-#### Maus-Auswahl
-1. Alt+Klicken und Ziehen um Zeilen auszuwählen
-2. Loslassen zum Betreten des Auswahlmodus
-3. Enter oder y zum Kopieren an Claude, Ctrl+C ins System-Clipboard
+#### Maus-Auswahl (Klicken & Ziehen)
+1. In Terminal- oder Vorschau-Bereichen klicken und ziehen für zeichenweise Auswahl
+2. Loslassen kopiert automatisch ins System-Clipboard
+3. Auswahl ist auf Bereichsgrenzen beschränkt
+4. Gelbe Hervorhebung zeigt ausgewählte Zeichen
 
-**Hinweis:** Normaler Klick fokussiert nur den Bereich (keine Auswahl).
+**Hinweis:** Maus-Auswahl ist zeichenweise (nicht zeilenbasiert wie Tastatur-Auswahl).
 
 #### Intelligentes Filtering
 Beim Kopieren zu Claude wird die Ausgabe automatisch gefiltert:

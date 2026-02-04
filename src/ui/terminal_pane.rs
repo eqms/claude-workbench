@@ -117,17 +117,23 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
         let parser = pty.parser.lock().unwrap();
         let screen = parser.screen();
 
-        // Get selection range if this pane is the source (keyboard or mouse selection)
+        // Get selection range - keyboard selection is line-based, mouse selection is char-based
         let selection_range = if selection_active {
             app.terminal_selection.line_range()
-        } else if mouse_selection_active {
-            app.mouse_selection.line_range()
+        } else {
+            None
+        };
+
+        // Get character-level mouse selection (only when mouse_selection is active)
+        let char_selection = if mouse_selection_active {
+            app.mouse_selection.char_range()
         } else {
             None
         };
 
         TerminalWidget::new(screen)
             .with_selection(selection_range)
+            .with_char_selection(char_selection)
             .render(inner_area, f.buffer_mut());
 
         // Scrollbar
@@ -157,7 +163,10 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
 
 struct TerminalWidget<'a> {
     screen: &'a vt100::Screen,
+    /// Line-based selection range (for keyboard selection mode)
     selection_range: Option<(usize, usize)>,
+    /// Character-level selection: ((start_row, start_col), (end_row, end_col))
+    char_selection: Option<((usize, usize), (usize, usize))>,
 }
 
 impl<'a> TerminalWidget<'a> {
@@ -165,12 +174,43 @@ impl<'a> TerminalWidget<'a> {
         Self {
             screen,
             selection_range: None,
+            char_selection: None,
         }
     }
 
     fn with_selection(mut self, range: Option<(usize, usize)>) -> Self {
         self.selection_range = range;
         self
+    }
+
+    fn with_char_selection(mut self, char_sel: Option<((usize, usize), (usize, usize))>) -> Self {
+        self.char_selection = char_sel;
+        self
+    }
+
+    /// Check if a specific cell (row, col) is within the character-level selection
+    fn is_char_selected(&self, row: usize, col: usize) -> bool {
+        let Some(((start_row, start_col), (end_row, end_col))) = self.char_selection else {
+            return false;
+        };
+
+        if row < start_row || row > end_row {
+            return false;
+        }
+
+        if start_row == end_row {
+            // Single-line selection
+            col >= start_col && col <= end_col
+        } else if row == start_row {
+            // First line of multi-line: from start_col to end of line
+            col >= start_col
+        } else if row == end_row {
+            // Last line of multi-line: from start to end_col
+            col <= end_col
+        } else {
+            // Middle lines: entire line selected
+            true
+        }
     }
 }
 
@@ -183,9 +223,10 @@ impl Widget for TerminalWidget<'_> {
                 break;
             }
 
-            // Check if this row is selected
+            let row_idx = r as usize;
+
+            // Check if this row is selected (line-based keyboard selection)
             let row_selected = self.selection_range.is_some_and(|(start, end)| {
-                let row_idx = r as usize;
                 row_idx >= start && row_idx <= end
             });
 
@@ -194,6 +235,8 @@ impl Widget for TerminalWidget<'_> {
                     break;
                 }
 
+                let col_idx = c as usize;
+
                 let cell = self.screen.cell(r, c);
                 if let Some(cell) = cell {
                     let char_val = cell.contents().chars().next().unwrap_or(' ');
@@ -201,8 +244,8 @@ impl Widget for TerminalWidget<'_> {
                     let x = area.x + c;
                     let y = area.y + r;
                     if x < buf.area.width && y < buf.area.height {
-                        if let Some(c) = buf.cell_mut((x, y)) {
-                            c.set_char(char_val);
+                        if let Some(buf_cell) = buf.cell_mut((x, y)) {
+                            buf_cell.set_char(char_val);
 
                             // Map Colors
                             let fg = map_color(cell.fgcolor());
@@ -216,12 +259,17 @@ impl Widget for TerminalWidget<'_> {
                                 style = style.bg(b);
                             }
 
-                            // Apply selection highlighting (DarkGray background)
-                            if row_selected {
+                            // Apply selection highlighting
+                            // Character-level selection (mouse) takes precedence, then line-based (keyboard)
+                            if self.is_char_selected(row_idx, col_idx) {
+                                // Mouse selection: use inverted colors for better visibility
+                                style = style.bg(Color::LightYellow).fg(Color::Black);
+                            } else if row_selected {
+                                // Keyboard selection: DarkGray background
                                 style = style.bg(Color::DarkGray);
                             }
 
-                            // Attributes (Bold, Italic, etc. - MVP skip or add basic)
+                            // Attributes (Bold, Italic, etc.)
                             if cell.bold() {
                                 style = style.add_modifier(ratatui::style::Modifier::BOLD);
                             }
@@ -235,7 +283,7 @@ impl Widget for TerminalWidget<'_> {
                                 style = style.add_modifier(ratatui::style::Modifier::UNDERLINED);
                             }
 
-                            c.set_style(style);
+                            buf_cell.set_style(style);
                         }
                     }
                 }
