@@ -230,8 +230,9 @@ impl App {
     /// Start async update check
     fn start_update_check(&mut self) {
         self.update_state.start_check();
-        self.update_check_receiver =
-            Some(update::check_for_update_async_with_version(self.fake_version.clone()));
+        self.update_check_receiver = Some(update::check_for_update_async_with_version(
+            self.fake_version.clone(),
+        ));
     }
 
     /// Poll for async update check results
@@ -283,7 +284,10 @@ impl App {
             update::log_update("[app] poll_update_result: checking receiver...");
             match receiver.try_recv() {
                 Ok(result) => {
-                    update::log_update(&format!("[app] poll_update_result: GOT RESULT {:?}", result));
+                    update::log_update(&format!(
+                        "[app] poll_update_result: GOT RESULT {:?}",
+                        result
+                    ));
                     match result {
                         UpdateResult::Success { new_version, .. } => {
                             update::log_update(&format!("[app] SUCCESS: {}", new_version));
@@ -304,7 +308,8 @@ impl App {
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     update::log_update("[app] poll_update_result: CHANNEL DISCONNECTED!");
-                    self.update_state.set_error("Update channel disconnected unexpectedly".to_string());
+                    self.update_state
+                        .set_error("Update channel disconnected unexpectedly".to_string());
                     self.update_state.updating = false;
                     self.update_state.show_dialog = true;
                     self.update_receiver = None;
@@ -1507,8 +1512,7 @@ impl App {
 
                             // Permission mode dialog handling (high priority - before Claude startup)
                             // Skip if update dialog is visible - update takes priority
-                            if self.permission_mode_dialog.visible
-                                && !self.update_state.show_dialog
+                            if self.permission_mode_dialog.visible && !self.update_state.show_dialog
                             {
                                 match key.code {
                                     KeyCode::Esc => {

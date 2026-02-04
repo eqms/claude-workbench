@@ -4,11 +4,7 @@
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
-use syntect::{
-    highlighting::ThemeSet,
-    html::highlighted_html_for_string,
-    parsing::SyntaxSet,
-};
+use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
 
 const TEXT_HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
 <html lang="en">
@@ -94,8 +90,15 @@ pub fn can_syntax_highlight(path: &Path) -> bool {
         let lower_name = name.to_lowercase();
         if matches!(
             lower_name.as_str(),
-            "makefile" | "dockerfile" | "gemfile" | "rakefile" | "cmakelists.txt"
-            | ".gitignore" | ".gitattributes" | ".editorconfig" | ".env"
+            "makefile"
+                | "dockerfile"
+                | "gemfile"
+                | "rakefile"
+                | "cmakelists.txt"
+                | ".gitignore"
+                | ".gitattributes"
+                | ".editorconfig"
+                | ".env"
         ) {
             return true;
         }
@@ -117,20 +120,18 @@ pub fn text_to_html(path: &Path) -> Result<PathBuf> {
         .and_then(|ext| ss.find_syntax_by_extension(ext))
         .or_else(|| {
             // Try by filename for special files
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .and_then(|name| {
-                    let lower = name.to_lowercase();
-                    match lower.as_str() {
-                        "makefile" => ss.find_syntax_by_extension("makefile"),
-                        "dockerfile" => ss.find_syntax_by_extension("dockerfile"),
-                        "gemfile" | "rakefile" => ss.find_syntax_by_extension("rb"),
-                        "cmakelists.txt" => ss.find_syntax_by_extension("cmake"),
-                        _ if lower.starts_with(".git") => ss.find_syntax_by_extension("gitconfig"),
-                        _ if lower.starts_with(".env") => ss.find_syntax_by_extension("sh"),
-                        _ => None,
-                    }
-                })
+            path.file_name().and_then(|n| n.to_str()).and_then(|name| {
+                let lower = name.to_lowercase();
+                match lower.as_str() {
+                    "makefile" => ss.find_syntax_by_extension("makefile"),
+                    "dockerfile" => ss.find_syntax_by_extension("dockerfile"),
+                    "gemfile" | "rakefile" => ss.find_syntax_by_extension("rb"),
+                    "cmakelists.txt" => ss.find_syntax_by_extension("cmake"),
+                    _ if lower.starts_with(".git") => ss.find_syntax_by_extension("gitconfig"),
+                    _ if lower.starts_with(".env") => ss.find_syntax_by_extension("sh"),
+                    _ => None,
+                }
+            })
         })
         .unwrap_or_else(|| ss.find_syntax_plain_text());
 

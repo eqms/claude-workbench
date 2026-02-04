@@ -163,8 +163,8 @@ fn render_updating(frame: &mut Frame, area: Rect, state: &UpdateState) {
         .unwrap_or("Downloading update...");
 
     // Check if this is an error (contains "failed" or "error")
-    let is_error = message.to_lowercase().contains("failed")
-        || message.to_lowercase().contains("error");
+    let is_error =
+        message.to_lowercase().contains("failed") || message.to_lowercase().contains("error");
 
     let color = if is_error { Color::Red } else { Color::Yellow };
 
@@ -250,9 +250,7 @@ fn render_error(frame: &mut Frame, area: Rect, error: &str) {
         Line::from(""),
         Line::from(Span::styled(
             "Update failed:",
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
     ];

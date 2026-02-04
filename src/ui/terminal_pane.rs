@@ -226,9 +226,9 @@ impl Widget for TerminalWidget<'_> {
             let row_idx = r as usize;
 
             // Check if this row is selected (line-based keyboard selection)
-            let row_selected = self.selection_range.is_some_and(|(start, end)| {
-                row_idx >= start && row_idx <= end
-            });
+            let row_selected = self
+                .selection_range
+                .is_some_and(|(start, end)| row_idx >= start && row_idx <= end);
 
             for c in 0..area.width {
                 if c >= cols {

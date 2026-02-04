@@ -19,7 +19,9 @@ use session::load_session;
 use std::io::Write;
 use std::panic;
 use std::path::PathBuf;
-use update::{check_for_update_with_version, perform_update_to_version_sync, UpdateCheckResult, UpdateResult};
+use update::{
+    check_for_update_with_version, perform_update_to_version_sync, UpdateCheckResult, UpdateResult,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -101,7 +103,10 @@ fn run_update_to_version_cli(target_version: &str) -> Result<()> {
     println!();
 
     match perform_update_to_version_sync(target_version) {
-        UpdateResult::Success { old_version, new_version } => {
+        UpdateResult::Success {
+            old_version,
+            new_version,
+        } => {
             println!("✅ Update successful: {} -> {}", old_version, new_version);
             println!();
             println!("Please restart the application to use the new version.");

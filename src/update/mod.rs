@@ -4,9 +4,9 @@
 //! Provides non-blocking update checks and update execution.
 
 use self_update::backends::github::{ReleaseList, Update};
+use std::io::Write;
 use std::sync::mpsc;
 use std::thread;
-use std::io::Write;
 
 /// Log file path for update debugging
 pub const LOG_FILE: &str = "/tmp/claude-workbench-update.log";
@@ -177,11 +177,11 @@ impl UpdateState {
         self.updating = false;
         self.update_success = true;
         self.installed_version = Some(new_version);
-        self.available_version = None;  // Clear to prevent showing "Update Available" again
+        self.available_version = None; // Clear to prevent showing "Update Available" again
         self.release_notes = None;
         self.error = None;
         self.progress_message = None;
-        self.show_dialog = true;  // Keep dialog open to show success
+        self.show_dialog = true; // Keep dialog open to show success
     }
 
     /// Reset success state (when dialog is closed)
@@ -452,12 +452,16 @@ pub fn perform_update_sync() -> UpdateResult {
             log_update("Update configuration OK, calling updater.update()...");
             match updater.update() {
                 Ok(status) => {
-                    log_update(&format!("UPDATE SUCCESS: {} -> {}", CURRENT_VERSION, status.version()));
+                    log_update(&format!(
+                        "UPDATE SUCCESS: {} -> {}",
+                        CURRENT_VERSION,
+                        status.version()
+                    ));
                     UpdateResult::Success {
                         old_version: CURRENT_VERSION.to_string(),
                         new_version: status.version().to_string(),
                     }
-                },
+                }
                 Err(e) => {
                     // Detailed error with context for troubleshooting
                     let error_msg = format!("{}\n\n[{}]", e, context);
@@ -480,7 +484,10 @@ pub fn perform_update_sync() -> UpdateResult {
 /// This allows updating to any version, including older ones.
 /// Useful for testing the update mechanism without releasing new versions.
 pub fn perform_update_to_version_sync(target_version: &str) -> UpdateResult {
-    log_update(&format!("=== perform_update_to_version_sync({}) STARTED ===", target_version));
+    log_update(&format!(
+        "=== perform_update_to_version_sync({}) STARTED ===",
+        target_version
+    ));
 
     let target = get_target();
     let os = std::env::consts::OS;
@@ -508,7 +515,7 @@ pub fn perform_update_to_version_sync(target_version: &str) -> UpdateResult {
         .repo_name(REPO_NAME)
         .bin_name(BIN_NAME)
         .target(target)
-        .target_version_tag(&target_tag)  // Specific version instead of latest
+        .target_version_tag(&target_tag) // Specific version instead of latest
         .current_version(CURRENT_VERSION)
         .show_download_progress(false)
         .show_output(false)
@@ -516,15 +523,22 @@ pub fn perform_update_to_version_sync(target_version: &str) -> UpdateResult {
         .build()
     {
         Ok(updater) => {
-            log_update(&format!("Update configuration OK, updating to {}...", target_tag));
+            log_update(&format!(
+                "Update configuration OK, updating to {}...",
+                target_tag
+            ));
             match updater.update() {
                 Ok(status) => {
-                    log_update(&format!("UPDATE TO VERSION SUCCESS: {} -> {}", CURRENT_VERSION, status.version()));
+                    log_update(&format!(
+                        "UPDATE TO VERSION SUCCESS: {} -> {}",
+                        CURRENT_VERSION,
+                        status.version()
+                    ));
                     UpdateResult::Success {
                         old_version: CURRENT_VERSION.to_string(),
                         new_version: status.version().to_string(),
                     }
-                },
+                }
                 Err(e) => {
                     let error_msg = format!("{}\n\n[{}]", e, context);
                     log_update(&format!("UPDATE TO VERSION FAILED: {}", error_msg));
