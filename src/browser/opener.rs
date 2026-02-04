@@ -53,7 +53,8 @@ pub fn can_preview_in_browser(path: &Path) -> bool {
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase());
 
-    matches!(
+    // Native browser/viewer types
+    if matches!(
         ext.as_deref(),
         Some(
             "html"
@@ -70,7 +71,12 @@ pub fn can_preview_in_browser(path: &Path) -> bool {
                 | "svg"
                 | "webp"
         )
-    )
+    ) {
+        return true;
+    }
+
+    // Text files that can be syntax-highlighted
+    crate::browser::syntax::can_syntax_highlight(path)
 }
 
 /// Check if file is a markdown file

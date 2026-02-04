@@ -1682,6 +1682,9 @@ impl App {
                                                                 if browser::is_markdown(&path) {
                                                                     browser::markdown_to_html(&path)
                                                                         .unwrap_or(path)
+                                                                } else if browser::can_syntax_highlight(&path) {
+                                                                    browser::text_to_html(&path)
+                                                                        .unwrap_or(path)
                                                                 } else {
                                                                     path
                                                                 };
@@ -1949,6 +1952,10 @@ impl App {
                                                     && key.modifiers.contains(KeyModifiers::CONTROL)
                                                 {
                                                     self.preview.copy_block();
+                                                    self.preview.update_modified();
+                                                    self.preview.update_edit_highlighting(
+                                                        &self.syntax_manager,
+                                                    );
                                                 }
                                                 // MC Edit style: Ctrl+F6 = move (cut) block
                                                 else if key.code == KeyCode::F(6)
