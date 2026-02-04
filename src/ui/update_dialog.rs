@@ -17,6 +17,8 @@ pub struct UpdateDialogAreas {
     pub popup_area: Option<Rect>,
     pub update_button_area: Option<Rect>,
     pub later_button_area: Option<Rect>,
+    pub restart_button_area: Option<Rect>,
+    pub close_button_area: Option<Rect>,
 }
 
 /// Button selection in the update dialog
@@ -25,6 +27,8 @@ pub enum UpdateDialogButton {
     #[default]
     Update,
     Later,
+    Restart,
+    Close,
 }
 
 impl UpdateDialogButton {
@@ -32,6 +36,8 @@ impl UpdateDialogButton {
         match self {
             UpdateDialogButton::Update => UpdateDialogButton::Later,
             UpdateDialogButton::Later => UpdateDialogButton::Update,
+            UpdateDialogButton::Restart => UpdateDialogButton::Close,
+            UpdateDialogButton::Close => UpdateDialogButton::Restart,
         }
     }
 }
@@ -112,9 +118,9 @@ pub fn render(
 
     // Render content based on state (order matters!)
     if state.update_success {
-        // Update completed successfully - show success message
+        // Update completed successfully - show success message with restart option
         render_success(frame, chunks[0], state.installed_version.as_deref());
-        render_close_button(frame, chunks[1]);
+        areas = render_restart_buttons(frame, chunks[1], selected_button, areas);
     } else if state.updating {
         render_updating(frame, chunks[0], state);
     } else if state.checking {
@@ -324,11 +330,7 @@ fn render_success(frame: &mut Frame, area: Rect, new_version: Option<&str>) {
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "Please restart the application",
-            Style::default().fg(Color::Yellow),
-        )),
-        Line::from(Span::styled(
-            "to use the new version.",
+            "Restart to use the new version.",
             Style::default().fg(Color::Yellow),
         )),
     ])
@@ -472,6 +474,55 @@ fn render_buttons(
     areas
 }
 
+fn render_restart_buttons(
+    frame: &mut Frame,
+    area: Rect,
+    selected: UpdateDialogButton,
+    mut areas: UpdateDialogAreas,
+) -> UpdateDialogAreas {
+    let button_width = 18u16;
+    let total_width = button_width * 2 + 4;
+    let start_x = area.x + (area.width.saturating_sub(total_width)) / 2;
+
+    // Restart button (primary action)
+    let restart_style = if selected == UpdateDialogButton::Restart {
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::Green)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::Green)
+    };
+
+    let restart_area = Rect::new(start_x, area.y + 1, button_width, 1);
+    areas.restart_button_area = Some(restart_area);
+
+    let restart_btn = Paragraph::new(" ⟳ Restart Now ")
+        .style(restart_style)
+        .alignment(Alignment::Center);
+    frame.render_widget(restart_btn, restart_area);
+
+    // Close button (secondary action)
+    let close_style = if selected == UpdateDialogButton::Close {
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let close_area = Rect::new(start_x + button_width + 4, area.y + 1, button_width, 1);
+    areas.close_button_area = Some(close_area);
+
+    let close_btn = Paragraph::new(" Later ")
+        .style(close_style)
+        .alignment(Alignment::Center);
+    frame.render_widget(close_btn, close_area);
+
+    areas
+}
+
 fn render_close_button(frame: &mut Frame, area: Rect) {
     let hint = Paragraph::new(Line::from(vec![
         Span::styled("Press ", Style::default().fg(Color::DarkGray)),
@@ -494,6 +545,16 @@ pub fn check_button_click(areas: &UpdateDialogAreas, x: u16, y: u16) -> Option<U
     if let Some(area) = areas.later_button_area {
         if x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height {
             return Some(UpdateDialogButton::Later);
+        }
+    }
+    if let Some(area) = areas.restart_button_area {
+        if x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height {
+            return Some(UpdateDialogButton::Restart);
+        }
+    }
+    if let Some(area) = areas.close_button_area {
+        if x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height {
+            return Some(UpdateDialogButton::Close);
         }
     }
     None

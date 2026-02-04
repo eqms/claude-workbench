@@ -579,6 +579,60 @@ pub fn current_version() -> &'static str {
     CURRENT_VERSION
 }
 
+/// Restart the application by re-executing the current binary
+///
+/// This function attempts to restart the application by:
+/// 1. Getting the path to the current executable
+/// 2. Spawning a new process with the same arguments
+/// 3. The caller should exit the current process after this returns Ok
+///
+/// Returns Ok(()) on successful spawn, or an error message.
+pub fn restart_application() -> Result<(), String> {
+    log_update("=== restart_application() CALLED ===");
+
+    // Get the current executable path
+    let exe =
+        std::env::current_exe().map_err(|e| format!("Failed to get executable path: {}", e))?;
+
+    log_update(&format!("Executable path: {:?}", exe));
+
+    // Get current arguments (skip the program name)
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    log_update(&format!("Arguments: {:?}", args));
+
+    // On Unix, we can use exec to replace the current process
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+
+        log_update("Using Unix exec() for seamless restart");
+
+        let mut cmd = std::process::Command::new(&exe);
+        cmd.args(&args);
+
+        // exec() replaces the current process - this should not return
+        let error = cmd.exec();
+        // If we get here, exec failed
+        let msg = format!("exec() failed: {}", error);
+        log_update(&msg);
+        return Err(msg);
+    }
+
+    // On non-Unix (Windows), spawn a new process and signal caller to exit
+    #[cfg(not(unix))]
+    {
+        log_update("Using spawn() for Windows restart");
+
+        std::process::Command::new(&exe)
+            .args(&args)
+            .spawn()
+            .map_err(|e| format!("Failed to spawn new process: {}", e))?;
+
+        log_update("New process spawned successfully");
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -293,6 +293,8 @@ impl App {
                             update::log_update(&format!("[app] SUCCESS: {}", new_version));
                             // Set success state - shows dedicated success screen
                             self.update_state.set_success(new_version);
+                            // Set button to Restart (primary action after update)
+                            self.update_dialog_button = UpdateDialogButton::Restart;
                         }
                         UpdateResult::Error(msg) => {
                             update::log_update(&format!("[app] ERROR: {}", msg));
@@ -515,8 +517,21 @@ impl App {
                                                         self.start_update();
                                                     }
                                                 }
-                                                UpdateDialogButton::Later => {
+                                                UpdateDialogButton::Later
+                                                | UpdateDialogButton::Close => {
                                                     self.update_state.close_dialog();
+                                                }
+                                                UpdateDialogButton::Restart => {
+                                                    // Attempt to restart the application
+                                                    if let Err(e) = update::restart_application() {
+                                                        self.update_state.set_error(format!(
+                                                            "Restart failed: {}\n\nPlease restart manually.",
+                                                            e
+                                                        ));
+                                                    } else {
+                                                        // On Windows, restart spawns new process
+                                                        self.should_quit = true;
+                                                    }
                                                 }
                                             }
                                         }
@@ -1189,7 +1204,28 @@ impl App {
                                         self.update_state.close_dialog();
                                     }
                                     KeyCode::Enter => {
-                                        if self.update_state.available_version.is_some()
+                                        // Success screen with Restart/Close buttons
+                                        if self.update_state.update_success {
+                                            if self.update_dialog_button
+                                                == UpdateDialogButton::Restart
+                                            {
+                                                // Attempt to restart the application
+                                                if let Err(e) = update::restart_application() {
+                                                    // If restart fails, show error and close dialog
+                                                    self.update_state.set_error(format!(
+                                                        "Restart failed: {}\n\nPlease restart manually.",
+                                                        e
+                                                    ));
+                                                } else {
+                                                    // On Windows, restart spawns new process - we should exit
+                                                    self.should_quit = true;
+                                                }
+                                            } else {
+                                                self.update_state.close_dialog();
+                                            }
+                                        }
+                                        // Update available with Update/Later buttons
+                                        else if self.update_state.available_version.is_some()
                                             && !self.update_state.updating
                                         {
                                             if self.update_dialog_button
@@ -1204,9 +1240,20 @@ impl App {
                                         }
                                     }
                                     KeyCode::Tab | KeyCode::Left | KeyCode::Right => {
-                                        if self.update_state.available_version.is_some()
+                                        // Toggle buttons for update available or success screens
+                                        if self.update_state.update_success {
+                                            // Toggle Restart/Close
+                                            self.update_dialog_button = if self.update_dialog_button
+                                                == UpdateDialogButton::Restart
+                                            {
+                                                UpdateDialogButton::Close
+                                            } else {
+                                                UpdateDialogButton::Restart
+                                            };
+                                        } else if self.update_state.available_version.is_some()
                                             && !self.update_state.updating
                                         {
+                                            // Toggle Update/Later
                                             self.update_dialog_button =
                                                 self.update_dialog_button.toggle();
                                         }
