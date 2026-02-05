@@ -3,9 +3,7 @@ use ratatui::{
     prelude::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
-    },
+    widgets::{Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
 use std::fs;
@@ -911,9 +909,9 @@ pub fn render(
             };
 
             // Render highlighted content in read-only mode (without block, already rendered)
-            let paragraph = Paragraph::new(lines)
-                .wrap(Wrap { trim: false })
-                .scroll((state.scroll, 0));
+            // Note: No wrapping - code should not wrap as it breaks indentation/readability
+            // Long lines extend past visible area (future: add horizontal scroll)
+            let paragraph = Paragraph::new(lines).scroll((state.scroll, 0));
 
             f.render_widget(paragraph, content_area);
 
