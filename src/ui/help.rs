@@ -304,6 +304,9 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from("  - Markdown:  Convert to styled HTML, dark mode"),
         Line::from("  - PDF:       Open in default PDF viewer"),
         Line::from("  - Images:    PNG/JPG/GIF/SVG/WebP in viewer"),
+        Line::from("  - Code:      500+ languages with syntax highlighting"),
+        Line::from("  - Config:    TOML/INI/CONF/CFG/ENV and more"),
+        Line::from("  - Text:      LOG/CSV/TSV and other text files"),
         Line::from(""),
         // Fuzzy Finder
         Line::from(Span::styled(

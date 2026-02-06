@@ -6,6 +6,7 @@ pub mod git;
 pub mod input;
 pub mod session;
 pub mod setup;
+pub mod syntax_registry;
 pub mod terminal;
 pub mod types;
 pub mod ui;

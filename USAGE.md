@@ -150,6 +150,9 @@ Open files in external applications:
 - **Markdown**: Converts to styled HTML with dark mode
 - **PDF**: Opens in default PDF viewer
 - **Images**: PNG, JPG, GIF, SVG, WebP in system viewer
+- **Code files**: 500+ languages with syntax highlighting (Rust, Python, JS, Go, etc.)
+- **Config files**: TOML, INI, CONF, CFG, ENV, YAML, JSON, XML, Properties, and more
+- **Text files**: LOG, CSV, TSV, and other plain text files
 - **O (Shift+O)**: Open directory in Finder/file manager
 
 ### Terminal Selection Mode
@@ -336,6 +339,9 @@ Dateien in externen Anwendungen öffnen:
 - **Markdown**: Konvertierung zu gestyltem HTML mit Dark-Mode
 - **PDF**: Öffnet im Standard-PDF-Viewer
 - **Bilder**: PNG, JPG, GIF, SVG, WebP im System-Viewer
+- **Code-Dateien**: 500+ Sprachen mit Syntax-Highlighting (Rust, Python, JS, Go, etc.)
+- **Config-Dateien**: TOML, INI, CONF, CFG, ENV, YAML, JSON, XML, Properties u.v.m.
+- **Text-Dateien**: LOG, CSV, TSV und andere Textdateien
 - **O (Shift+O)**: Verzeichnis im Finder/Dateimanager öffnen
 
 ### Terminal-Auswahlmodus

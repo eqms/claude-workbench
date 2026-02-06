@@ -1,6 +1,7 @@
 //! Syntax-highlighted HTML preview for text files
 //!
 //! Uses syntect for syntax highlighting with support for 500+ languages.
+//! Delegates file type detection to the central `syntax_registry` module.
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
@@ -77,34 +78,7 @@ const TEXT_HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
 /// Check if file can be syntax-highlighted via syntect
 pub fn can_syntax_highlight(path: &Path) -> bool {
     let ss = SyntaxSet::load_defaults_newlines();
-
-    // Check by extension first
-    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-        if ss.find_syntax_by_extension(ext).is_some() {
-            return true;
-        }
-    }
-
-    // Also check common config files by name
-    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-        let lower_name = name.to_lowercase();
-        if matches!(
-            lower_name.as_str(),
-            "makefile"
-                | "dockerfile"
-                | "gemfile"
-                | "rakefile"
-                | "cmakelists.txt"
-                | ".gitignore"
-                | ".gitattributes"
-                | ".editorconfig"
-                | ".env"
-        ) {
-            return true;
-        }
-    }
-
-    false
+    crate::syntax_registry::is_known_text_file(path, &ss)
 }
 
 /// Convert text file to HTML with syntax highlighting
@@ -113,27 +87,8 @@ pub fn text_to_html(path: &Path) -> Result<PathBuf> {
     let ss = SyntaxSet::load_defaults_newlines();
     let ts = ThemeSet::load_defaults();
 
-    // Get syntax for this file
-    let syntax = path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .and_then(|ext| ss.find_syntax_by_extension(ext))
-        .or_else(|| {
-            // Try by filename for special files
-            path.file_name().and_then(|n| n.to_str()).and_then(|name| {
-                let lower = name.to_lowercase();
-                match lower.as_str() {
-                    "makefile" => ss.find_syntax_by_extension("makefile"),
-                    "dockerfile" => ss.find_syntax_by_extension("dockerfile"),
-                    "gemfile" | "rakefile" => ss.find_syntax_by_extension("rb"),
-                    "cmakelists.txt" => ss.find_syntax_by_extension("cmake"),
-                    _ if lower.starts_with(".git") => ss.find_syntax_by_extension("gitconfig"),
-                    _ if lower.starts_with(".env") => ss.find_syntax_by_extension("sh"),
-                    _ => None,
-                }
-            })
-        })
-        .unwrap_or_else(|| ss.find_syntax_plain_text());
+    // Get syntax for this file via central registry
+    let syntax = crate::syntax_registry::find_syntax_for_path(path, &ss);
 
     // Use base16-ocean.dark theme (dark mode friendly)
     let theme = &ts.themes["base16-ocean.dark"];
@@ -146,7 +101,7 @@ pub fn text_to_html(path: &Path) -> Result<PathBuf> {
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
-    let language = detect_language_name(path, &ss);
+    let language = crate::syntax_registry::display_name_for_path(path, &ss);
     let size = format_file_size(content.len());
     let lines = content.lines().count();
 
@@ -185,33 +140,6 @@ fn format_file_size(bytes: usize) -> String {
     }
 }
 
-/// Detect human-readable language name
-fn detect_language_name(path: &Path, ss: &SyntaxSet) -> String {
-    // Try by extension
-    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-        if let Some(syntax) = ss.find_syntax_by_extension(ext) {
-            return syntax.name.clone();
-        }
-    }
-
-    // Try by filename
-    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-        let lower = name.to_lowercase();
-        return match lower.as_str() {
-            "makefile" => "Makefile".to_string(),
-            "dockerfile" => "Dockerfile".to_string(),
-            "gemfile" => "Ruby (Gemfile)".to_string(),
-            "rakefile" => "Ruby (Rakefile)".to_string(),
-            "cmakelists.txt" => "CMake".to_string(),
-            _ if lower.starts_with(".git") => "Git Config".to_string(),
-            _ if lower.starts_with(".env") => "Environment".to_string(),
-            _ => "Plain Text".to_string(),
-        };
-    }
-
-    "Plain Text".to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,9 +168,22 @@ mod tests {
         assert!(can_syntax_highlight(Path::new("style.css")));
         assert!(can_syntax_highlight(Path::new("data.xml")));
 
-        // Special files by name (our custom handling)
+        // Special files by name
         assert!(can_syntax_highlight(Path::new("Makefile")));
         assert!(can_syntax_highlight(Path::new("Dockerfile")));
+
+        // NEW: Config/text files via registry
+        assert!(can_syntax_highlight(Path::new("config.toml")));
+        assert!(can_syntax_highlight(Path::new("nginx.conf")));
+        assert!(can_syntax_highlight(Path::new("settings.ini")));
+        assert!(can_syntax_highlight(Path::new("settings.cfg")));
+        assert!(can_syntax_highlight(Path::new("app.log")));
+        assert!(can_syntax_highlight(Path::new("data.csv")));
+        assert!(can_syntax_highlight(Path::new("unit.service")));
+        assert!(can_syntax_highlight(Path::new("main.tf")));
+        assert!(can_syntax_highlight(Path::new(".bashrc")));
+        assert!(can_syntax_highlight(Path::new(".gitignore")));
+        assert!(can_syntax_highlight(Path::new(".env.local")));
 
         // Non-text files should return false
         assert!(!can_syntax_highlight(Path::new("image.png")));

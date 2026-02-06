@@ -31,21 +31,17 @@ impl SyntaxManager {
         }
     }
 
-    /// Detect syntax by file extension
+    /// Detect syntax name via central registry
     pub fn detect_syntax_name(&self, path: &Path) -> Option<String> {
-        let extension = path.extension()?.to_str()?;
-        self.syntax_set
-            .find_syntax_by_extension(extension)
-            .map(|s| s.name.clone())
+        Some(crate::syntax_registry::display_name_for_path(
+            path,
+            &self.syntax_set,
+        ))
     }
 
     /// Highlight content and return ratatui Lines
     pub fn highlight(&self, content: &str, path: &Path) -> Vec<Line<'static>> {
-        let syntax = path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .and_then(|ext| self.syntax_set.find_syntax_by_extension(ext))
-            .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+        let syntax = crate::syntax_registry::find_syntax_for_path(path, &self.syntax_set);
 
         let theme = self
             .theme_set
