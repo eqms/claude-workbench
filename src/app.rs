@@ -33,6 +33,7 @@ pub struct App {
     pub config: Config,
     pub session: SessionState,
     pub should_quit: bool,
+    pub should_restart: bool,
     pub terminals: HashMap<PaneId, PseudoTerminal>,
     pub active_pane: PaneId,
     pub file_browser: FileBrowserState,
@@ -168,6 +169,7 @@ impl App {
             config,
             session,
             should_quit: false,
+            should_restart: false,
             terminals,
             active_pane: PaneId::Claude,
             file_browser,
@@ -444,7 +446,7 @@ impl App {
         }
     }
 
-    pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
+    pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<bool> {
         while !self.should_quit {
             // Check for exited PTYs and restart them with a shell
             self.check_and_restart_exited_ptys();
@@ -522,16 +524,9 @@ impl App {
                                                     self.update_state.close_dialog();
                                                 }
                                                 UpdateDialogButton::Restart => {
-                                                    // Attempt to restart the application
-                                                    if let Err(e) = update::restart_application() {
-                                                        self.update_state.set_error(format!(
-                                                            "Restart failed: {}\n\nPlease restart manually.",
-                                                            e
-                                                        ));
-                                                    } else {
-                                                        // On Windows, restart spawns new process
-                                                        self.should_quit = true;
-                                                    }
+                                                    // Signal restart and exit cleanly
+                                                    self.should_restart = true;
+                                                    self.should_quit = true;
                                                 }
                                             }
                                         }
@@ -1209,17 +1204,9 @@ impl App {
                                             if self.update_dialog_button
                                                 == UpdateDialogButton::Restart
                                             {
-                                                // Attempt to restart the application
-                                                if let Err(e) = update::restart_application() {
-                                                    // If restart fails, show error and close dialog
-                                                    self.update_state.set_error(format!(
-                                                        "Restart failed: {}\n\nPlease restart manually.",
-                                                        e
-                                                    ));
-                                                } else {
-                                                    // On Windows, restart spawns new process - we should exit
-                                                    self.should_quit = true;
-                                                }
+                                                // Signal restart and exit cleanly
+                                                self.should_restart = true;
+                                                self.should_quit = true;
                                             } else {
                                                 self.update_state.close_dialog();
                                             }
@@ -2388,7 +2375,7 @@ impl App {
                 } // End Match
             }
         }
-        Ok(())
+        Ok(self.should_restart)
     }
 
     fn draw(&mut self, frame: &mut Frame) {

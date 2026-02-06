@@ -183,10 +183,24 @@ async fn async_main(fake_version: Option<String>) -> Result<()> {
 
     let app = App::new(config, session, fake_version);
 
-    let app_result = app.run(terminal);
+    let restart_requested = app.run(terminal);
 
     // Normal cleanup
     restore_terminal();
 
-    app_result
+    // Check if restart was requested (after update)
+    match restart_requested {
+        Ok(true) => {
+            println!("Restarting application...");
+            if let Err(e) = update::restart_application() {
+                eprintln!("Restart failed: {}", e);
+                eprintln!("Please restart manually.");
+                return Err(anyhow::anyhow!("Restart failed: {}", e));
+            }
+            // exec() on Unix replaces the process, so this is only reached on Windows
+            Ok(())
+        }
+        Ok(false) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
