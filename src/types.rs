@@ -493,6 +493,7 @@ impl MouseSelection {
 
     /// Finish selection and return character-level range with pane
     /// Returns ((start_row, start_col), (end_row, end_col), pane)
+    #[allow(clippy::type_complexity)]
     pub fn finish(&mut self) -> Option<((usize, usize), (usize, usize), PaneId)> {
         if !self.selecting {
             return None;

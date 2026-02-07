@@ -179,7 +179,7 @@ pub fn load_config() -> Result<Config> {
     let local_config = Path::new("config.yaml");
     if local_config.exists() {
         let contents = fs::read_to_string(local_config)?;
-        let config: Config = serde_yaml::from_str(&contents)?;
+        let config: Config = serde_yaml_ng::from_str(&contents)?;
         return Ok(config);
     }
 
@@ -188,7 +188,7 @@ pub fn load_config() -> Result<Config> {
         let config_path = config_dir.join("config.yaml");
         if config_path.exists() {
             let contents = fs::read_to_string(&config_path)?;
-            let config: Config = serde_yaml::from_str(&contents)?;
+            let config: Config = serde_yaml_ng::from_str(&contents)?;
             return Ok(config);
         }
     }
@@ -217,7 +217,7 @@ pub fn save_config(config: &Config) -> Result<()> {
     // If local config.yaml exists, update it (maintains project-specific settings)
     let local_config = Path::new("config.yaml");
     if local_config.exists() {
-        let yaml = serde_yaml::to_string(config)?;
+        let yaml = serde_yaml_ng::to_string(config)?;
         fs::write(local_config, &yaml)?;
         set_restrictive_permissions(local_config)?;
         return Ok(());
@@ -227,7 +227,7 @@ pub fn save_config(config: &Config) -> Result<()> {
     if let Some(config_dir) = get_config_dir() {
         let config_path = config_dir.join("config.yaml");
         fs::create_dir_all(&config_dir)?;
-        let yaml = serde_yaml::to_string(config)?;
+        let yaml = serde_yaml_ng::to_string(config)?;
         fs::write(&config_path, &yaml)?;
         set_restrictive_permissions(&config_path)?;
     }

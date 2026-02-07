@@ -209,10 +209,7 @@ const FILENAME_DISPLAY_NAMES: &[(&str, &str)] = &[
 /// 6. Fallback: Plain Text
 pub fn find_syntax_for_path<'a>(path: &Path, ss: &'a SyntaxSet) -> &'a SyntaxReference {
     let ext = path.extension().and_then(|e| e.to_str());
-    let filename = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let lower_name = filename.to_lowercase();
 
     // 1. Syntect native by extension
@@ -262,10 +259,7 @@ pub fn find_syntax_for_path<'a>(path: &Path, ss: &'a SyntaxSet) -> &'a SyntaxRef
 /// Returns true if syntect knows the extension natively, or if we have a mapping for it.
 pub fn is_known_text_file(path: &Path, ss: &SyntaxSet) -> bool {
     let ext = path.extension().and_then(|e| e.to_str());
-    let filename = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let lower_name = filename.to_lowercase();
 
     // 1. Syntect native by extension
@@ -305,10 +299,7 @@ pub fn is_known_text_file(path: &Path, ss: &SyntaxSet) -> bool {
 /// Get a human-readable display name for the file's language/type.
 pub fn display_name_for_path(path: &Path, ss: &SyntaxSet) -> String {
     let ext = path.extension().and_then(|e| e.to_str());
-    let filename = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let lower_name = filename.to_lowercase();
 
     // 1. Syntect native by extension → use syntect's name
@@ -494,26 +485,14 @@ mod tests {
     #[test]
     fn test_display_names() {
         let ss = ss();
-        assert_eq!(
-            display_name_for_path(Path::new("config.toml"), &ss),
-            "TOML"
-        );
+        assert_eq!(display_name_for_path(Path::new("config.toml"), &ss), "TOML");
         assert_eq!(
             display_name_for_path(Path::new("nginx.conf"), &ss),
             "Config"
         );
-        assert_eq!(
-            display_name_for_path(Path::new("settings.ini"), &ss),
-            "INI"
-        );
-        assert_eq!(
-            display_name_for_path(Path::new("data.csv"), &ss),
-            "CSV"
-        );
-        assert_eq!(
-            display_name_for_path(Path::new("app.log"), &ss),
-            "Log"
-        );
+        assert_eq!(display_name_for_path(Path::new("settings.ini"), &ss), "INI");
+        assert_eq!(display_name_for_path(Path::new("data.csv"), &ss), "CSV");
+        assert_eq!(display_name_for_path(Path::new("app.log"), &ss), "Log");
         assert_eq!(
             display_name_for_path(Path::new("main.tf"), &ss),
             "Terraform"

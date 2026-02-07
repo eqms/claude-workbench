@@ -3,8 +3,8 @@
 //! Filters shell prompts, preserves error messages and stack traces,
 //! detects syntax for code blocks.
 
-use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::LazyLock;
 
 /// Filter options for terminal output
 #[derive(Debug, Clone)]
@@ -44,9 +44,9 @@ pub struct FilteredOutput {
     pub contains_error: bool,
 }
 
-lazy_static! {
-    // Shell prompt patterns
-    static ref PROMPT_PATTERNS: Vec<Regex> = vec![
+// Shell prompt patterns
+static PROMPT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         // user@host:path$ or user@host:path#
         Regex::new(r"^[a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+:[^\$#]*[\$#]\s*$").unwrap(),
         // Simple prompts: $, >, %, >>> (Python)
@@ -62,10 +62,12 @@ lazy_static! {
         Regex::new(r"^\[\d{2}:\d{2}(:\d{2})?\]\s*[\$#>]").unwrap(),
         // Just a directory path ending with prompt
         Regex::new(r"^[~\w/\-\.]+\s*[\$#>%]\s*$").unwrap(),
-    ];
+    ]
+});
 
-    // Error patterns to preserve
-    static ref ERROR_PATTERNS: Vec<Regex> = vec![
+// Error patterns to preserve
+static ERROR_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         // Python traceback
         Regex::new(r"Traceback \(most recent call last\)").unwrap(),
         Regex::new(r#"^\s+File "[^"]+", line \d+"#).unwrap(),
@@ -86,56 +88,68 @@ lazy_static! {
         Regex::new(r"(?i)^error:").unwrap(),
         Regex::new(r"(?i)^fatal:").unwrap(),
         Regex::new(r"(?i)^panic:").unwrap(),
-    ];
+    ]
+});
 
-    // Directory listing patterns to filter
-    static ref DIR_LISTING_PATTERNS: Vec<Regex> = vec![
+// Directory listing patterns to filter
+static DIR_LISTING_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         // Permission strings: drwxr-xr-x, -rw-r--r--
         Regex::new(r"^[d\-][rwx\-]{9}").unwrap(),
         // Total line: total 123
         Regex::new(r"^total\s+\d+").unwrap(),
-    ];
+    ]
+});
 
-    // Syntax detection patterns
-    static ref PYTHON_PATTERNS: Vec<Regex> = vec![
+// Syntax detection patterns
+static PYTHON_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         Regex::new(r"^def\s+\w+\s*\(").unwrap(),
         Regex::new(r"^class\s+\w+").unwrap(),
         Regex::new(r"^import\s+\w+").unwrap(),
         Regex::new(r"^from\s+\w+\s+import").unwrap(),
         Regex::new(r"self\.\w+").unwrap(),
         Regex::new(r"__init__").unwrap(),
-    ];
+    ]
+});
 
-    static ref RUST_PATTERNS: Vec<Regex> = vec![
+static RUST_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         Regex::new(r"^fn\s+\w+").unwrap(),
         Regex::new(r"^pub\s+(fn|struct|enum|mod)").unwrap(),
         Regex::new(r"^impl\s+").unwrap(),
         Regex::new(r"^let\s+(mut\s+)?\w+").unwrap(),
         Regex::new(r"^use\s+\w+::").unwrap(),
-    ];
+    ]
+});
 
-    static ref JAVASCRIPT_PATTERNS: Vec<Regex> = vec![
+static JAVASCRIPT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         Regex::new(r"^const\s+\w+\s*=").unwrap(),
         Regex::new(r"^let\s+\w+\s*=").unwrap(),
         Regex::new(r"^function\s+\w+").unwrap(),
         Regex::new(r"^(export\s+)?(default\s+)?class\s+").unwrap(),
         Regex::new(r"=>\s*\{?").unwrap(),
         Regex::new(r"^import\s+.*\s+from\s+").unwrap(),
-    ];
+    ]
+});
 
-    static ref BASH_PATTERNS: Vec<Regex> = vec![
+static BASH_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         Regex::new(r"^#!/bin/(ba)?sh").unwrap(),
         Regex::new(r"^export\s+\w+=").unwrap(),
         Regex::new(r"^if\s+\[").unwrap(),
         Regex::new(r"^\$\{?\w+").unwrap(),
-    ];
+    ]
+});
 
-    static ref XML_PATTERNS: Vec<Regex> = vec![
+static XML_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         Regex::new(r"^<\?xml").unwrap(),
         Regex::new(r"^<!DOCTYPE").unwrap(),
         Regex::new(r"^<[a-zA-Z_][\w\-]*(\s|>|/)").unwrap(),
-    ];
-}
+    ]
+});
 
 /// Check if a line matches any shell prompt pattern
 fn is_prompt_line(line: &str) -> bool {

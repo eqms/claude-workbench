@@ -293,14 +293,13 @@ checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
 name = "claude-workbench"
-version = "0.47.0"
+version = "0.48.0"
 dependencies = [
  "anyhow",
  "arboard",
  "clap",
  "crossterm 0.28.1",
  "dirs",
- "lazy_static",
  "libc",
  "portable-pty",
  "pulldown-cmark 0.10.3",
@@ -308,9 +307,10 @@ dependencies = [
  "regex",
  "self_update",
  "serde",
- "serde_yaml",
+ "serde_yaml_ng",
  "shell-escape",
  "syntect",
+ "tempfile",
  "tokio",
  "tui-markdown",
  "tui-textarea",
@@ -2623,10 +2623,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_yaml"
-version = "0.9.34+deprecated"
+name = "serde_yaml_ng"
+version = "0.9.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+checksum = "bd24347956e682cf958c95e82deb9914cad4010d3efc035d579f81f4c426038c"
 dependencies = [
  "indexmap",
  "itoa",

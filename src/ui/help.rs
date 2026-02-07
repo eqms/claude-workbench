@@ -647,7 +647,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  tokio         ", Style::default().fg(Color::Cyan)),
-            Span::styled("1.42.0  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("1.44.0  ", Style::default().fg(Color::DarkGray)),
             Span::styled("MIT", Style::default().fg(Color::Green)),
         ]),
         Line::from(vec![
@@ -681,7 +681,7 @@ fn help_content() -> Vec<Line<'static>> {
             Span::styled("MIT/Apache-2.0", Style::default().fg(Color::Green)),
         ]),
         Line::from(vec![
-            Span::styled("  serde_yaml    ", Style::default().fg(Color::Cyan)),
+            Span::styled("  serde_yaml_ng ", Style::default().fg(Color::Cyan)),
             Span::styled("0.9     ", Style::default().fg(Color::DarkGray)),
             Span::styled("MIT/Apache-2.0", Style::default().fg(Color::Green)),
         ]),

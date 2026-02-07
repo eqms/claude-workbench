@@ -115,7 +115,10 @@ fn run_update_to_version_cli(target_version: &str) -> Result<()> {
         UpdateResult::Error(msg) => {
             println!("❌ Update failed: {}", msg);
             println!();
-            println!("Check the log file for details: {}", update::LOG_FILE);
+            println!(
+                "Check the log file for details: {}",
+                update::log_file_path().display()
+            );
         }
     }
 

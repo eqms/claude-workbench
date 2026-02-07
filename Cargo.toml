@@ -1,30 +1,30 @@
 [package]
 name = "claude-workbench"
-version = "0.47.0"
+version = "0.48.0"
 edition = "2021"
 
 [dependencies]
 ratatui = "0.30.0" # Bumped to match modern deps
 crossterm = "0.28.1"
-tokio = { version = "1.42.0", features = ["full"] }
-anyhow = "1.0.94"
-serde = { version = "1.0.216", features = ["derive"] }
-serde_yaml = "0.9.33"
+tokio = { version = "1.44.0", features = ["full"] }
+anyhow = "1.0.98"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_yaml_ng = "0.9"
 dirs = "5.0"
 tui-textarea = { git = "https://github.com/0xferrous/tui-textarea.git", branch = "update-ratatui" }
 portable-pty = "0.8.1"
-clap = { version = "4.5.21", features = ["derive", "env"] }
+clap = { version = "4.5.37", features = ["derive", "env"] }
 vt100 = "0.16"
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "default-themes", "regex-onig"] }
 tui-markdown = "0.3"
 pulldown-cmark = "0.10"
 shell-escape = "0.1"
-arboard = "3.4"  # Cross-platform clipboard
-regex = "1.10"
-lazy_static = "1.4"
+arboard = "3.6"  # Cross-platform clipboard
+regex = "1.12"
 libc = "0.2"
 self_update = { version = "0.42", default-features = false, features = [
     "archive-tar",
     "compression-flate2",
     "rustls"
 ] }
+tempfile = "3"

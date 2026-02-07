@@ -8,15 +8,25 @@ use std::io::Write;
 use std::sync::mpsc;
 use std::thread;
 
-/// Log file path for update debugging
-pub const LOG_FILE: &str = "/tmp/claude-workbench-update.log";
+/// Get the log file path using platform-appropriate cache directory
+pub fn log_file_path() -> std::path::PathBuf {
+    dirs::cache_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join("claude-workbench")
+        .join("update.log")
+}
 
 /// Write a log message to the update log file
 pub fn log_update(msg: &str) {
+    let log_path = log_file_path();
+    // Ensure parent directory exists
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     if let Ok(mut file) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(LOG_FILE)
+        .open(&log_path)
     {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -615,7 +625,7 @@ pub fn restart_application() -> Result<(), String> {
         // If we get here, exec failed
         let msg = format!("exec() failed: {}", error);
         log_update(&msg);
-        return Err(msg);
+        Err(msg)
     }
 
     // On non-Unix (Windows), spawn a new process and signal caller to exit

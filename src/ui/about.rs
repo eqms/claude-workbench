@@ -60,7 +60,7 @@ pub fn render(frame: &mut Frame, area: Rect, state: &mut AboutState) {
         Line::from(""),
         Line::from(vec![
             Span::styled("Copyright ", Style::default().fg(Color::DarkGray)),
-            Span::styled("(c) 2025 Martin Schmid", Style::default().fg(Color::White)),
+            Span::styled("(c) 2025-2026 Martin Schmid", Style::default().fg(Color::White)),
         ]),
         Line::from(""),
         Line::from(vec![

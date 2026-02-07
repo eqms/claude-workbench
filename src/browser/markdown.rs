@@ -128,14 +128,12 @@ pub fn markdown_to_html(md_path: &Path) -> Result<PathBuf> {
         .replace("{title}", title)
         .replace("{content}", &html_content);
 
-    // Create temp file with unique name based on source path
-    // Use a hash of the full path for uniqueness
-    let path_hash = md_path
-        .to_string_lossy()
-        .bytes()
-        .fold(0u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
-    let temp_name = format!("preview_{:x}.html", path_hash);
-    let temp_path = std::env::temp_dir().join(temp_name);
+    // Create temp file with cryptographically random name (prevents symlink attacks)
+    let named_temp = tempfile::Builder::new()
+        .prefix("cwb-preview-")
+        .suffix(".html")
+        .tempfile()?;
+    let (_, temp_path) = named_temp.keep()?;
 
     std::fs::write(&temp_path, html)?;
     Ok(temp_path)
@@ -163,14 +161,22 @@ fn fix_image_paths(html: &str, base_dir: &Path) -> String {
                 return caps[0].to_string();
             }
 
-            // Resolve relative path to absolute
+            // Resolve relative path to absolute with path traversal guard
             let abs_path = base_dir.join(src);
-            if abs_path.exists() {
-                // Convert to file:// URL
-                let file_url = format!("file://{}", abs_path.display());
-                format!(r#"<img {}src="{}"{}>"#, before, file_url, after)
+            if let Ok(resolved) = abs_path.canonicalize() {
+                // Ensure resolved path stays within base directory (prevent path traversal)
+                let canonical_base = base_dir
+                    .canonicalize()
+                    .unwrap_or_else(|_| base_dir.to_path_buf());
+                if resolved.starts_with(&canonical_base) {
+                    let file_url = format!("file://{}", resolved.display());
+                    format!(r#"<img {}src="{}"{}>"#, before, file_url, after)
+                } else {
+                    // Path traversal detected - keep original (don't resolve)
+                    caps[0].to_string()
+                }
             } else {
-                // Keep original if file doesn't exist
+                // File doesn't exist or can't be resolved - keep original
                 caps[0].to_string()
             }
         })

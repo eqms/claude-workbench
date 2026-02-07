@@ -114,13 +114,12 @@ pub fn text_to_html(path: &Path) -> Result<PathBuf> {
         .replace("{lines}", &lines.to_string())
         .replace("{highlighted_code}", &highlighted);
 
-    // Create temp file
-    let path_hash = path
-        .to_string_lossy()
-        .bytes()
-        .fold(0u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
-    let temp_name = format!("syntax_{:x}.html", path_hash);
-    let temp_path = std::env::temp_dir().join(temp_name);
+    // Create temp file with cryptographically random name (prevents symlink attacks)
+    let named_temp = tempfile::Builder::new()
+        .prefix("cwb-syntax-")
+        .suffix(".html")
+        .tempfile()?;
+    let (_, temp_path) = named_temp.keep()?;
 
     std::fs::write(&temp_path, html)?;
     Ok(temp_path)

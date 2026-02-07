@@ -3277,6 +3277,7 @@ impl App {
             }
 
             let mut result = String::new();
+            #[allow(clippy::needless_range_loop)] // row index needed for start/end column logic
             for row in start_row..=end_row.min(content_lines.len().saturating_sub(1)) {
                 let line = content_lines[row];
                 let line_chars: Vec<char> = line.chars().collect();
