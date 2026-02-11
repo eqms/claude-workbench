@@ -8,7 +8,7 @@ use crate::session::SessionState;
 use crate::terminal::PseudoTerminal;
 use crate::types::{
     ClaudePermissionMode, DragState, EditorMode, GitRemoteCheckResult, GitRemoteState, HelpState,
-    MouseSelection, PaneId, SearchMode, TerminalSelection,
+    MouseSelection, PaneId, ScrollbarAreas, ScrollbarDragState, SearchMode, TerminalSelection,
 };
 use crate::ui;
 use crate::ui::file_browser::FileBrowserState;
@@ -87,6 +87,11 @@ pub struct App {
     pub update_dialog_areas: UpdateDialogAreas,
     // Fake version for testing updates (--fake-version CLI arg)
     pub fake_version: Option<String>,
+    // Scrollbar drag support
+    pub scrollbar_drag: ScrollbarDragState,
+    pub scrollbar_areas: ScrollbarAreas,
+    // Cached preview pane width for horizontal scroll calculations
+    pub preview_width: u16,
 }
 
 impl App {
@@ -206,6 +211,9 @@ impl App {
             update_dialog_button: UpdateDialogButton::default(),
             update_dialog_areas: UpdateDialogAreas::default(),
             fake_version,
+            scrollbar_drag: ScrollbarDragState::default(),
+            scrollbar_areas: ScrollbarAreas::default(),
+            preview_width: 80,
         };
 
         // Open wizard on first run
@@ -618,6 +626,31 @@ impl App {
                                     continue;
                                 }
 
+                                // Check scrollbar click (before normal pane clicks)
+                                {
+                                    let mut hit_scrollbar = false;
+                                    for pane_id in [
+                                        PaneId::FileBrowser,
+                                        PaneId::Preview,
+                                        PaneId::Claude,
+                                        PaneId::LazyGit,
+                                        PaneId::Terminal,
+                                    ] {
+                                        if let Some(sb) = self.scrollbar_areas.get(&pane_id) {
+                                            if x == sb.x && y >= sb.y && y < sb.y + sb.height {
+                                                self.scrollbar_drag.dragging = true;
+                                                self.scrollbar_drag.pane = Some(pane_id);
+                                                self.handle_scrollbar_position(pane_id, y, sb);
+                                                hit_scrollbar = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if hit_scrollbar {
+                                        continue;
+                                    }
+                                }
+
                                 if is_inside(files, x, y) {
                                     self.active_pane = PaneId::FileBrowser;
                                     // File browser layout: [list with borders] + [info bar (1 line)]
@@ -984,6 +1017,15 @@ impl App {
                                 {
                                     continue;
                                 }
+                                // Handle scrollbar drag
+                                if self.scrollbar_drag.dragging {
+                                    if let Some(pane) = self.scrollbar_drag.pane {
+                                        if let Some(sb) = self.scrollbar_areas.get(&pane) {
+                                            self.handle_scrollbar_position(pane, y, sb);
+                                        }
+                                    }
+                                    continue;
+                                }
                                 // Handle character-level mouse text selection in terminal panes
                                 if self.mouse_selection.selecting {
                                     self.mouse_selection.update(x, y);
@@ -1006,6 +1048,12 @@ impl App {
                                     || self.wizard.visible
                                     || self.menu.visible
                                 {
+                                    continue;
+                                }
+                                // Handle scrollbar drag finish
+                                if self.scrollbar_drag.dragging {
+                                    self.scrollbar_drag.dragging = false;
+                                    self.scrollbar_drag.pane = None;
                                     continue;
                                 }
                                 // Handle mouse text selection finish - copy to clipboard
@@ -1065,8 +1113,17 @@ impl App {
                                     self.file_browser.down();
                                     self.update_preview();
                                 } else if is_inside(preview, x, y) {
-                                    // In Edit mode, move TextArea cursor; in ReadOnly mode, scroll
-                                    if self.preview.mode == crate::types::EditorMode::Edit {
+                                    // Shift+Scroll = horizontal scroll
+                                    if mouse
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::SHIFT)
+                                    {
+                                        let max = self.preview.max_line_width();
+                                        for _ in 0..3 {
+                                            self.preview.scroll_right(max);
+                                        }
+                                    } else if self.preview.mode == crate::types::EditorMode::Edit {
+                                        // In Edit mode, move TextArea cursor
                                         if let Some(editor) = &mut self.preview.editor {
                                             for _ in 0..3 {
                                                 editor.move_cursor(tui_textarea::CursorMove::Down);
@@ -1119,8 +1176,16 @@ impl App {
                                     self.file_browser.up();
                                     self.update_preview();
                                 } else if is_inside(preview, x, y) {
-                                    // In Edit mode, move TextArea cursor; in ReadOnly mode, scroll
-                                    if self.preview.mode == crate::types::EditorMode::Edit {
+                                    // Shift+Scroll = horizontal scroll
+                                    if mouse
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::SHIFT)
+                                    {
+                                        for _ in 0..3 {
+                                            self.preview.scroll_left();
+                                        }
+                                    } else if self.preview.mode == crate::types::EditorMode::Edit {
+                                        // In Edit mode, move TextArea cursor
                                         if let Some(editor) = &mut self.preview.editor {
                                             for _ in 0..3 {
                                                 editor.move_cursor(tui_textarea::CursorMove::Up);
@@ -1489,11 +1554,23 @@ impl App {
                                 continue;
                             }
 
-                            // F7: Navigate to Claude settings directory (~/.claude)
+                            // F7: Toggle between ~/.claude and previous directory
                             if key.code == KeyCode::F(7) {
                                 if let Some(home) = std::env::var_os("HOME") {
                                     let claude_dir = std::path::PathBuf::from(home).join(".claude");
-                                    if claude_dir.exists() && claude_dir.is_dir() {
+                                    // Already in ~/.claude? → toggle back
+                                    if self.file_browser.current_dir.starts_with(&claude_dir)
+                                        || self.file_browser.root_dir.starts_with(&claude_dir)
+                                    {
+                                        if let Some(prev) = self.file_browser.previous_dir.take() {
+                                            self.file_browser.current_dir = prev;
+                                            self.file_browser.load_directory();
+                                            self.active_pane = PaneId::FileBrowser;
+                                        }
+                                    } else if claude_dir.exists() && claude_dir.is_dir() {
+                                        // Save current dir, navigate to ~/.claude
+                                        self.file_browser.previous_dir =
+                                            Some(self.file_browser.root_dir.clone());
                                         self.file_browser.current_dir = claude_dir;
                                         self.file_browser.load_directory();
                                         self.active_pane = PaneId::FileBrowser;
@@ -1979,6 +2056,41 @@ impl App {
                                                         &self.syntax_manager,
                                                     );
                                                 }
+                                                // Platform Copy: Cmd+C / Ctrl+C
+                                                else if key.code == KeyCode::Char('c')
+                                                    && (key.modifiers.contains(KeyModifiers::SUPER)
+                                                        || key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL))
+                                                {
+                                                    self.preview.copy_block();
+                                                }
+                                                // Platform Cut: Cmd+X / Ctrl+X
+                                                else if key.code == KeyCode::Char('x')
+                                                    && (key.modifiers.contains(KeyModifiers::SUPER)
+                                                        || key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL))
+                                                {
+                                                    self.preview.move_block();
+                                                    self.preview.update_modified();
+                                                    self.preview.update_edit_highlighting(
+                                                        &self.syntax_manager,
+                                                    );
+                                                }
+                                                // Platform Paste: Cmd+V / Ctrl+V
+                                                else if key.code == KeyCode::Char('v')
+                                                    && (key.modifiers.contains(KeyModifiers::SUPER)
+                                                        || key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL))
+                                                {
+                                                    self.preview.paste_from_clipboard();
+                                                    self.preview.update_modified();
+                                                    self.preview.update_edit_highlighting(
+                                                        &self.syntax_manager,
+                                                    );
+                                                }
                                                 // MC Edit style: Ctrl+F3 = toggle block marking
                                                 else if key.code == KeyCode::F(3)
                                                     && key.modifiers.contains(KeyModifiers::CONTROL)
@@ -2088,6 +2200,36 @@ impl App {
                                                                         &self.syntax_manager,
                                                                     );
                                                             }
+                                                            // Auto-adjust horizontal scroll to follow cursor
+                                                            if let Some(editor) =
+                                                                &self.preview.editor
+                                                            {
+                                                                let (_, cursor_col) =
+                                                                    editor.cursor();
+                                                                let visible_width =
+                                                                    self.preview_width as usize;
+                                                                let h_scroll =
+                                                                    self.preview.horizontal_scroll
+                                                                        as usize;
+                                                                if visible_width > 0
+                                                                    && cursor_col
+                                                                        >= h_scroll
+                                                                            + visible_width
+                                                                                .saturating_sub(5)
+                                                                {
+                                                                    self.preview
+                                                                        .horizontal_scroll =
+                                                                        (cursor_col.saturating_sub(
+                                                                            visible_width / 2,
+                                                                        ))
+                                                                            as u16;
+                                                                } else if cursor_col < h_scroll {
+                                                                    self.preview
+                                                                        .horizontal_scroll =
+                                                                        cursor_col.saturating_sub(5)
+                                                                            as u16;
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -2164,6 +2306,13 @@ impl App {
                                                         }
                                                         KeyCode::Up | KeyCode::Char('k') => {
                                                             self.preview.scroll_up()
+                                                        }
+                                                        KeyCode::Left | KeyCode::Char('h') => {
+                                                            self.preview.scroll_left();
+                                                        }
+                                                        KeyCode::Right | KeyCode::Char('l') => {
+                                                            let max = self.preview.max_line_width();
+                                                            self.preview.scroll_right(max);
                                                         }
                                                         KeyCode::PageDown => {
                                                             for _ in 0..10 {
@@ -2378,6 +2527,29 @@ impl App {
         Ok(self.should_restart)
     }
 
+    /// Handle scrollbar drag: convert mouse Y position to scroll position for a pane
+    fn handle_scrollbar_position(&mut self, pane: PaneId, y: u16, sb: Rect) {
+        let clamped = y.clamp(sb.y, sb.y + sb.height.saturating_sub(1));
+        let ratio = (clamped - sb.y) as f64 / sb.height.max(1) as f64;
+
+        match pane {
+            PaneId::Preview => {
+                let total = self.preview.highlighted_lines.len();
+                self.preview.scroll = (ratio * total as f64) as u16;
+            }
+            PaneId::FileBrowser => {
+                let total = self.file_browser.entries.len();
+                let idx = ((ratio * total as f64) as usize).min(total.saturating_sub(1));
+                self.file_browser.list_state.select(Some(idx));
+            }
+            PaneId::Claude | PaneId::LazyGit | PaneId::Terminal => {
+                if let Some(pty) = self.terminals.get(&pane) {
+                    pty.set_scrollback_position(ratio);
+                }
+            }
+        }
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
         let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(
@@ -2406,6 +2578,27 @@ impl App {
         resize_pty(&mut self.terminals, PaneId::Claude, claude);
         resize_pty(&mut self.terminals, PaneId::LazyGit, lazygit);
         resize_pty(&mut self.terminals, PaneId::Terminal, terminal);
+
+        // Calculate scrollbar areas for drag support (right edge inside borders)
+        let sb_area = |rect: Rect| -> Option<Rect> {
+            if rect.width > 2 && rect.height > 2 {
+                Some(Rect::new(
+                    rect.x + rect.width.saturating_sub(1),
+                    rect.y + 1,
+                    1,
+                    rect.height.saturating_sub(2),
+                ))
+            } else {
+                None
+            }
+        };
+        self.scrollbar_areas.file_browser = sb_area(files);
+        self.scrollbar_areas.preview = sb_area(preview);
+        self.scrollbar_areas.claude = sb_area(claude);
+        self.scrollbar_areas.lazygit = sb_area(lazygit);
+        self.scrollbar_areas.terminal = sb_area(terminal);
+        // Cache preview width for horizontal scroll auto-adjust
+        self.preview_width = preview.width.saturating_sub(10); // Account for gutter+borders
 
         if self.show_file_browser {
             ui::file_browser::render(

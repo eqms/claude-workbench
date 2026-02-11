@@ -27,6 +27,7 @@ pub struct PreviewState {
     pub current_file: Option<PathBuf>,
     pub content: String,
     pub scroll: u16,
+    pub horizontal_scroll: u16,
 
     // Editor state
     pub mode: EditorMode,
@@ -62,6 +63,7 @@ impl Default for PreviewState {
             current_file: None,
             content: String::new(),
             scroll: 0,
+            horizontal_scroll: 0,
             mode: EditorMode::ReadOnly,
             editor: None,
             modified: false,
@@ -91,6 +93,7 @@ impl PreviewState {
 
         self.current_file = Some(path.clone());
         self.scroll = 0;
+        self.horizontal_scroll = 0;
         self.is_markdown = is_markdown_file(&path);
 
         // Set syntax name (Markdown or detected syntax)
@@ -165,6 +168,30 @@ impl PreviewState {
 
     pub fn scroll_up(&mut self) {
         self.scroll = self.scroll.saturating_sub(1);
+    }
+
+    pub fn scroll_left(&mut self) {
+        self.horizontal_scroll = self.horizontal_scroll.saturating_sub(1);
+    }
+
+    pub fn scroll_right(&mut self, max_width: u16) {
+        if self.horizontal_scroll < max_width {
+            self.horizontal_scroll = self.horizontal_scroll.saturating_add(1);
+        }
+    }
+
+    /// Calculate the maximum line width across all highlighted lines
+    pub fn max_line_width(&self) -> u16 {
+        self.highlighted_lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|s| s.content.chars().count())
+                    .sum::<usize>()
+            })
+            .max()
+            .unwrap_or(0) as u16
     }
 
     /// Check if the currently displayed file has been modified externally
@@ -560,6 +587,19 @@ impl PreviewState {
         }
     }
 
+    /// Paste text from system clipboard at cursor position
+    pub fn paste_from_clipboard(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                if let Ok(text) = clipboard.get_text() {
+                    if !text.is_empty() {
+                        editor.insert_str(&text);
+                    }
+                }
+            }
+        }
+    }
+
     /// Delete selection (MC F8)
     pub fn delete_block(&mut self) {
         if let Some(editor) = &mut self.editor {
@@ -804,7 +844,8 @@ pub fn render(
                 }
 
                 // Render content without block (block already rendered)
-                let paragraph = Paragraph::new(lines_with_cursor).scroll((scroll_offset as u16, 0));
+                let paragraph = Paragraph::new(lines_with_cursor)
+                    .scroll((scroll_offset as u16, state.horizontal_scroll));
 
                 f.render_widget(paragraph, content_area);
 
@@ -910,12 +951,12 @@ pub fn render(
 
             // Render highlighted content in read-only mode (without block, already rendered)
             // Note: No wrapping - code should not wrap as it breaks indentation/readability
-            // Long lines extend past visible area (future: add horizontal scroll)
-            let paragraph = Paragraph::new(lines).scroll((state.scroll, 0));
+            // Horizontal scroll enabled via h/l keys and Shift+Scroll
+            let paragraph = Paragraph::new(lines).scroll((state.scroll, state.horizontal_scroll));
 
             f.render_widget(paragraph, content_area);
 
-            // Scrollbar for read-only mode
+            // Vertical scrollbar for read-only mode
             if total_lines > 0 {
                 let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("▲"))
@@ -924,6 +965,17 @@ pub fn render(
                 let mut scrollbar_state = ScrollbarState::new(total_lines).position(scroll_offset);
 
                 f.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+            }
+
+            // Horizontal scrollbar (only when content exceeds visible width)
+            let max_width = state.max_line_width() as usize;
+            if max_width > content_area.width as usize {
+                let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+                    .begin_symbol(Some("◄"))
+                    .end_symbol(Some("►"));
+                let mut h_sb_state =
+                    ScrollbarState::new(max_width).position(state.horizontal_scroll as usize);
+                f.render_stateful_widget(h_scrollbar, content_area, &mut h_sb_state);
             }
         }
     }

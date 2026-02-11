@@ -232,6 +232,15 @@ impl PseudoTerminal {
         parser.screen().scrollback()
     }
 
+    /// Set scrollback position by ratio (0.0 = top/max scrollback, 1.0 = bottom/current)
+    pub fn set_scrollback_position(&self, ratio: f64) {
+        let max_scrollback = 1000usize;
+        let target = ((1.0 - ratio) * max_scrollback as f64) as usize;
+        let mut parser = self.parser.lock().unwrap();
+        let screen = parser.screen_mut();
+        screen.set_scrollback(target);
+    }
+
     /// Check if the PTY process has exited
     pub fn has_exited(&self) -> bool {
         self.exited.load(Ordering::SeqCst)

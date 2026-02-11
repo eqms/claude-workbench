@@ -146,7 +146,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  F7           ", Style::default().fg(Color::Cyan)),
-            Span::raw("Claude Settings (~/.claude)"),
+            Span::raw("Toggle ~/.claude (press again to go back)"),
         ]),
         Line::from(vec![
             Span::styled("  F12          ", Style::default().fg(Color::Cyan)),
@@ -355,6 +355,18 @@ fn help_content() -> Vec<Line<'static>> {
             Span::styled("  Home/End     ", Style::default().fg(Color::Cyan)),
             Span::raw("Jump to start/end"),
         ]),
+        Line::from(vec![
+            Span::styled("  h/← , l/→   ", Style::default().fg(Color::Cyan)),
+            Span::raw("Scroll horizontally"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Shift+Scroll ", Style::default().fg(Color::Cyan)),
+            Span::raw("Horizontal mouse scroll"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Scrollbar    ", Style::default().fg(Color::Cyan)),
+            Span::raw("Click & drag to scroll"),
+        ]),
         Line::from(""),
         Line::from(Span::styled(
             "  Search & Replace (MC Edit style):",
@@ -416,6 +428,18 @@ fn help_content() -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled("  Ctrl+Z       ", Style::default().fg(Color::Cyan)),
             Span::raw("Undo"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Cmd/Ctrl+C   ", Style::default().fg(Color::Cyan)),
+            Span::raw("Copy selection to clipboard"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Cmd/Ctrl+X   ", Style::default().fg(Color::Cyan)),
+            Span::raw("Cut selection to clipboard"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Cmd/Ctrl+V   ", Style::default().fg(Color::Cyan)),
+            Span::raw("Paste from clipboard"),
         ]),
         Line::from(vec![
             Span::styled("  Esc          ", Style::default().fg(Color::Cyan)),

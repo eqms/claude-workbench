@@ -67,6 +67,8 @@ pub struct FileBrowserState {
     git_statuses: HashMap<PathBuf, GitFileStatus>,
     pub show_hidden: bool,
     pub expanded_dirs: HashSet<PathBuf>,
+    /// Previous directory for F7 toggle (back from ~/.claude)
+    pub previous_dir: Option<PathBuf>,
 }
 
 impl FileBrowserState {
@@ -84,6 +86,7 @@ impl FileBrowserState {
             git_statuses: HashMap::new(),
             show_hidden,
             expanded_dirs: HashSet::new(),
+            previous_dir: None,
         };
         // Start with root expanded
         s.expanded_dirs.insert(root_dir);

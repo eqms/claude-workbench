@@ -533,6 +533,35 @@ impl MouseSelection {
     }
 }
 
+/// Scrollbar drag state for interactive scrollbar clicking/dragging
+#[derive(Debug, Clone, Default)]
+pub struct ScrollbarDragState {
+    pub dragging: bool,
+    pub pane: Option<PaneId>,
+}
+
+/// Cached scrollbar areas for mouse hit testing
+#[derive(Debug, Clone, Default)]
+pub struct ScrollbarAreas {
+    pub file_browser: Option<ratatui::layout::Rect>,
+    pub preview: Option<ratatui::layout::Rect>,
+    pub claude: Option<ratatui::layout::Rect>,
+    pub lazygit: Option<ratatui::layout::Rect>,
+    pub terminal: Option<ratatui::layout::Rect>,
+}
+
+impl ScrollbarAreas {
+    pub fn get(&self, pane: &PaneId) -> Option<ratatui::layout::Rect> {
+        match pane {
+            PaneId::FileBrowser => self.file_browser,
+            PaneId::Preview => self.preview,
+            PaneId::Claude => self.claude,
+            PaneId::LazyGit => self.lazygit,
+            PaneId::Terminal => self.terminal,
+        }
+    }
+}
+
 /// Search mode: Search only vs. Search & Replace (MC Edit style)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SearchMode {
