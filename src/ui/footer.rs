@@ -40,6 +40,7 @@ pub enum FooterAction {
     CopyBlock,     // ^F5 (MC Edit: copy block)
     MoveBlock,     // ^F6 (MC Edit: cut block)
     DeleteBlock,   // ^F8 (MC Edit: delete block)
+    PlatformPaste, // ^V / Cmd+V (Paste from clipboard)
     Search,        // / or ^F (Search)
     SearchReplace, // ^H (Search & Replace in Edit mode)
     None,          // No action (non-clickable)
@@ -125,16 +126,15 @@ pub fn get_context_button_positions(
             ("Esc", "Cancel", FooterAction::SelectCancel),
         ]
     } else if active_pane == PaneId::Preview && editor_mode == EditorMode::Edit {
-        // Edit mode - consistent F-key pane shortcuts + edit-specific actions
-        // Block operations (^F3/^F5/^F6/^F8) are shown in editor shortcut bar
+        // Edit mode - modern platform editing shortcuts
+        // MC Edit legacy shortcuts (^F3/^F5/^F6/^F8) still work via keyboard
         vec![
-            ("^S", "Save", FooterAction::Save),
+            ("^C", "Copy", FooterAction::CopyBlock),
+            ("^X", "Cut", FooterAction::MoveBlock),
+            ("^V", "Paste", FooterAction::PlatformPaste),
+            ("^Z", "Undo", FooterAction::Undo),
             ("^H", "S&R", FooterAction::SearchReplace),
-            ("F1", "Files", FooterAction::ToggleFiles),
-            ("F3", "Refresh", FooterAction::Refresh),
-            ("F4", "Claude", FooterAction::FocusClaude),
-            ("F5", "Git", FooterAction::ToggleGit),
-            ("F6", "Term", FooterAction::ToggleTerm),
+            ("^S", "Save", FooterAction::Save),
             ("Esc", "Exit", FooterAction::ExitEdit),
             ("F12", "Help", FooterAction::Help),
         ]
@@ -208,16 +208,14 @@ impl Widget for Footer {
                 ("Esc", "Cancel"),
             ]
         } else if self.active_pane == PaneId::Preview && self.editor_mode == EditorMode::Edit {
-            // Edit mode keys - consistent F-key pane shortcuts + edit-specific actions
-            // Block operations (Ctrl+F3/F5/F6/F8) are documented in Help (F12)
+            // Edit mode - modern platform editing shortcuts
             vec![
-                ("^S", "Save"),
+                ("^C", "Copy"),
+                ("^X", "Cut"),
+                ("^V", "Paste"),
+                ("^Z", "Undo"),
                 ("^H", "S&R"),
-                ("F1", "Files"),
-                ("F3", "Refresh"),
-                ("F4", "Claude"),
-                ("F5", "Git"),
-                ("F6", "Term"),
+                ("^S", "Save"),
                 ("Esc", "Exit"),
                 ("F12", "Help"),
             ]

@@ -909,8 +909,24 @@ impl App {
                                                             crate::types::EditorMode::ReadOnly;
                                                     }
                                                 }
-                                                FooterAction::Undo | FooterAction::Redo => {
-                                                    // Undo/Redo handled by keyboard only
+                                                FooterAction::Undo => {
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
+                                                        if let Some(editor) =
+                                                            &mut self.preview.editor
+                                                        {
+                                                            editor.undo();
+                                                            self.preview.update_modified();
+                                                            self.preview.update_edit_highlighting(
+                                                                &self.syntax_manager,
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                                FooterAction::Redo => {
+                                                    // Redo handled by keyboard only
                                                 }
                                                 FooterAction::SelectDown
                                                 | FooterAction::SelectUp => {
@@ -964,6 +980,19 @@ impl App {
                                                             == crate::types::EditorMode::Edit
                                                     {
                                                         self.preview.delete_block();
+                                                        self.preview.update_modified();
+                                                        self.preview.update_edit_highlighting(
+                                                            &self.syntax_manager,
+                                                        );
+                                                    }
+                                                }
+                                                FooterAction::PlatformPaste => {
+                                                    // Platform paste (Ctrl+V)
+                                                    if self.active_pane == PaneId::Preview
+                                                        && self.preview.mode
+                                                            == crate::types::EditorMode::Edit
+                                                    {
+                                                        self.preview.paste_from_clipboard();
                                                         self.preview.update_modified();
                                                         self.preview.update_edit_highlighting(
                                                             &self.syntax_manager,
