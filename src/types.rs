@@ -533,11 +533,20 @@ impl MouseSelection {
     }
 }
 
+/// Scrollbar axis for distinguishing vertical/horizontal scrollbar interactions
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScrollbarAxis {
+    #[default]
+    Vertical,
+    Horizontal,
+}
+
 /// Scrollbar drag state for interactive scrollbar clicking/dragging
 #[derive(Debug, Clone, Default)]
 pub struct ScrollbarDragState {
     pub dragging: bool,
     pub pane: Option<PaneId>,
+    pub axis: ScrollbarAxis,
 }
 
 /// Cached scrollbar areas for mouse hit testing
@@ -548,6 +557,7 @@ pub struct ScrollbarAreas {
     pub claude: Option<ratatui::layout::Rect>,
     pub lazygit: Option<ratatui::layout::Rect>,
     pub terminal: Option<ratatui::layout::Rect>,
+    pub preview_horizontal: Option<ratatui::layout::Rect>,
 }
 
 impl ScrollbarAreas {

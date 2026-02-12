@@ -70,17 +70,22 @@
 |-----|--------|
 | Ctrl+S | Save |
 | Ctrl+Z | Undo |
+| Ctrl+C / Cmd+C | Copy selection to clipboard |
+| Ctrl+X / Cmd+X | Cut selection to clipboard |
+| Ctrl+V / Cmd+V | Paste from clipboard |
+| Ctrl+Y | Delete current line |
 | Esc | Exit (confirm if modified) |
 
-**MC Edit Style Block Operations:**
+**Block Selection & MC Edit Legacy:**
 | Key | Action |
 |-----|--------|
 | Shift+Arrow | Select text |
 | Ctrl+F3 | Toggle block marking |
-| Ctrl+F5 | Copy block |
-| Ctrl+F6 | Move (cut) block |
+| Ctrl+F5 | Copy block (legacy) |
+| Ctrl+F6 | Move (cut) block (legacy) |
 | Ctrl+F8 | Delete block |
-| Ctrl+Y | Delete current line |
+
+**Mouse:** Click/drag vertical and horizontal scrollbars for navigation.
 
 #### Terminal Panes
 | Key | Action |
@@ -259,17 +264,22 @@ When copying to Claude, output is automatically filtered:
 |-------|--------|
 | Ctrl+S | Speichern |
 | Ctrl+Z | Rückgängig |
+| Ctrl+C / Cmd+C | Auswahl in Zwischenablage kopieren |
+| Ctrl+X / Cmd+X | Auswahl in Zwischenablage ausschneiden |
+| Ctrl+V / Cmd+V | Aus Zwischenablage einfügen |
+| Ctrl+Y | Aktuelle Zeile löschen |
 | Esc | Beenden (Bestätigung wenn geändert) |
 
-**MC Edit Block-Operationen:**
+**Block-Auswahl & MC Edit Legacy:**
 | Taste | Aktion |
 |-------|--------|
 | Shift+Pfeiltaste | Text auswählen |
 | Ctrl+F3 | Block-Markierung umschalten |
-| Ctrl+F5 | Block kopieren |
-| Ctrl+F6 | Block verschieben (ausschneiden) |
+| Ctrl+F5 | Block kopieren (Legacy) |
+| Ctrl+F6 | Block verschieben (Legacy) |
 | Ctrl+F8 | Block löschen |
-| Ctrl+Y | Aktuelle Zeile löschen |
+
+**Maus:** Vertikale und horizontale Scrollbars per Klick/Drag bedienbar.
 
 #### Terminal-Bereiche
 | Taste | Aktion |

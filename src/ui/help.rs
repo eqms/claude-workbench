@@ -475,6 +475,15 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Delete current line"),
         ]),
         Line::from(""),
+        Line::from(Span::styled(
+            "  Scrollbars (mouse):",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(vec![
+            Span::styled("  Click/Drag   ", Style::default().fg(Color::Green)),
+            Span::raw("Vertical & horizontal scrollbar navigation"),
+        ]),
+        Line::from(""),
         // Terminal Panes
         Line::from(Span::styled(
             "Terminal Panes (F4/F5/F6)",

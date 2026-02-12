@@ -860,9 +860,20 @@ pub fn render(
 
                     f.render_stateful_widget(scrollbar, editor_area, &mut scrollbar_state);
                 }
+
+                // Horizontal scrollbar (only when content exceeds visible width)
+                let edit_max_width = editor_lines.iter().map(|l| l.len()).max().unwrap_or(0);
+                if edit_max_width > content_area.width as usize {
+                    let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+                        .begin_symbol(Some("◄"))
+                        .end_symbol(Some("►"));
+                    let mut h_sb_state = ScrollbarState::new(edit_max_width)
+                        .position(state.horizontal_scroll as usize);
+                    f.render_stateful_widget(h_scrollbar, content_area, &mut h_sb_state);
+                }
             }
 
-            // Render MC Edit style shortcut bar
+            // Render editor status bar
             render_edit_shortcuts(f, shortcut_area, state.block_marking);
         }
         EditorMode::ReadOnly => {
@@ -1414,19 +1425,31 @@ fn insert_cursor_into_line(line: &Line<'static>, col: usize, raw_text: &str) -> 
     Line::from(result_spans)
 }
 
-/// Render MC Edit style shortcut bar at bottom of editor
+/// Render editor status bar with platform-aware shortcuts
 fn render_edit_shortcuts(f: &mut Frame, area: Rect, block_marking: bool) {
-    let shortcuts = vec![
-        ("Sh+←→↑↓", "Mark"),
-        ("^F3", if block_marking { "EndBlk" } else { "Block" }),
-        ("^F5", "Copy"),
-        ("^F6", "Move"),
-        ("^F8", "Del"),
-        ("^Y", "DelLn"),
-        ("^H", "S&R"),
-        ("^S", "Save"),
-        ("Esc", "Exit"),
-    ];
+    let shortcuts: Vec<(&str, &str)> = if block_marking {
+        vec![
+            ("Sh+←→↑↓", "Mark"),
+            ("^C", "Copy"),
+            ("^X", "Cut"),
+            ("^V", "Paste"),
+            ("^F3", "EndBlk"),
+            ("^F8", "Del"),
+            ("^Z", "Undo"),
+        ]
+    } else {
+        vec![
+            ("Sh+←→↑↓", "Mark"),
+            ("^C", "Copy"),
+            ("^X", "Cut"),
+            ("^V", "Paste"),
+            ("^Z", "Undo"),
+            ("^Y", "DelLn"),
+            ("^H", "S&R"),
+            ("^S", "Save"),
+            ("Esc", "Exit"),
+        ]
+    };
 
     let mut spans = Vec::new();
     for (key, desc) in shortcuts {

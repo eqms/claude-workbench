@@ -8,7 +8,8 @@ use crate::session::SessionState;
 use crate::terminal::PseudoTerminal;
 use crate::types::{
     ClaudePermissionMode, DragState, EditorMode, GitRemoteCheckResult, GitRemoteState, HelpState,
-    MouseSelection, PaneId, ScrollbarAreas, ScrollbarDragState, SearchMode, TerminalSelection,
+    MouseSelection, PaneId, ScrollbarAreas, ScrollbarAxis, ScrollbarDragState, SearchMode,
+    TerminalSelection,
 };
 use crate::ui;
 use crate::ui::file_browser::FileBrowserState;
@@ -640,9 +641,23 @@ impl App {
                                             if x == sb.x && y >= sb.y && y < sb.y + sb.height {
                                                 self.scrollbar_drag.dragging = true;
                                                 self.scrollbar_drag.pane = Some(pane_id);
+                                                self.scrollbar_drag.axis = ScrollbarAxis::Vertical;
                                                 self.handle_scrollbar_position(pane_id, y, sb);
                                                 hit_scrollbar = true;
                                                 break;
+                                            }
+                                        }
+                                    }
+                                    // Check horizontal scrollbar for preview pane
+                                    if !hit_scrollbar {
+                                        if let Some(hsb) = self.scrollbar_areas.preview_horizontal {
+                                            if y == hsb.y && x >= hsb.x && x < hsb.x + hsb.width {
+                                                self.scrollbar_drag.dragging = true;
+                                                self.scrollbar_drag.pane = Some(PaneId::Preview);
+                                                self.scrollbar_drag.axis =
+                                                    ScrollbarAxis::Horizontal;
+                                                self.handle_horizontal_scrollbar_position(x, hsb);
+                                                hit_scrollbar = true;
                                             }
                                         }
                                     }
@@ -1048,9 +1063,20 @@ impl App {
                                 }
                                 // Handle scrollbar drag
                                 if self.scrollbar_drag.dragging {
-                                    if let Some(pane) = self.scrollbar_drag.pane {
-                                        if let Some(sb) = self.scrollbar_areas.get(&pane) {
-                                            self.handle_scrollbar_position(pane, y, sb);
+                                    match self.scrollbar_drag.axis {
+                                        ScrollbarAxis::Horizontal => {
+                                            if let Some(hsb) =
+                                                self.scrollbar_areas.preview_horizontal
+                                            {
+                                                self.handle_horizontal_scrollbar_position(x, hsb);
+                                            }
+                                        }
+                                        ScrollbarAxis::Vertical => {
+                                            if let Some(pane) = self.scrollbar_drag.pane {
+                                                if let Some(sb) = self.scrollbar_areas.get(&pane) {
+                                                    self.handle_scrollbar_position(pane, y, sb);
+                                                }
+                                            }
                                         }
                                     }
                                     continue;
@@ -1083,6 +1109,7 @@ impl App {
                                 if self.scrollbar_drag.dragging {
                                     self.scrollbar_drag.dragging = false;
                                     self.scrollbar_drag.pane = None;
+                                    self.scrollbar_drag.axis = ScrollbarAxis::default();
                                     continue;
                                 }
                                 // Handle mouse text selection finish - copy to clipboard
@@ -2579,6 +2606,22 @@ impl App {
         }
     }
 
+    /// Handle horizontal scrollbar drag: convert mouse X position to horizontal scroll
+    fn handle_horizontal_scrollbar_position(&mut self, x: u16, hsb: Rect) {
+        let clamped = x.clamp(hsb.x, hsb.x + hsb.width.saturating_sub(1));
+        let ratio = (clamped - hsb.x) as f64 / hsb.width.max(1) as f64;
+        let max_width = if self.preview.mode == EditorMode::Edit {
+            self.preview
+                .editor
+                .as_ref()
+                .map(|e| e.lines().iter().map(|l| l.len()).max().unwrap_or(0))
+                .unwrap_or(0)
+        } else {
+            self.preview.max_line_width() as usize
+        };
+        self.preview.horizontal_scroll = (ratio * max_width as f64) as u16;
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
         let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(
@@ -2626,6 +2669,17 @@ impl App {
         self.scrollbar_areas.claude = sb_area(claude);
         self.scrollbar_areas.lazygit = sb_area(lazygit);
         self.scrollbar_areas.terminal = sb_area(terminal);
+        // Horizontal scrollbar area for preview pane (bottom edge inside borders)
+        self.scrollbar_areas.preview_horizontal = if preview.width > 2 && preview.height > 2 {
+            Some(Rect::new(
+                preview.x + 1,
+                preview.y + preview.height.saturating_sub(2),
+                preview.width.saturating_sub(2),
+                1,
+            ))
+        } else {
+            None
+        };
         // Cache preview width for horizontal scroll auto-adjust
         self.preview_width = preview.width.saturating_sub(10); // Account for gutter+borders
 
