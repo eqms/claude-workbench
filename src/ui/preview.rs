@@ -780,7 +780,14 @@ pub fn render(
                         .split(inner);
 
                 let gutter_area = chunks[0];
-                let content_area = chunks[1];
+                let mut content_area = chunks[1];
+
+                // Check if horizontal scrollbar will be needed - reserve space
+                let edit_max_width = editor_lines.iter().map(|l| l.len()).max().unwrap_or(0);
+                let needs_h_scrollbar = edit_max_width > content_area.width as usize;
+                if needs_h_scrollbar {
+                    content_area.height = content_area.height.saturating_sub(1);
+                }
 
                 // Calculate scroll to keep cursor visible
                 let visible_height = content_area.height as usize;
@@ -861,15 +868,20 @@ pub fn render(
                     f.render_stateful_widget(scrollbar, editor_area, &mut scrollbar_state);
                 }
 
-                // Horizontal scrollbar (only when content exceeds visible width)
-                let edit_max_width = editor_lines.iter().map(|l| l.len()).max().unwrap_or(0);
-                if edit_max_width > content_area.width as usize {
+                // Horizontal scrollbar (rendered in reserved space below content)
+                if needs_h_scrollbar {
+                    let h_scrollbar_area = Rect::new(
+                        content_area.x,
+                        content_area.y + content_area.height,
+                        content_area.width,
+                        1,
+                    );
                     let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
                         .begin_symbol(Some("◄"))
                         .end_symbol(Some("►"));
                     let mut h_sb_state = ScrollbarState::new(edit_max_width)
                         .position(state.horizontal_scroll as usize);
-                    f.render_stateful_widget(h_scrollbar, content_area, &mut h_sb_state);
+                    f.render_stateful_widget(h_scrollbar, h_scrollbar_area, &mut h_sb_state);
                 }
             }
 
@@ -890,7 +902,14 @@ pub fn render(
                 .split(inner);
 
             let gutter_area = chunks[0];
-            let content_area = chunks[1];
+            let mut content_area = chunks[1];
+
+            // Check if horizontal scrollbar will be needed - reserve space
+            let max_width = state.max_line_width() as usize;
+            let needs_h_scrollbar = max_width > content_area.width as usize;
+            if needs_h_scrollbar {
+                content_area.height = content_area.height.saturating_sub(1);
+            }
             let visible_height = content_area.height as usize;
 
             // Render line numbers gutter (no current line in ReadOnly)
@@ -978,15 +997,20 @@ pub fn render(
                 f.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
             }
 
-            // Horizontal scrollbar (only when content exceeds visible width)
-            let max_width = state.max_line_width() as usize;
-            if max_width > content_area.width as usize {
+            // Horizontal scrollbar (rendered in reserved space below content)
+            if needs_h_scrollbar {
+                let h_scrollbar_area = Rect::new(
+                    content_area.x,
+                    content_area.y + content_area.height,
+                    content_area.width,
+                    1,
+                );
                 let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
                     .begin_symbol(Some("◄"))
                     .end_symbol(Some("►"));
                 let mut h_sb_state =
                     ScrollbarState::new(max_width).position(state.horizontal_scroll as usize);
-                f.render_stateful_widget(h_scrollbar, content_area, &mut h_sb_state);
+                f.render_stateful_widget(h_scrollbar, h_scrollbar_area, &mut h_sb_state);
             }
         }
     }

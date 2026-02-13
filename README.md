@@ -35,6 +35,9 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 - Drag & Drop files into terminals
 - Git remote change detection with pull prompts
 - Claude fullscreen mode when all panes hidden (F1/F2/F5/F6 toggles)
+- **Interactive pane resizing** - drag pane borders with mouse
+- **Horizontal scrolling** - in Preview and Edit mode for long lines
+- **Self-update** - automatic update check from GitHub Releases
 - Mouse and keyboard navigation throughout
 
 ### Quick Start
@@ -142,6 +145,9 @@ Ein Rust-basierter TUI (Terminal User Interface) Multiplexer für KI-unterstütz
 - Drag & Drop von Dateien in Terminals
 - Git Remote-Änderungserkennung mit Pull-Aufforderung
 - Claude Vollbildmodus wenn alle Bereiche ausgeblendet (F1/F2/F5/F6 Umschaltung)
+- **Interaktives Pane-Resizing** - Bereichsgrenzen per Maus ziehen
+- **Horizontales Scrollen** - in Vorschau und Editor für lange Zeilen
+- **Selbst-Update** - automatische Update-Prüfung von GitHub Releases
 - Maus- und Tastaturnavigation durchgehend
 
 ### Schnellstart

@@ -57,6 +57,8 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 | j/k, Up/Down | Scroll 1 line |
 | PageUp/Down | Scroll 10 lines |
 | Home/End | Jump to start/end |
+| h/l | Scroll horizontally (left/right) |
+| Shift+Scroll | Horizontal scroll with mouse wheel |
 | E | Enter edit mode |
 | Ctrl+S | Enter selection mode |
 
@@ -91,6 +93,8 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 | Ctrl+F5 | Copy block (legacy) |
 | Ctrl+F6 | Move (cut) block (legacy) |
 | Ctrl+F8 | Delete block |
+
+**Horizontal Scrolling:** Use `h`/`l` keys or `Shift+Scroll` for horizontal scrolling in Edit mode.
 
 **Mouse:** Click/drag vertical and horizontal scrollbars for navigation.
 
@@ -258,6 +262,8 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | j/k, Up/Down | 1 Zeile scrollen |
 | PageUp/Down | 10 Zeilen scrollen |
 | Home/End | An Anfang/Ende springen |
+| h/l | Horizontal scrollen (links/rechts) |
+| Shift+Scroll | Horizontales Scrollen mit Mausrad |
 | E | Bearbeitungsmodus starten |
 | Ctrl+S | Auswahlmodus starten |
 
@@ -292,6 +298,8 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | Ctrl+F5 | Block kopieren (Legacy) |
 | Ctrl+F6 | Block verschieben (Legacy) |
 | Ctrl+F8 | Block löschen |
+
+**Horizontales Scrollen:** `h`/`l` Tasten oder `Shift+Scroll` für horizontales Scrollen im Bearbeitungsmodus.
 
 **Maus:** Vertikale und horizontale Scrollbars per Klick/Drag bedienbar.
 
