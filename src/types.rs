@@ -527,10 +527,55 @@ impl MouseSelection {
         self.pane_area = None;
     }
 
+    /// Check if selection covers enough distance to be intentional (>2 chars)
+    /// Prevents accidental clipboard overwrite on simple focus-clicks
+    pub fn has_meaningful_selection(&self) -> bool {
+        if !self.selecting {
+            return false;
+        }
+        let dx = (self.current_x as i32 - self.start_x as i32).unsigned_abs();
+        let dy = (self.current_y as i32 - self.start_y as i32).unsigned_abs();
+        // At least 3 characters horizontal distance OR any vertical distance
+        dx > 2 || dy > 0
+    }
+
     /// Check if selection is active for a specific pane
     pub fn is_selecting_in(&self, pane: PaneId) -> bool {
         self.selecting && self.source_pane == Some(pane)
     }
+}
+
+/// Which border is being dragged for interactive pane resizing
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResizeBorder {
+    /// Vertical border between FileBrowser and Preview
+    FilePreview,
+    /// Vertical border between Preview and Right Panel (Claude/Git/Terminal)
+    PreviewRight,
+    /// Horizontal border between Top Area and Claude
+    TopClaude,
+}
+
+/// State for interactive pane resizing via mouse drag
+#[derive(Debug, Clone, Default)]
+pub struct ResizeState {
+    pub dragging: bool,
+    pub border: Option<ResizeBorder>,
+}
+
+/// Cached border positions for pane resize hit testing
+#[derive(Debug, Clone, Default)]
+pub struct BorderAreas {
+    /// X-Position of vertical border between FileBrowser and Preview
+    pub file_preview_x: Option<u16>,
+    /// X-Position of vertical border between Preview and Right Panel
+    pub preview_right_x: Option<u16>,
+    /// Y-Position of horizontal border between Top Area and Claude
+    pub top_claude_y: Option<u16>,
+    /// Total terminal width
+    pub total_width: u16,
+    /// Total terminal height
+    pub total_height: u16,
 }
 
 /// Scrollbar axis for distinguishing vertical/horizontal scrollbar interactions

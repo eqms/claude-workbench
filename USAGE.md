@@ -27,6 +27,13 @@
 | F10 | About |
 | F12 | Help |
 | Esc | Close Dialogs/Help |
+| Alt+Shift+Left | Shrink File Browser width |
+| Alt+Shift+Right | Grow File Browser width |
+| Alt+Shift+Up | Shrink Claude pane height |
+| Alt+Shift+Down | Grow Claude pane height |
+
+#### Pane Resizing (Mouse)
+Drag pane borders to resize interactively. Changes are saved automatically.
 
 #### Context-specific (FileBrowser/Preview only)
 | Key | Action |
@@ -221,6 +228,13 @@ When copying to Claude, output is automatically filtered:
 | F10 | Über |
 | F12 | Hilfe |
 | Esc | Dialoge/Hilfe schließen |
+| Alt+Shift+Links | Dateibrowser-Breite verkleinern |
+| Alt+Shift+Rechts | Dateibrowser-Breite vergrößern |
+| Alt+Shift+Oben | Claude-Bereich verkleinern |
+| Alt+Shift+Unten | Claude-Bereich vergrößern |
+
+#### Bereich-Größenänderung (Maus)
+Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen werden automatisch gespeichert.
 
 #### Kontext-spezifisch (nur FileBrowser/Preview)
 | Taste | Aktion |

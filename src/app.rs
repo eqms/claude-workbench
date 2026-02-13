@@ -7,9 +7,9 @@ use crate::config::Config;
 use crate::session::SessionState;
 use crate::terminal::PseudoTerminal;
 use crate::types::{
-    ClaudePermissionMode, DragState, EditorMode, GitRemoteCheckResult, GitRemoteState, HelpState,
-    MouseSelection, PaneId, ScrollbarAreas, ScrollbarAxis, ScrollbarDragState, SearchMode,
-    TerminalSelection,
+    BorderAreas, ClaudePermissionMode, DragState, EditorMode, GitRemoteCheckResult, GitRemoteState,
+    HelpState, MouseSelection, PaneId, ResizeBorder, ResizeState, ScrollbarAreas, ScrollbarAxis,
+    ScrollbarDragState, SearchMode, TerminalSelection,
 };
 use crate::ui;
 use crate::ui::file_browser::FileBrowserState;
@@ -93,6 +93,9 @@ pub struct App {
     pub scrollbar_areas: ScrollbarAreas,
     // Cached preview pane width for horizontal scroll calculations
     pub preview_width: u16,
+    // Interactive pane resizing state
+    pub resize_state: ResizeState,
+    pub border_areas: BorderAreas,
 }
 
 impl App {
@@ -215,6 +218,8 @@ impl App {
             scrollbar_drag: ScrollbarDragState::default(),
             scrollbar_areas: ScrollbarAreas::default(),
             preview_width: 80,
+            resize_state: ResizeState::default(),
+            border_areas: BorderAreas::default(),
         };
 
         // Open wizard on first run
@@ -666,6 +671,59 @@ impl App {
                                     }
                                 }
 
+                                // Check for pane border drag (interactive resizing)
+                                {
+                                    let mut hit_border = false;
+                                    // Check vertical border: FileBrowser | Preview
+                                    if let Some(border_x) = self.border_areas.file_preview_x {
+                                        let top_limit = self
+                                            .border_areas
+                                            .top_claude_y
+                                            .unwrap_or(self.border_areas.total_height);
+                                        if (x as i16 - border_x as i16).abs() <= 1
+                                            && y > 0
+                                            && y < top_limit
+                                        {
+                                            self.resize_state.dragging = true;
+                                            self.resize_state.border =
+                                                Some(ResizeBorder::FilePreview);
+                                            hit_border = true;
+                                        }
+                                    }
+                                    // Check vertical border: Preview | Right Panel
+                                    if !hit_border {
+                                        if let Some(border_x) = self.border_areas.preview_right_x {
+                                            let top_limit = self
+                                                .border_areas
+                                                .top_claude_y
+                                                .unwrap_or(self.border_areas.total_height);
+                                            if (x as i16 - border_x as i16).abs() <= 1
+                                                && y > 0
+                                                && y < top_limit
+                                            {
+                                                self.resize_state.dragging = true;
+                                                self.resize_state.border =
+                                                    Some(ResizeBorder::PreviewRight);
+                                                hit_border = true;
+                                            }
+                                        }
+                                    }
+                                    // Check horizontal border: Top Area | Claude
+                                    if !hit_border {
+                                        if let Some(border_y) = self.border_areas.top_claude_y {
+                                            if (y as i16 - border_y as i16).abs() <= 1 {
+                                                self.resize_state.dragging = true;
+                                                self.resize_state.border =
+                                                    Some(ResizeBorder::TopClaude);
+                                                hit_border = true;
+                                            }
+                                        }
+                                    }
+                                    if hit_border {
+                                        continue;
+                                    }
+                                }
+
                                 if is_inside(files, x, y) {
                                     self.active_pane = PaneId::FileBrowser;
                                     // File browser layout: [list with borders] + [info bar (1 line)]
@@ -1081,6 +1139,56 @@ impl App {
                                     }
                                     continue;
                                 }
+                                // Handle pane border resize drag
+                                if self.resize_state.dragging {
+                                    match self.resize_state.border {
+                                        Some(ResizeBorder::FilePreview) => {
+                                            if self.border_areas.total_width > 0 {
+                                                let new_pct = ((x as f64
+                                                    / self.border_areas.total_width as f64)
+                                                    * 100.0)
+                                                    as u16;
+                                                self.config.layout.file_browser_width_percent =
+                                                    new_pct.clamp(10, 50);
+                                            }
+                                        }
+                                        Some(ResizeBorder::PreviewRight) => {
+                                            if self.border_areas.total_width > 0 {
+                                                let file_pct =
+                                                    self.config.layout.file_browser_width_percent;
+                                                let new_preview_pct = ((x as f64
+                                                    / self.border_areas.total_width as f64)
+                                                    * 100.0)
+                                                    as u16;
+                                                let preview_pct = new_preview_pct
+                                                    .saturating_sub(file_pct)
+                                                    .clamp(15, 70);
+                                                self.config.layout.preview_width_percent =
+                                                    preview_pct;
+                                                self.config.layout.right_panel_width_percent =
+                                                    100u16
+                                                        .saturating_sub(file_pct)
+                                                        .saturating_sub(preview_pct)
+                                                        .clamp(10, 60);
+                                            }
+                                        }
+                                        Some(ResizeBorder::TopClaude) => {
+                                            // Footer is 1 line at bottom
+                                            let usable_height =
+                                                self.border_areas.total_height.saturating_sub(1);
+                                            if usable_height > 0 {
+                                                let claude_start_pct =
+                                                    ((y as f64 / usable_height as f64) * 100.0)
+                                                        as u16;
+                                                self.config.layout.claude_height_percent = 100u16
+                                                    .saturating_sub(claude_start_pct)
+                                                    .clamp(20, 80);
+                                            }
+                                        }
+                                        None => {}
+                                    }
+                                    continue;
+                                }
                                 // Handle character-level mouse text selection in terminal panes
                                 if self.mouse_selection.selecting {
                                     self.mouse_selection.update(x, y);
@@ -1105,6 +1213,13 @@ impl App {
                                 {
                                     continue;
                                 }
+                                // Handle pane resize drag finish - save config
+                                if self.resize_state.dragging {
+                                    self.resize_state.dragging = false;
+                                    self.resize_state.border = None;
+                                    let _ = crate::config::save_config(&self.config);
+                                    continue;
+                                }
                                 // Handle scrollbar drag finish
                                 if self.scrollbar_drag.dragging {
                                     self.scrollbar_drag.dragging = false;
@@ -1113,9 +1228,12 @@ impl App {
                                     continue;
                                 }
                                 // Handle mouse text selection finish - copy to clipboard
+                                // Only copy if selection covers meaningful distance (>2 chars)
+                                // to prevent clipboard overwrite on simple focus-clicks
                                 if self.mouse_selection.selecting {
-                                    // Copy selected text directly to system clipboard
-                                    self.copy_mouse_selection_to_clipboard();
+                                    if self.mouse_selection.has_meaningful_selection() {
+                                        self.copy_mouse_selection_to_clipboard();
+                                    }
                                     self.mouse_selection.clear();
                                 } else if self.drag_state.dragging {
                                     // Determine drop target
@@ -1174,9 +1292,20 @@ impl App {
                                         .modifiers
                                         .contains(crossterm::event::KeyModifiers::SHIFT)
                                     {
-                                        let max = self.preview.max_line_width();
-                                        for _ in 0..3 {
-                                            self.preview.scroll_right(max);
+                                        if self.preview.mode == crate::types::EditorMode::Edit {
+                                            // In Edit mode: move editor cursor horizontally
+                                            if let Some(editor) = &mut self.preview.editor {
+                                                for _ in 0..3 {
+                                                    editor.move_cursor(
+                                                        tui_textarea::CursorMove::Forward,
+                                                    );
+                                                }
+                                            }
+                                        } else {
+                                            let max = self.preview.max_line_width();
+                                            for _ in 0..3 {
+                                                self.preview.scroll_right(max);
+                                            }
                                         }
                                     } else if self.preview.mode == crate::types::EditorMode::Edit {
                                         // In Edit mode, move TextArea cursor
@@ -1237,8 +1366,19 @@ impl App {
                                         .modifiers
                                         .contains(crossterm::event::KeyModifiers::SHIFT)
                                     {
-                                        for _ in 0..3 {
-                                            self.preview.scroll_left();
+                                        if self.preview.mode == crate::types::EditorMode::Edit {
+                                            // In Edit mode: move editor cursor horizontally
+                                            if let Some(editor) = &mut self.preview.editor {
+                                                for _ in 0..3 {
+                                                    editor.move_cursor(
+                                                        tui_textarea::CursorMove::Back,
+                                                    );
+                                                }
+                                            }
+                                        } else {
+                                            for _ in 0..3 {
+                                                self.preview.scroll_left();
+                                            }
                                         }
                                     } else if self.preview.mode == crate::types::EditorMode::Edit {
                                         // In Edit mode, move TextArea cursor
@@ -1740,6 +1880,49 @@ impl App {
                                     _ => {}
                                 }
                                 continue;
+                            }
+
+                            // Interactive pane resizing: Alt+Shift+Arrow
+                            if key
+                                .modifiers
+                                .contains(KeyModifiers::ALT | KeyModifiers::SHIFT)
+                            {
+                                match key.code {
+                                    KeyCode::Left => {
+                                        self.config.layout.file_browser_width_percent = self
+                                            .config
+                                            .layout
+                                            .file_browser_width_percent
+                                            .saturating_sub(2)
+                                            .max(10);
+                                        let _ = crate::config::save_config(&self.config);
+                                        continue;
+                                    }
+                                    KeyCode::Right => {
+                                        self.config.layout.file_browser_width_percent =
+                                            (self.config.layout.file_browser_width_percent + 2)
+                                                .min(50);
+                                        let _ = crate::config::save_config(&self.config);
+                                        continue;
+                                    }
+                                    KeyCode::Up => {
+                                        self.config.layout.claude_height_percent = self
+                                            .config
+                                            .layout
+                                            .claude_height_percent
+                                            .saturating_sub(2)
+                                            .max(20);
+                                        let _ = crate::config::save_config(&self.config);
+                                        continue;
+                                    }
+                                    KeyCode::Down => {
+                                        self.config.layout.claude_height_percent =
+                                            (self.config.layout.claude_height_percent + 2).min(80);
+                                        let _ = crate::config::save_config(&self.config);
+                                        continue;
+                                    }
+                                    _ => {}
+                                }
                             }
 
                             // Global Focus Switching
@@ -2650,6 +2833,26 @@ impl App {
         resize_pty(&mut self.terminals, PaneId::Claude, claude);
         resize_pty(&mut self.terminals, PaneId::LazyGit, lazygit);
         resize_pty(&mut self.terminals, PaneId::Terminal, terminal);
+
+        // Cache border positions for interactive pane resizing
+        self.border_areas.total_width = area.width;
+        self.border_areas.total_height = area.height;
+        self.border_areas.file_preview_x = if files.width > 0 && preview.width > 0 {
+            Some(files.x + files.width)
+        } else {
+            None
+        };
+        self.border_areas.preview_right_x =
+            if preview.width > 0 && (lazygit.width > 0 || terminal.width > 0) {
+                Some(preview.x + preview.width)
+            } else {
+                None
+            };
+        self.border_areas.top_claude_y = if claude.height > 0 && claude.y > 0 {
+            Some(claude.y)
+        } else {
+            None
+        };
 
         // Calculate scrollbar areas for drag support (right edge inside borders)
         let sb_area = |rect: Rect| -> Option<Rect> {

@@ -120,7 +120,7 @@ impl FileBrowserState {
         }
 
         // Build tree recursively from root
-        self.build_tree_recursive(&self.root_dir.clone(), 0);
+        self.build_tree_recursive(&self.root_dir.clone(), 0, false);
 
         if !self.entries.is_empty() {
             self.list_state.select(Some(0));
@@ -128,7 +128,8 @@ impl FileBrowserState {
     }
 
     /// Recursively build the flat list from directory tree
-    fn build_tree_recursive(&mut self, dir: &PathBuf, depth: usize) {
+    /// When parent_ignored is true, all children inherit GitFileStatus::Ignored
+    fn build_tree_recursive(&mut self, dir: &PathBuf, depth: usize, parent_ignored: bool) {
         let is_expanded = self.expanded_dirs.contains(dir);
 
         if let Ok(read_entries) = fs::read_dir(dir) {
@@ -167,8 +168,16 @@ impl FileBrowserState {
                 let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
                 let modified = metadata.and_then(|m| m.modified().ok());
 
-                let git_status = if is_dir {
-                    git::aggregate_directory_status(&path, &self.git_statuses)
+                let git_status = if parent_ignored {
+                    GitFileStatus::Ignored
+                } else if is_dir {
+                    // Check if this directory itself is ignored
+                    let dir_status = self.git_statuses.get(&path).copied();
+                    if dir_status == Some(GitFileStatus::Ignored) {
+                        GitFileStatus::Ignored
+                    } else {
+                        git::aggregate_directory_status(&path, &self.git_statuses)
+                    }
                 } else {
                     self.git_statuses
                         .get(&path)
@@ -190,8 +199,10 @@ impl FileBrowserState {
                 });
 
                 // If directory is expanded, recurse into it
+                // Propagate ignored status to children
                 if is_dir && is_expanded && expanded {
-                    self.build_tree_recursive(&path, depth + 1);
+                    let child_ignored = parent_ignored || git_status == GitFileStatus::Ignored;
+                    self.build_tree_recursive(&path, depth + 1, child_ignored);
                 }
             }
         }
@@ -353,7 +364,7 @@ impl FileBrowserState {
             });
         }
 
-        self.build_tree_recursive(&self.root_dir.clone(), 0);
+        self.build_tree_recursive(&self.root_dir.clone(), 0, false);
 
         // Restore selection by path and name (to distinguish ".." from regular entries)
         if let Some((path, name)) = selected_path {
