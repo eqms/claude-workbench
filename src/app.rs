@@ -1293,13 +1293,10 @@ impl App {
                                         .contains(crossterm::event::KeyModifiers::SHIFT)
                                     {
                                         if self.preview.mode == crate::types::EditorMode::Edit {
-                                            // In Edit mode: move editor cursor horizontally
-                                            if let Some(editor) = &mut self.preview.editor {
-                                                for _ in 0..3 {
-                                                    editor.move_cursor(
-                                                        tui_textarea::CursorMove::Forward,
-                                                    );
-                                                }
+                                            // In Edit mode: scroll content horizontally (not cursor)
+                                            let max = self.preview.edit_max_display_width();
+                                            for _ in 0..3 {
+                                                self.preview.scroll_right(max);
                                             }
                                         } else {
                                             let max = self.preview.max_line_width();
@@ -1367,13 +1364,9 @@ impl App {
                                         .contains(crossterm::event::KeyModifiers::SHIFT)
                                     {
                                         if self.preview.mode == crate::types::EditorMode::Edit {
-                                            // In Edit mode: move editor cursor horizontally
-                                            if let Some(editor) = &mut self.preview.editor {
-                                                for _ in 0..3 {
-                                                    editor.move_cursor(
-                                                        tui_textarea::CursorMove::Back,
-                                                    );
-                                                }
+                                            // In Edit mode: scroll content horizontally (not cursor)
+                                            for _ in 0..3 {
+                                                self.preview.scroll_left();
                                             }
                                         } else {
                                             for _ in 0..3 {
@@ -2794,11 +2787,7 @@ impl App {
         let clamped = x.clamp(hsb.x, hsb.x + hsb.width.saturating_sub(1));
         let ratio = (clamped - hsb.x) as f64 / hsb.width.max(1) as f64;
         let max_width = if self.preview.mode == EditorMode::Edit {
-            self.preview
-                .editor
-                .as_ref()
-                .map(|e| e.lines().iter().map(|l| l.len()).max().unwrap_or(0))
-                .unwrap_or(0)
+            self.preview.edit_max_display_width() as usize
         } else {
             self.preview.max_line_width() as usize
         };
@@ -2872,17 +2861,9 @@ impl App {
         self.scrollbar_areas.claude = sb_area(claude);
         self.scrollbar_areas.lazygit = sb_area(lazygit);
         self.scrollbar_areas.terminal = sb_area(terminal);
-        // Horizontal scrollbar area for preview pane (bottom edge inside borders)
-        self.scrollbar_areas.preview_horizontal = if preview.width > 2 && preview.height > 2 {
-            Some(Rect::new(
-                preview.x + 1,
-                preview.y + preview.height.saturating_sub(2),
-                preview.width.saturating_sub(2),
-                1,
-            ))
-        } else {
-            None
-        };
+        // Use the cached horizontal scrollbar area from the actual render pass
+        // (accounts for gutter width, content area, and scrollbar visibility)
+        self.scrollbar_areas.preview_horizontal = self.preview.cached_h_scrollbar_area;
         // Cache preview width for horizontal scroll auto-adjust
         self.preview_width = preview.width.saturating_sub(10); // Account for gutter+borders
 
@@ -2914,7 +2895,7 @@ impl App {
             ui::preview::render(
                 frame,
                 preview,
-                &self.preview,
+                &mut self.preview,
                 self.active_pane == PaneId::Preview,
                 preview_selection_range,
                 preview_char_selection,
@@ -3824,7 +3805,11 @@ impl App {
         // Account for block border (1px on each side)
         let inner_x = area.x + 1;
         let inner_y = area.y + 1;
-        let inner_height = editor_area_height.saturating_sub(2);
+        let mut inner_height = editor_area_height.saturating_sub(2);
+        // Account for horizontal scrollbar if present
+        if self.preview.cached_h_scrollbar_area.is_some() {
+            inner_height = inner_height.saturating_sub(1);
+        }
 
         // Content area starts after the gutter
         let content_x = inner_x + gutter_width;

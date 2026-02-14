@@ -55,6 +55,9 @@ pub struct PreviewState {
 
     // File modification tracking for auto-refresh
     pub last_modified: Option<std::time::SystemTime>,
+
+    // Cached horizontal scrollbar area from last render (for accurate mouse hit testing)
+    pub cached_h_scrollbar_area: Option<Rect>,
 }
 
 impl Default for PreviewState {
@@ -76,6 +79,7 @@ impl Default for PreviewState {
             block_marking: false,
             selection_start: None,
             last_modified: None,
+            cached_h_scrollbar_area: None,
         }
     }
 }
@@ -191,6 +195,20 @@ impl PreviewState {
                     .sum::<usize>()
             })
             .max()
+            .unwrap_or(0) as u16
+    }
+
+    /// Calculate the maximum display width (chars count) across all editor lines
+    pub fn edit_max_display_width(&self) -> u16 {
+        self.editor
+            .as_ref()
+            .map(|e| {
+                e.lines()
+                    .iter()
+                    .map(|l| l.chars().count())
+                    .max()
+                    .unwrap_or(0)
+            })
             .unwrap_or(0) as u16
     }
 
@@ -734,7 +752,7 @@ fn render_gutter(
 pub fn render(
     f: &mut Frame,
     area: Rect,
-    state: &PreviewState,
+    state: &mut PreviewState,
     is_focused: bool,
     selection_range: Option<(usize, usize)>,
     char_selection: Option<((usize, usize), (usize, usize))>,
@@ -783,7 +801,11 @@ pub fn render(
                 let mut content_area = chunks[1];
 
                 // Check if horizontal scrollbar will be needed - reserve space
-                let edit_max_width = editor_lines.iter().map(|l| l.len()).max().unwrap_or(0);
+                let edit_max_width = editor_lines
+                    .iter()
+                    .map(|l| l.chars().count())
+                    .max()
+                    .unwrap_or(0);
                 let needs_h_scrollbar = edit_max_width > content_area.width as usize;
                 if needs_h_scrollbar {
                     content_area.height = content_area.height.saturating_sub(1);
@@ -876,12 +898,15 @@ pub fn render(
                         content_area.width,
                         1,
                     );
+                    state.cached_h_scrollbar_area = Some(h_scrollbar_area);
                     let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
                         .begin_symbol(Some("◄"))
                         .end_symbol(Some("►"));
                     let mut h_sb_state = ScrollbarState::new(edit_max_width)
                         .position(state.horizontal_scroll as usize);
                     f.render_stateful_widget(h_scrollbar, h_scrollbar_area, &mut h_sb_state);
+                } else {
+                    state.cached_h_scrollbar_area = None;
                 }
             }
 
@@ -1005,12 +1030,15 @@ pub fn render(
                     content_area.width,
                     1,
                 );
+                state.cached_h_scrollbar_area = Some(h_scrollbar_area);
                 let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
                     .begin_symbol(Some("◄"))
                     .end_symbol(Some("►"));
                 let mut h_sb_state =
                     ScrollbarState::new(max_width).position(state.horizontal_scroll as usize);
                 f.render_stateful_widget(h_scrollbar, h_scrollbar_area, &mut h_sb_state);
+            } else {
+                state.cached_h_scrollbar_area = None;
             }
         }
     }
