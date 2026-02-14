@@ -2766,8 +2766,19 @@ impl App {
 
         match pane {
             PaneId::Preview => {
-                let total = self.preview.highlighted_lines.len();
-                self.preview.scroll = (ratio * total as f64) as u16;
+                if self.preview.mode == EditorMode::Edit {
+                    // In Edit mode, scroll_offset is derived from cursor position,
+                    // so we must move the cursor to the target line for scrolling to work
+                    if let Some(editor) = &mut self.preview.editor {
+                        let total = editor.lines().len();
+                        let target_line =
+                            ((ratio * total as f64) as usize).min(total.saturating_sub(1));
+                        editor.move_cursor(tui_textarea::CursorMove::Jump(target_line as u16, 0));
+                    }
+                } else {
+                    let total = self.preview.highlighted_lines.len();
+                    self.preview.scroll = (ratio * total as f64) as u16;
+                }
             }
             PaneId::FileBrowser => {
                 let total = self.file_browser.entries.len();

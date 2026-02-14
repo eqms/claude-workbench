@@ -878,11 +878,20 @@ pub fn render(
 
                 f.render_widget(paragraph, content_area);
 
+                // Scrollbar styling: green when focused, gray when not
+                let sb_color = if is_focused {
+                    Color::Green
+                } else {
+                    Color::Gray
+                };
+                let sb_style = Style::default().fg(sb_color);
+
                 // Scrollbar
                 if total_lines > 0 {
                     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                         .begin_symbol(Some("▲"))
-                        .end_symbol(Some("▼"));
+                        .end_symbol(Some("▼"))
+                        .style(sb_style);
 
                     let mut scrollbar_state =
                         ScrollbarState::new(total_lines).position(scroll_offset);
@@ -901,7 +910,8 @@ pub fn render(
                     state.cached_h_scrollbar_area = Some(h_scrollbar_area);
                     let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
                         .begin_symbol(Some("◄"))
-                        .end_symbol(Some("►"));
+                        .end_symbol(Some("►"))
+                        .style(sb_style);
                     let mut h_sb_state = ScrollbarState::new(edit_max_width)
                         .position(state.horizontal_scroll as usize);
                     f.render_stateful_widget(h_scrollbar, h_scrollbar_area, &mut h_sb_state);
@@ -1011,11 +1021,20 @@ pub fn render(
 
             f.render_widget(paragraph, content_area);
 
+            // Scrollbar styling: green when focused, gray when not
+            let sb_color = if is_focused {
+                Color::Green
+            } else {
+                Color::Gray
+            };
+            let sb_style = Style::default().fg(sb_color);
+
             // Vertical scrollbar for read-only mode
             if total_lines > 0 {
                 let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("▲"))
-                    .end_symbol(Some("▼"));
+                    .end_symbol(Some("▼"))
+                    .style(sb_style);
 
                 let mut scrollbar_state = ScrollbarState::new(total_lines).position(scroll_offset);
 
@@ -1033,7 +1052,8 @@ pub fn render(
                 state.cached_h_scrollbar_area = Some(h_scrollbar_area);
                 let h_scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
                     .begin_symbol(Some("◄"))
-                    .end_symbol(Some("►"));
+                    .end_symbol(Some("►"))
+                    .style(sb_style);
                 let mut h_sb_state =
                     ScrollbarState::new(max_width).position(state.horizontal_scroll as usize);
                 f.render_stateful_widget(h_scrollbar, h_scrollbar_area, &mut h_sb_state);
