@@ -19,9 +19,16 @@ pub struct PermissionModeState {
 impl PermissionModeState {
     /// Open the dialog
     pub fn open(&mut self) {
+        self.open_with_default(None);
+    }
+
+    /// Open the dialog with a pre-selected default mode
+    pub fn open_with_default(&mut self, default: Option<ClaudePermissionMode>) {
         self.visible = true;
-        self.selected = 0;
         self.confirmed = false;
+        self.selected = default
+            .and_then(|mode| ClaudePermissionMode::all().iter().position(|m| *m == mode))
+            .unwrap_or(0);
     }
 
     /// Close the dialog without confirming

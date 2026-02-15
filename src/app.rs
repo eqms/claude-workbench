@@ -114,16 +114,15 @@ impl App {
 
         // Determine if we should show permission mode dialog
         // Don't show if wizard needs to run first (first-time setup)
-        let should_show_permission_dialog = config.claude.show_permission_dialog
-            && config.claude.default_permission_mode.is_none()
-            && config.setup.wizard_completed;
+        let should_show_permission_dialog =
+            config.claude.show_permission_dialog && config.setup.wizard_completed;
 
         // 1. Claude Pane - delayed init if permission dialog should be shown
         let claude_command_str;
         if should_show_permission_dialog {
             // Delay Claude PTY creation until permission mode is selected
             claude_pty_pending = true;
-            permission_mode_dialog.open();
+            permission_mode_dialog.open_with_default(config.claude.default_permission_mode);
             claude_command_str = String::new();
         } else {
             // Use configured default permission mode or Default
@@ -427,12 +426,12 @@ impl App {
         self.terminals.remove(&PaneId::Claude);
         self.claude_error = None;
 
-        let should_show_permission_dialog = self.config.claude.show_permission_dialog
-            && self.config.claude.default_permission_mode.is_none();
+        let should_show_permission_dialog = self.config.claude.show_permission_dialog;
 
         if should_show_permission_dialog {
             self.claude_pty_pending = true;
-            self.permission_mode_dialog.open();
+            self.permission_mode_dialog
+                .open_with_default(self.config.claude.default_permission_mode);
         } else {
             let mode = self
                 .config
@@ -1816,8 +1815,12 @@ impl App {
                             {
                                 match key.code {
                                     KeyCode::Esc => {
-                                        // Cancel: use default mode
-                                        let mode = ClaudePermissionMode::Default;
+                                        // Cancel: use saved default or fall back to Default
+                                        let mode = self
+                                            .config
+                                            .claude
+                                            .default_permission_mode
+                                            .unwrap_or(ClaudePermissionMode::Default);
                                         self.permission_mode_dialog.close();
                                         if self.claude_pty_pending {
                                             self.init_claude_pty(mode);
@@ -1825,9 +1828,11 @@ impl App {
                                         self.active_pane = PaneId::Claude;
                                     }
                                     KeyCode::Enter => {
-                                        // Confirm selected mode
+                                        // Confirm selected mode and save to config
                                         let mode = self.permission_mode_dialog.selected_mode();
                                         self.permission_mode_dialog.confirm();
+                                        self.config.claude.default_permission_mode = Some(mode);
+                                        let _ = crate::config::save_config(&self.config);
                                         if self.claude_pty_pending {
                                             self.init_claude_pty(mode);
                                         }
@@ -3743,33 +3748,47 @@ impl App {
         let text = if source_pane == PaneId::Preview {
             // Extract from preview content with character-level selection
             let content_lines: Vec<&str> = self.preview.content.lines().collect();
-            if start_row >= content_lines.len() {
+
+            // (C) Scroll offset: char_range() returns screen-relative rows
+            let scroll_offset = self.preview.scroll as usize;
+            let adj_start_row = start_row + scroll_offset;
+            let adj_end_row = end_row + scroll_offset;
+
+            if adj_start_row >= content_lines.len() {
                 return;
             }
 
+            // (B) Subtract gutter width from column indices
+            let gutter_w = ui::preview::calculate_gutter_width(content_lines.len()) as usize;
+            let base_start_col = start_col.saturating_sub(gutter_w);
+            let base_end_col = end_col.saturating_sub(gutter_w);
+
+            // (D) Add horizontal scroll offset
+            let h_scroll = self.preview.horizontal_scroll as usize;
+            let adj_start_col = base_start_col + h_scroll;
+            let adj_end_col = base_end_col + h_scroll;
+
             let mut result = String::new();
             #[allow(clippy::needless_range_loop)] // row index needed for start/end column logic
-            for row in start_row..=end_row.min(content_lines.len().saturating_sub(1)) {
+            for row in adj_start_row..=adj_end_row.min(content_lines.len().saturating_sub(1)) {
                 let line = content_lines[row];
                 let line_chars: Vec<char> = line.chars().collect();
 
-                let col_start = if row == start_row {
-                    start_col.min(line_chars.len())
+                let col_start = if row == adj_start_row {
+                    adj_start_col.min(line_chars.len())
                 } else {
                     0
                 };
-                let col_end = if row == end_row {
-                    (end_col + 1).min(line_chars.len()) // +1 because end_col is inclusive
+                let col_end = if row == adj_end_row {
+                    (adj_end_col + 1).min(line_chars.len()) // +1 because end_col is inclusive
                 } else {
                     line_chars.len()
                 };
 
                 let selected: String = line_chars[col_start..col_end].iter().collect();
-
-                if row == end_row {
-                    result.push_str(selected.trim_end());
-                } else {
-                    result.push_str(selected.trim_end());
+                // (A) No trim_end() — preserve original content including spaces
+                result.push_str(&selected);
+                if row != adj_end_row {
                     result.push('\n');
                 }
             }

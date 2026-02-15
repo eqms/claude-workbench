@@ -687,7 +687,7 @@ impl PreviewState {
 
 /// Calculate the width needed for line number gutter based on total line count
 /// Returns total gutter width including separator: " 123 │"
-fn calculate_gutter_width(total_lines: usize) -> u16 {
+pub(crate) fn calculate_gutter_width(total_lines: usize) -> u16 {
     if total_lines == 0 {
         return 4; // Minimum: " 1 │"
     }
