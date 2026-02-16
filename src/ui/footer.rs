@@ -12,38 +12,39 @@ use crate::types::{EditorMode, PaneId};
 /// Action identifiers for footer button clicks
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FooterAction {
-    ToggleFiles,   // F1
-    TogglePreview, // F2
-    Refresh,       // F3
-    FocusClaude,   // F4
-    ToggleGit,     // F5
-    ToggleTerm,    // F6
-    FileMenu,      // F9
-    FuzzyFind,     // ^P
-    OpenFile,      // o
-    OpenFinder,    // O
-    Settings,      // F8
-    About,         // F10
-    Help,          // F12
-    Edit,          // E (Preview mode)
-    StartSelect,   // ^S (starts selection)
-    Save,          // ^S (Edit mode - save)
-    ExitEdit,      // Esc (Edit mode)
-    Undo,          // ^Z
-    Redo,          // ^Y
-    SelectDown,    // j/↓ (selection mode)
-    SelectUp,      // k/↑ (selection mode)
-    SelectCopy,    // Enter/y (selection mode)
-    SelectCancel,  // Esc (selection mode)
-    ToggleHidden,  // . (toggle hidden files)
-    ToggleBlock,   // ^F3 (MC Edit: toggle block marking)
-    CopyBlock,     // ^F5 (MC Edit: copy block)
-    MoveBlock,     // ^F6 (MC Edit: cut block)
-    DeleteBlock,   // ^F8 (MC Edit: delete block)
-    PlatformPaste, // ^V / Cmd+V (Paste from clipboard)
-    Search,        // / or ^F (Search)
-    SearchReplace, // ^H (Search & Replace in Edit mode)
-    None,          // No action (non-clickable)
+    ToggleFiles,    // F1
+    TogglePreview,  // F2
+    Refresh,        // F3
+    FocusClaude,    // F4
+    ToggleGit,      // F5
+    ToggleTerm,     // F6
+    FileMenu,       // F9
+    FuzzyFind,      // ^P
+    OpenFile,       // o
+    OpenFinder,     // O
+    Settings,       // F8
+    About,          // F10
+    Help,           // F12
+    Edit,           // E (Preview mode)
+    StartSelect,    // ^S (starts selection)
+    Save,           // ^S (Edit mode - save)
+    ExitEdit,       // Esc (Edit mode)
+    Undo,           // ^Z
+    Redo,           // ^Y
+    SelectDown,     // j/↓ (selection mode)
+    SelectUp,       // k/↑ (selection mode)
+    SelectCopy,     // Enter/y (selection mode)
+    SelectCancel,   // Esc (selection mode)
+    ToggleHidden,   // . (toggle hidden files)
+    ToggleBlock,    // ^F3 (MC Edit: toggle block marking)
+    CopyBlock,      // ^F5 (MC Edit: copy block)
+    MoveBlock,      // ^F6 (MC Edit: cut block)
+    DeleteBlock,    // ^F8 (MC Edit: delete block)
+    PlatformPaste,  // ^V / Cmd+V (Paste from clipboard)
+    Search,         // / or ^F (Search)
+    SearchReplace,  // ^H (Search & Replace in Edit mode)
+    ToggleAutosave, // ^A (Toggle autosave)
+    None,           // No action (non-clickable)
 }
 
 pub struct Footer {
@@ -51,6 +52,7 @@ pub struct Footer {
     pub editor_mode: EditorMode,
     pub editor_modified: bool,
     pub selection_mode: bool,
+    pub autosave: bool,
 }
 
 /// Format current date/time for footer display
@@ -106,6 +108,7 @@ impl Default for Footer {
             editor_mode: EditorMode::ReadOnly,
             editor_modified: false,
             selection_mode: false,
+            autosave: false,
         }
     }
 }
@@ -129,6 +132,7 @@ pub fn get_context_button_positions(
         // Edit mode - pane navigation + save/exit (editor shortcuts shown in editor status bar)
         vec![
             ("^S", "Save", FooterAction::Save),
+            ("^A", "Auto", FooterAction::ToggleAutosave),
             ("^H", "S&R", FooterAction::SearchReplace),
             ("F1", "Files", FooterAction::ToggleFiles),
             ("F3", "Refresh", FooterAction::Refresh),
@@ -211,6 +215,7 @@ impl Widget for Footer {
             // Edit mode - pane navigation + save/exit (editor shortcuts in status bar)
             vec![
                 ("^S", "Save"),
+                ("^A", "Auto"),
                 ("^H", "S&R"),
                 ("F1", "Files"),
                 ("F3", "Refresh"),
@@ -286,11 +291,33 @@ impl Widget for Footer {
             spans.push(Span::raw(" "));
         }
 
-        // Right side: datetime + version
+        // Right side: datetime + AUTO indicator + version
         let datetime_text = format_datetime();
         let version = env!("CARGO_PKG_VERSION");
-        let right_text = format!(" {} │ v{} ", datetime_text, version);
-        let right_width = right_text.len() as u16;
+
+        let right_spans = if self.autosave {
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    "AUTO",
+                    Style::default().bg(Color::DarkGray).fg(Color::Green),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
+        } else {
+            vec![Span::styled(
+                format!(" {} │ v{} ", datetime_text, version),
+                Style::default().bg(Color::DarkGray).fg(Color::White),
+            )]
+        };
+
+        let right_width: u16 = right_spans.iter().map(|s| s.content.len() as u16).sum();
 
         let keys_area = Rect::new(
             area.x,
@@ -309,8 +336,6 @@ impl Widget for Footer {
             .style(Style::default().bg(Color::Black))
             .render(keys_area, buf);
 
-        Paragraph::new(right_text)
-            .style(Style::default().bg(Color::DarkGray).fg(Color::White))
-            .render(right_area, buf);
+        Paragraph::new(Line::from(right_spans)).render(right_area, buf);
     }
 }

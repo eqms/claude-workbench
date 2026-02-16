@@ -78,12 +78,13 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 | Key | Action |
 |-----|--------|
 | Ctrl+S | Save |
+| Ctrl+A | Toggle Autosave on/off |
 | Ctrl+Z | Undo |
 | Ctrl+C / Cmd+C | Copy selection to clipboard |
 | Ctrl+X / Cmd+X | Cut selection to clipboard |
 | Ctrl+V / Cmd+V | Paste from clipboard |
 | Ctrl+Y | Delete current line |
-| Esc | Exit (confirm if modified) |
+| Esc | Exit (autosave if enabled, otherwise confirm) |
 
 **Block Selection & MC Edit Legacy:**
 | Key | Action |
@@ -283,12 +284,13 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | Taste | Aktion |
 |-------|--------|
 | Ctrl+S | Speichern |
+| Ctrl+A | Autosave ein-/ausschalten |
 | Ctrl+Z | Rückgängig |
 | Ctrl+C / Cmd+C | Auswahl in Zwischenablage kopieren |
 | Ctrl+X / Cmd+X | Auswahl in Zwischenablage ausschneiden |
 | Ctrl+V / Cmd+V | Aus Zwischenablage einfügen |
 | Ctrl+Y | Aktuelle Zeile löschen |
-| Esc | Beenden (Bestätigung wenn geändert) |
+| Esc | Beenden (Autosave wenn aktiviert, sonst Bestätigung) |
 
 **Block-Auswahl & MC Edit Legacy:**
 | Taste | Aktion |

@@ -70,6 +70,7 @@ pub enum SettingsField {
     ShellPath,
     ScrollbackLines,
     ShowHiddenFiles,
+    Autosave,
     AutoRefreshMs,
     CheckForUpdates, // Action item, not editable
     // Layout
@@ -95,6 +96,7 @@ pub struct SettingsState {
     pub shell_path: String,
     pub scrollback_lines: usize,
     pub show_hidden_files: bool,
+    pub autosave: bool,
     pub auto_refresh_ms: u64,
     pub file_browser_width: u16,
     pub preview_width: u16,
@@ -121,6 +123,7 @@ impl Default for SettingsState {
             shell_path: "/bin/bash".to_string(),
             scrollback_lines: 1000,
             show_hidden_files: true, // Show hidden files by default
+            autosave: false,
             auto_refresh_ms: 2000,
             file_browser_width: 20,
             preview_width: 50,
@@ -145,6 +148,7 @@ impl SettingsState {
         self.shell_path = config.terminal.shell_path.clone();
         self.scrollback_lines = config.pty.scrollback_lines;
         self.show_hidden_files = config.file_browser.show_hidden;
+        self.autosave = config.ui.autosave;
         self.auto_refresh_ms = config.file_browser.auto_refresh_ms;
         self.file_browser_width = config.layout.file_browser_width_percent;
         self.preview_width = config.layout.preview_width_percent;
@@ -170,6 +174,7 @@ impl SettingsState {
         config.terminal.shell_path = self.shell_path.clone();
         config.pty.scrollback_lines = self.scrollback_lines;
         config.file_browser.show_hidden = self.show_hidden_files;
+        config.ui.autosave = self.autosave;
         config.file_browser.auto_refresh_ms = self.auto_refresh_ms;
         config.layout.file_browser_width_percent = self.file_browser_width;
         config.layout.preview_width_percent = self.preview_width;
@@ -205,7 +210,7 @@ impl SettingsState {
 
     pub fn item_count(&self) -> usize {
         match self.category {
-            SettingsCategory::General => 5, // shell, scrollback, hidden, auto-refresh, check updates
+            SettingsCategory::General => 6, // shell, scrollback, hidden, autosave, auto-refresh, check updates
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
             SettingsCategory::Paths => 2,   // claude, lazygit
             SettingsCategory::Templates => self.available_templates.len(),
@@ -215,7 +220,7 @@ impl SettingsState {
 
     /// Check if the currently selected item is the "Check for Updates" action
     pub fn is_check_updates_selected(&self) -> bool {
-        self.category == SettingsCategory::General && self.selected_idx == 4
+        self.category == SettingsCategory::General && self.selected_idx == 5
     }
 
     pub fn move_up(&mut self) {
@@ -238,7 +243,8 @@ impl SettingsState {
                 0 => Some(SettingsField::ShellPath),
                 1 => Some(SettingsField::ScrollbackLines),
                 2 => Some(SettingsField::ShowHiddenFiles),
-                3 => Some(SettingsField::AutoRefreshMs),
+                3 => Some(SettingsField::Autosave),
+                4 => Some(SettingsField::AutoRefreshMs),
                 _ => None,
             },
             SettingsCategory::Layout => match self.selected_idx {
@@ -261,6 +267,7 @@ impl SettingsState {
                 SettingsField::ShellPath => self.shell_path.clone(),
                 SettingsField::ScrollbackLines => self.scrollback_lines.to_string(),
                 SettingsField::ShowHiddenFiles => self.show_hidden_files.to_string(),
+                SettingsField::Autosave => self.autosave.to_string(),
                 SettingsField::AutoRefreshMs => self.auto_refresh_ms.to_string(),
                 SettingsField::FileBrowserWidth => self.file_browser_width.to_string(),
                 SettingsField::PreviewWidth => self.preview_width.to_string(),
@@ -282,6 +289,10 @@ impl SettingsState {
             SettingsCategory::General => match self.selected_idx {
                 2 => {
                     self.show_hidden_files = !self.show_hidden_files;
+                    self.has_changes = true;
+                }
+                3 => {
+                    self.autosave = !self.autosave;
                     self.has_changes = true;
                 }
                 _ => self.start_editing(),
@@ -307,6 +318,9 @@ impl SettingsState {
                 }
                 SettingsField::ShowHiddenFiles => {
                     self.show_hidden_files = value.to_lowercase() == "true";
+                }
+                SettingsField::Autosave => {
+                    self.autosave = value.to_lowercase() == "true";
                 }
                 SettingsField::AutoRefreshMs => {
                     if let Ok(v) = value.parse::<u64>() {
@@ -447,14 +461,15 @@ fn render_general(frame: &mut Frame, area: Rect, state: &SettingsState) {
             state.show_hidden_files,
             state.selected_idx == 2,
         ),
+        format_bool_setting("Autosave", state.autosave, state.selected_idx == 3),
         format_setting(
             "Auto Refresh (ms)",
             &auto_refresh_display,
-            state.selected_idx == 3,
+            state.selected_idx == 4,
             state.editing.as_ref() == Some(&SettingsField::AutoRefreshMs),
             &state.input_buffer,
         ),
-        format_action_setting("Check for Updates", state.selected_idx == 4),
+        format_action_setting("Check for Updates", state.selected_idx == 5),
     ];
 
     let list = create_settings_list(items);

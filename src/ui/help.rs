@@ -426,6 +426,10 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Save File"),
         ]),
         Line::from(vec![
+            Span::styled("  Ctrl+A       ", Style::default().fg(Color::Cyan)),
+            Span::raw("Toggle Autosave on/off"),
+        ]),
+        Line::from(vec![
             Span::styled("  Ctrl+Z       ", Style::default().fg(Color::Cyan)),
             Span::raw("Undo"),
         ]),

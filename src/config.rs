@@ -104,6 +104,8 @@ pub struct TerminalConfig {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UiConfig {
     pub theme: String,
+    #[serde(default)]
+    pub autosave: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -153,6 +155,7 @@ impl Default for Config {
             },
             ui: UiConfig {
                 theme: "default".into(),
+                autosave: false,
             },
             layout: LayoutConfig::default(),
             file_browser: FileBrowserConfig::default(),

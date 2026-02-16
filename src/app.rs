@@ -769,7 +769,21 @@ impl App {
                                                     .map(|e| e.is_dir)
                                                     .unwrap_or(false);
                                                 if is_dir {
-                                                    if has_unsaved {
+                                                    if has_unsaved && self.config.ui.autosave {
+                                                        // Autosave: save, exit edit mode, then enter directory
+                                                        let _ = self.preview.save();
+                                                        self.preview.exit_edit_mode(false);
+                                                        self.preview.refresh_highlighting(
+                                                            &self.syntax_manager,
+                                                        );
+                                                        self.file_browser
+                                                            .list_state
+                                                            .select(Some(idx));
+                                                        self.file_browser.enter_selected();
+                                                        self.update_preview();
+                                                        self.sync_terminals();
+                                                        self.check_repo_change();
+                                                    } else if has_unsaved {
                                                         self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
                                                         title: "Unsaved Changes".to_string(),
                                                         message: "Discard changes and enter directory?".to_string(),
@@ -787,7 +801,15 @@ impl App {
                                                 }
                                             } else {
                                                 // Single click: just select (but check for unsaved changes)
-                                                if has_unsaved {
+                                                if has_unsaved && self.config.ui.autosave {
+                                                    // Autosave: save, exit edit mode, then switch file
+                                                    let _ = self.preview.save();
+                                                    self.preview.exit_edit_mode(false);
+                                                    self.preview
+                                                        .refresh_highlighting(&self.syntax_manager);
+                                                    self.file_browser.list_state.select(Some(idx));
+                                                    self.update_preview();
+                                                } else if has_unsaved {
                                                     self.dialog.dialog_type =
                                                     ui::dialog::DialogType::Confirm {
                                                         title: "Unsaved Changes".to_string(),
@@ -1093,6 +1115,12 @@ impl App {
                                                     if self.active_pane == PaneId::FileBrowser {
                                                         self.menu.visible = true;
                                                     }
+                                                }
+                                                FooterAction::ToggleAutosave => {
+                                                    self.config.ui.autosave =
+                                                        !self.config.ui.autosave;
+                                                    let _ =
+                                                        crate::config::save_config(&self.config);
                                                 }
                                                 FooterAction::None => {}
                                             }
@@ -2070,6 +2098,13 @@ impl App {
                                                         self.add_to_gitignore(&path);
                                                     }
                                                 }
+                                                // Ctrl+A = Toggle Autosave
+                                                KeyCode::Char('\x01') => {
+                                                    self.config.ui.autosave =
+                                                        !self.config.ui.autosave;
+                                                    let _ =
+                                                        crate::config::save_config(&self.config);
+                                                }
                                                 _ => {}
                                             }
                                         }
@@ -2266,12 +2301,21 @@ impl App {
                                                     if self.preview.block_marking {
                                                         self.preview.cancel_selection();
                                                     } else if self.preview.is_modified() {
-                                                        // Show discard dialog
-                                                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
-                                                        title: "Unsaved Changes".to_string(),
-                                                        message: "Discard changes?".to_string(),
-                                                        action: ui::dialog::DialogAction::DiscardEditorChanges,
-                                                    };
+                                                        if self.config.ui.autosave {
+                                                            // Autosave: save and exit without dialog
+                                                            let _ = self.preview.save();
+                                                            self.preview.exit_edit_mode(false);
+                                                            self.preview.refresh_highlighting(
+                                                                &self.syntax_manager,
+                                                            );
+                                                        } else {
+                                                            // Show discard dialog
+                                                            self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                                            title: "Unsaved Changes".to_string(),
+                                                            message: "Discard changes?".to_string(),
+                                                            action: ui::dialog::DialogAction::DiscardEditorChanges,
+                                                        };
+                                                        }
                                                     } else {
                                                         self.preview.exit_edit_mode(true);
                                                     }
@@ -2284,6 +2328,18 @@ impl App {
                                                             &self.syntax_manager,
                                                         );
                                                     }
+                                                }
+                                                // Ctrl+A = Toggle Autosave
+                                                else if key.code == KeyCode::Char('\x01')
+                                                    || (key.code == KeyCode::Char('a')
+                                                        && key
+                                                            .modifiers
+                                                            .contains(KeyModifiers::CONTROL))
+                                                {
+                                                    self.config.ui.autosave =
+                                                        !self.config.ui.autosave;
+                                                    let _ =
+                                                        crate::config::save_config(&self.config);
                                                 }
                                                 // MC Edit style: Ctrl+Y = delete line
                                                 else if is_ctrl_y {
@@ -2533,6 +2589,22 @@ impl App {
                                                         self.terminal_selection.start(
                                                             self.preview.scroll as usize,
                                                             PaneId::Preview,
+                                                        );
+                                                        continue;
+                                                    }
+
+                                                    // Ctrl+A = Toggle Autosave (also available in ReadOnly)
+                                                    let is_ctrl_a = key.code
+                                                        == KeyCode::Char('\x01')
+                                                        || (key.code == KeyCode::Char('a')
+                                                            && key
+                                                                .modifiers
+                                                                .contains(KeyModifiers::CONTROL));
+                                                    if is_ctrl_a {
+                                                        self.config.ui.autosave =
+                                                            !self.config.ui.autosave;
+                                                        let _ = crate::config::save_config(
+                                                            &self.config,
                                                         );
                                                         continue;
                                                     }
@@ -2927,6 +2999,7 @@ impl App {
             editor_mode: self.preview.mode,
             editor_modified: self.preview.modified,
             selection_mode: self.terminal_selection.active,
+            autosave: self.config.ui.autosave,
         };
         frame.render_widget(footer_widget, footer);
 
