@@ -53,6 +53,7 @@ pub struct Footer {
     pub editor_modified: bool,
     pub selection_mode: bool,
     pub autosave: bool,
+    pub autosave_flash: bool,
 }
 
 /// Format current date/time for footer display
@@ -109,6 +110,7 @@ impl Default for Footer {
             editor_modified: false,
             selection_mode: false,
             autosave: false,
+            autosave_flash: false,
         }
     }
 }
@@ -118,7 +120,11 @@ pub fn get_context_button_positions(
     active_pane: PaneId,
     editor_mode: EditorMode,
     selection_mode: bool,
+    autosave: bool,
 ) -> Vec<(u16, u16, FooterAction)> {
+    // Dynamic autosave button label
+    let auto_label = if autosave { "Auto:ON" } else { "Auto:OFF" };
+
     // Get the same keys that render() uses
     let keys: Vec<(&str, &str, FooterAction)> = if selection_mode {
         vec![
@@ -132,7 +138,7 @@ pub fn get_context_button_positions(
         // Edit mode - pane navigation + save/exit (editor shortcuts shown in editor status bar)
         vec![
             ("^S", "Save", FooterAction::Save),
-            ("^A", "Auto", FooterAction::ToggleAutosave),
+            ("^A", auto_label, FooterAction::ToggleAutosave),
             ("^H", "S&R", FooterAction::SearchReplace),
             ("F1", "Files", FooterAction::ToggleFiles),
             ("F3", "Refresh", FooterAction::Refresh),
@@ -201,6 +207,9 @@ pub fn get_context_button_positions(
 
 impl Widget for Footer {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        // Dynamic autosave button label
+        let auto_label = if self.autosave { "Auto:ON" } else { "Auto:OFF" };
+
         // Context-dependent key display
         let keys: Vec<(&str, &str)> = if self.selection_mode {
             // Terminal selection mode keys
@@ -215,7 +224,7 @@ impl Widget for Footer {
             // Edit mode - pane navigation + save/exit (editor shortcuts in status bar)
             vec![
                 ("^S", "Save"),
-                ("^A", "Auto"),
+                ("^A", auto_label),
                 ("^H", "S&R"),
                 ("F1", "Files"),
                 ("F3", "Refresh"),
@@ -291,18 +300,35 @@ impl Widget for Footer {
             spans.push(Span::raw(" "));
         }
 
-        // Right side: datetime + AUTO indicator + version
+        // Right side: datetime + autosave indicator (3-state) + version
         let datetime_text = format_datetime();
         let version = env!("CARGO_PKG_VERSION");
 
-        let right_spans = if self.autosave {
+        let right_spans = if self.autosave_flash {
+            // Flash state: green background "✓ SAVED" for 2s after autosave
             vec![
                 Span::styled(
                     format!(" {} │ ", datetime_text),
                     Style::default().bg(Color::DarkGray).fg(Color::White),
                 ),
                 Span::styled(
-                    "AUTO",
+                    " \u{2713} SAVED ",
+                    Style::default().bg(Color::Green).fg(Color::Black),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
+        } else if self.autosave {
+            // Autosave ON: green text indicator
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    "AUTO:ON",
                     Style::default().bg(Color::DarkGray).fg(Color::Green),
                 ),
                 Span::styled(
@@ -311,10 +337,21 @@ impl Widget for Footer {
                 ),
             ]
         } else {
-            vec![Span::styled(
-                format!(" {} │ v{} ", datetime_text, version),
-                Style::default().bg(Color::DarkGray).fg(Color::White),
-            )]
+            // Autosave OFF: dim text indicator (always visible)
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    "AUTO:OFF",
+                    Style::default().bg(Color::DarkGray).fg(Color::Gray),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
         };
 
         let right_width: u16 = right_spans.iter().map(|s| s.content.len() as u16).sum();

@@ -17,6 +17,33 @@ A Rust-based TUI (Terminal User Interface) multiplexer designed for AI-assisted 
 ![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20|%20macOS%20|%20Windows-green.svg)
 
+### Built for Speed. Stripped to the Essentials.
+
+I love efficient coding, but I grew tired of bloated IDEs. Visual Studio Code felt too heavy, and other tools often came with baggage I simply didn't need for my daily workflow. What I truly wanted was an environment as fast as my thought process — built on the stability of Rust and bringing the power of Claude directly into the shell.
+
+Over the 2025/2026 New Year, I turned that vision into reality: **Claude Workbench**.
+
+It's not a traditional IDE; it's a high-performance TUI (Terminal User Interface). Built on the Fish shell and Rust, it seamlessly integrates tools like `lazy-git` and provides everything you need for a frictionless workflow — from an intelligent file browser and live Markdown rendering to direct Claude integration.
+
+No overhead. Maximum performance. Built by a developer, for developers.
+
+#### Why Start Fresh?
+
+- **The Problem:** Modern IDEs have become bloated, filled with features that distract rather than help.
+- **The Search:** After testing alternatives like Zed or Google IDX, they lacked the "Shell-First" philosophy I crave.
+- **The Goal:** Create a portable, lightning-fast solution that feels like a natural extension of the terminal.
+
+#### The Technical Foundation
+
+- **Rust:** Chosen for uncompromising performance, safety, and stability.
+- **Fish Shell (4.x):** The core for a modern, user-friendly command-line experience.
+- **Claude Integration:** Deep integration of Claude (e.g., via Claude Code) for AI-assisted development without leaving the terminal.
+- **Automation:** Hosted on GitHub with automated release workflows (compiling) and integrated self-update logic.
+
+<p align="center">
+  <img src="docs/claude-workbench-tui.png" alt="Claude Workbench - Core Features & Integrated Workflow" width="900">
+</p>
+
 ### Features
 
 | Pane | Key | Description |
@@ -126,6 +153,33 @@ See [LICENSE](LICENSE) for details.
 ## Deutsch
 
 Ein Rust-basierter TUI (Terminal User Interface) Multiplexer für KI-unterstützte Entwicklungsworkflows. Bietet eine integrierte Entwicklungsumgebung mit Dateibrowser, Syntax-hervorgehobener Vorschau und mehreren eingebetteten PTY-Terminals.
+
+### Gebaut für Geschwindigkeit. Reduziert auf das Wesentliche.
+
+Ich liebe effizientes Programmieren, aber ich hatte genug von aufgeblähten IDEs. Visual Studio Code fühlte sich zu schwer an, und andere Tools brachten oft Ballast mit, den ich für meinen täglichen Workflow schlicht nicht brauchte. Was ich wirklich wollte, war eine Umgebung, die so schnell ist wie mein Denkprozess — aufgebaut auf der Stabilität von Rust und mit der Kraft von Claude direkt in der Shell.
+
+Über Silvester 2025/2026 habe ich diese Vision Wirklichkeit werden lassen: **Claude Workbench**.
+
+Es ist keine traditionelle IDE; es ist ein hochperformantes TUI (Terminal User Interface). Aufgebaut auf der Fish Shell und Rust, integriert es nahtlos Werkzeuge wie `lazy-git` und bietet alles, was man für einen reibungslosen Workflow braucht — von einem intelligenten Dateibrowser und Live-Markdown-Rendering bis hin zur direkten Claude-Integration.
+
+Kein Overhead. Maximale Performance. Von einem Entwickler, für Entwickler.
+
+#### Warum von Grund auf neu?
+
+- **Das Problem:** Moderne IDEs sind aufgebläht, vollgestopft mit Features die ablenken statt zu helfen.
+- **Die Suche:** Nach dem Testen von Alternativen wie Zed oder Google IDX fehlte ihnen die "Shell-First"-Philosophie, die ich brauche.
+- **Das Ziel:** Eine portable, blitzschnelle Lösung schaffen, die sich wie eine natürliche Erweiterung des Terminals anfühlt.
+
+#### Das technische Fundament
+
+- **Rust:** Gewählt für kompromisslose Performance, Sicherheit und Stabilität.
+- **Fish Shell (4.x):** Der Kern für ein modernes, benutzerfreundliches Kommandozeilen-Erlebnis.
+- **Claude-Integration:** Tiefe Integration von Claude (z.B. via Claude Code) für KI-unterstützte Entwicklung ohne das Terminal zu verlassen.
+- **Automatisierung:** Gehostet auf GitHub mit automatisierten Release-Workflows (Kompilierung) und integrierter Selbst-Update-Logik.
+
+<p align="center">
+  <img src="docs/claude-workbench-tui_de.png" alt="Claude Workbench - Kern-Features & Integrierter Workflow" width="900">
+</p>
 
 ### Funktionen
 

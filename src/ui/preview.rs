@@ -756,8 +756,9 @@ pub fn render(
     is_focused: bool,
     selection_range: Option<(usize, usize)>,
     char_selection: Option<((usize, usize), (usize, usize))>,
+    autosave: bool,
 ) {
-    let title = build_title(state);
+    let title = build_title(state, autosave);
     let selection_active = selection_range.is_some() || char_selection.is_some();
     let (border_style, border_type) =
         get_border_style(is_focused, state.mode, state.modified, selection_active);
@@ -1539,7 +1540,7 @@ fn render_edit_shortcuts(f: &mut Frame, area: Rect, block_marking: bool) {
     f.render_widget(paragraph, area);
 }
 
-fn build_title(state: &PreviewState) -> String {
+fn build_title(state: &PreviewState, autosave: bool) -> String {
     let mut title = state
         .current_file
         .as_ref()
@@ -1563,6 +1564,10 @@ fn build_title(state: &PreviewState) -> String {
         // Add block marking indicator (MC style)
         if state.block_marking {
             title.push_str(" [BLOCK]");
+        }
+        // Add autosave indicator when enabled
+        if autosave {
+            title.push_str(" [AUTO]");
         }
     }
 

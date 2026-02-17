@@ -96,6 +96,8 @@ pub struct App {
     // Interactive pane resizing state
     pub resize_state: ResizeState,
     pub border_areas: BorderAreas,
+    // Flash state for autosave "✓ SAVED" indicator (2s duration)
+    pub last_autosave_time: Option<std::time::Instant>,
 }
 
 impl App {
@@ -219,6 +221,7 @@ impl App {
             preview_width: 80,
             resize_state: ResizeState::default(),
             border_areas: BorderAreas::default(),
+            last_autosave_time: None,
         };
 
         // Open wizard on first run
@@ -772,6 +775,8 @@ impl App {
                                                     if has_unsaved && self.config.ui.autosave {
                                                         // Autosave: save, exit edit mode, then enter directory
                                                         let _ = self.preview.save();
+                                                        self.last_autosave_time =
+                                                            Some(std::time::Instant::now());
                                                         self.preview.exit_edit_mode(false);
                                                         self.preview.refresh_highlighting(
                                                             &self.syntax_manager,
@@ -804,6 +809,8 @@ impl App {
                                                 if has_unsaved && self.config.ui.autosave {
                                                     // Autosave: save, exit edit mode, then switch file
                                                     let _ = self.preview.save();
+                                                    self.last_autosave_time =
+                                                        Some(std::time::Instant::now());
                                                     self.preview.exit_edit_mode(false);
                                                     self.preview
                                                         .refresh_highlighting(&self.syntax_manager);
@@ -866,6 +873,7 @@ impl App {
                                         self.active_pane,
                                         self.preview.mode,
                                         is_selection_mode,
+                                        self.config.ui.autosave,
                                     );
 
                                     for (start, end, action) in positions {
@@ -2304,6 +2312,8 @@ impl App {
                                                         if self.config.ui.autosave {
                                                             // Autosave: save and exit without dialog
                                                             let _ = self.preview.save();
+                                                            self.last_autosave_time =
+                                                                Some(std::time::Instant::now());
                                                             self.preview.exit_edit_mode(false);
                                                             self.preview.refresh_highlighting(
                                                                 &self.syntax_manager,
@@ -2987,6 +2997,7 @@ impl App {
                 self.active_pane == PaneId::Preview,
                 preview_selection_range,
                 preview_char_selection,
+                self.config.ui.autosave,
             );
         }
 
@@ -2994,12 +3005,19 @@ impl App {
         ui::terminal_pane::render(frame, lazygit, PaneId::LazyGit, self);
         ui::terminal_pane::render(frame, terminal, PaneId::Terminal, self);
 
+        // Compute autosave flash state (2s duration after last autosave)
+        let autosave_flash = self
+            .last_autosave_time
+            .map(|t| t.elapsed().as_secs() < 2)
+            .unwrap_or(false);
+
         let footer_widget = ui::footer::Footer {
             active_pane: self.active_pane,
             editor_mode: self.preview.mode,
             editor_modified: self.preview.modified,
             selection_mode: self.terminal_selection.active,
             autosave: self.config.ui.autosave,
+            autosave_flash,
         };
         frame.render_widget(footer_widget, footer);
 

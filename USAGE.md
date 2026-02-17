@@ -86,6 +86,14 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 | Ctrl+Y | Delete current line |
 | Esc | Exit (autosave if enabled, otherwise confirm) |
 
+**Autosave Behavior:**
+- When autosave is ON, changes are saved automatically on: Esc (exit edit), file switch, directory change
+- Preview title shows `[AUTO]` tag when autosave is active in edit mode
+- Footer button shows `Auto:ON` / `Auto:OFF` to indicate current state
+- Footer right side shows `AUTO:ON` (green) or `AUTO:OFF` (dim) permanently
+- After autosave triggers, footer briefly shows `✓ SAVED` (green flash, 2s)
+- Toggle via Ctrl+A in edit mode or F8 Settings
+
 **Block Selection & MC Edit Legacy:**
 | Key | Action |
 |-----|--------|
@@ -291,6 +299,14 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | Ctrl+V / Cmd+V | Aus Zwischenablage einfügen |
 | Ctrl+Y | Aktuelle Zeile löschen |
 | Esc | Beenden (Autosave wenn aktiviert, sonst Bestätigung) |
+
+**Autosave-Verhalten:**
+- Bei aktiviertem Autosave werden Änderungen automatisch gespeichert bei: Esc (Editor verlassen), Dateiwechsel, Verzeichniswechsel
+- Preview-Titel zeigt `[AUTO]` Tag wenn Autosave im Edit-Modus aktiv ist
+- Footer-Button zeigt `Auto:ON` / `Auto:OFF` für den aktuellen Status
+- Footer rechts zeigt permanent `AUTO:ON` (grün) oder `AUTO:OFF` (gedimmt)
+- Nach Autosave-Auslösung zeigt Footer kurz `✓ SAVED` (grüner Flash, 2s)
+- Umschaltbar via Ctrl+A im Edit-Modus oder F8 Einstellungen
 
 **Block-Auswahl & MC Edit Legacy:**
 | Taste | Aktion |
