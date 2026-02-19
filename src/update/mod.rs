@@ -604,7 +604,35 @@ pub fn restart_application() -> Result<(), String> {
     let exe =
         std::env::current_exe().map_err(|e| format!("Failed to get executable path: {}", e))?;
 
+    // On Linux, /proc/self/exe appends " (deleted)" when the running binary's
+    // inode was replaced during self-update (atomic rename). The new binary
+    // exists at the original path without this suffix.
+    #[cfg(target_os = "linux")]
+    let exe = {
+        let exe_str = exe.to_string_lossy();
+        if exe_str.ends_with(" (deleted)") {
+            let clean_path = exe_str.trim_end_matches(" (deleted)");
+            log_update(&format!(
+                "Linux: stripped ' (deleted)' suffix: {:?} -> {:?}",
+                exe_str, clean_path
+            ));
+            std::path::PathBuf::from(clean_path.to_string())
+        } else {
+            exe
+        }
+    };
+
     log_update(&format!("Executable path: {:?}", exe));
+
+    // Verify the binary exists before attempting exec()
+    if !exe.exists() {
+        let msg = format!(
+            "Binary not found at {:?} after update. Please restart manually.",
+            exe
+        );
+        log_update(&msg);
+        return Err(msg);
+    }
 
     // Get current arguments (skip the program name)
     let args: Vec<String> = std::env::args().skip(1).collect();
