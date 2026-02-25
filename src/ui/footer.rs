@@ -44,6 +44,7 @@ pub enum FooterAction {
     Search,         // / or ^F (Search)
     SearchReplace,  // ^H (Search & Replace in Edit mode)
     ToggleAutosave, // ^A (Toggle autosave)
+    CopyLastLines,  // F9 in terminal panes - copy last N lines to clipboard
     None,           // No action (non-clickable)
 }
 
@@ -54,6 +55,8 @@ pub struct Footer {
     pub selection_mode: bool,
     pub autosave: bool,
     pub autosave_flash: bool,
+    pub copy_flash: bool,
+    pub copy_flash_lines: usize,
 }
 
 /// Format current date/time for footer display
@@ -111,6 +114,8 @@ impl Default for Footer {
             selection_mode: false,
             autosave: false,
             autosave_flash: false,
+            copy_flash: false,
+            copy_flash_lines: 0,
         }
     }
 }
@@ -173,6 +178,7 @@ pub fn get_context_button_positions(
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
+            ("F9", "CopyLast", FooterAction::CopyLastLines),
             ("^P", "Find", FooterAction::FuzzyFind),
             ("F12", "Help", FooterAction::Help),
         ]
@@ -252,7 +258,7 @@ impl Widget for Footer {
             self.active_pane,
             PaneId::Claude | PaneId::LazyGit | PaneId::Terminal
         ) {
-            // Terminal pane keys - show ^S for selection mode
+            // Terminal pane keys - show ^S for selection mode and F9 for copy
             vec![
                 ("^S", "Select"),
                 ("F1", "Files"),
@@ -261,6 +267,7 @@ impl Widget for Footer {
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
+                ("F9", "CopyLast"),
                 ("^P", "Find"),
                 ("F12", "Help"),
             ]
@@ -304,7 +311,27 @@ impl Widget for Footer {
         let datetime_text = format_datetime();
         let version = env!("CARGO_PKG_VERSION");
 
-        let right_spans = if self.autosave_flash {
+        let right_spans = if self.copy_flash {
+            // Flash state: green background "✓ N Zeilen" for 2s after F9 copy
+            use ratatui::style::Modifier;
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    format!(" \u{2713} {} Zeilen  ", self.copy_flash_lines),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
+        } else if self.autosave_flash {
             // Flash state: green background "✓ SAVED" for 2s after autosave
             vec![
                 Span::styled(

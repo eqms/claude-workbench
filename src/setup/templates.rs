@@ -107,6 +107,7 @@ pub fn get_builtin_templates() -> Vec<Template> {
                 lazygit_command: vec!["lazygit".to_string()],
                 scrollback_lines: 2000,
                 auto_restart: true,
+                copy_lines_count: 50,
             }),
         },
         Template {
@@ -133,6 +134,7 @@ pub fn get_builtin_templates() -> Vec<Template> {
                 ],
                 scrollback_lines: 1000,
                 auto_restart: true,
+                copy_lines_count: 50,
             }),
         },
     ]

@@ -33,10 +33,17 @@ pub struct PtyConfig {
     /// Auto-restart PTY processes when they exit (default: true)
     #[serde(default = "default_true")]
     pub auto_restart: bool,
+    /// Number of lines to copy when pressing F9 in terminal panes (default: 50)
+    #[serde(default = "default_copy_lines_count")]
+    pub copy_lines_count: usize,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_copy_lines_count() -> usize {
+    50
 }
 
 impl Default for PtyConfig {
@@ -47,6 +54,7 @@ impl Default for PtyConfig {
             lazygit_command: vec!["lazygit".to_string()],
             scrollback_lines: 1000,
             auto_restart: true,
+            copy_lines_count: 50,
         }
     }
 }

@@ -234,6 +234,40 @@ impl PseudoTerminal {
         lines
     }
 
+    /// Extract the last `count` lines from the most recent terminal output.
+    /// Temporarily sets scrollback to 0 to access the bottom of the buffer,
+    /// then restores the original scrollback position.
+    pub fn extract_last_n_lines(&self, count: usize) -> Vec<String> {
+        let mut parser = self.parser.lock().unwrap();
+        let screen = parser.screen_mut();
+
+        // Save and reset scrollback to see most recent output
+        let saved = screen.scrollback();
+        screen.set_scrollback(0);
+
+        let (rows, cols) = screen.size();
+        let start_row = if rows as usize > count {
+            rows as usize - count
+        } else {
+            0
+        };
+
+        let mut lines = Vec::new();
+        for row in start_row..rows as usize {
+            let mut line = String::new();
+            for col in 0..cols {
+                if let Some(cell) = screen.cell(row as u16, col) {
+                    line.push_str(cell.contents());
+                }
+            }
+            lines.push(line.trim_end().to_string());
+        }
+
+        // Restore original scrollback position
+        screen.set_scrollback(saved);
+        lines
+    }
+
     /// Extract text content from character-level selection range
     /// (start_row, start_col) to (end_row, end_col) - all 0-based
     /// For multi-line selections:

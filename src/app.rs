@@ -98,6 +98,9 @@ pub struct App {
     pub border_areas: BorderAreas,
     // Flash state for autosave "✓ SAVED" indicator (2s duration)
     pub last_autosave_time: Option<std::time::Instant>,
+    // Flash state for F9 "✓ N Zeilen" copy indicator (2s duration)
+    pub last_copy_time: Option<std::time::Instant>,
+    pub copy_flash_lines: usize,
 }
 
 impl App {
@@ -222,6 +225,8 @@ impl App {
             resize_state: ResizeState::default(),
             border_areas: BorderAreas::default(),
             last_autosave_time: None,
+            last_copy_time: None,
+            copy_flash_lines: 0,
         };
 
         // Open wizard on first run
@@ -1124,6 +1129,16 @@ impl App {
                                                         self.menu.visible = true;
                                                     }
                                                 }
+                                                FooterAction::CopyLastLines => {
+                                                    if matches!(
+                                                        self.active_pane,
+                                                        PaneId::Claude
+                                                            | PaneId::LazyGit
+                                                            | PaneId::Terminal
+                                                    ) {
+                                                        self.copy_last_lines_to_clipboard();
+                                                    }
+                                                }
                                                 FooterAction::ToggleAutosave => {
                                                     self.config.ui.autosave =
                                                         !self.config.ui.autosave;
@@ -1814,7 +1829,14 @@ impl App {
                             }
 
                             if key.code == KeyCode::F(9) {
-                                self.menu.toggle();
+                                if matches!(
+                                    self.active_pane,
+                                    PaneId::Claude | PaneId::LazyGit | PaneId::Terminal
+                                ) {
+                                    self.copy_last_lines_to_clipboard();
+                                } else {
+                                    self.menu.toggle();
+                                }
                                 continue;
                             }
 
@@ -3011,6 +3033,13 @@ impl App {
             .map(|t| t.elapsed().as_secs() < 2)
             .unwrap_or(false);
 
+        // Compute copy flash state (2s duration after last F9 copy)
+        let copy_flash = self
+            .last_copy_time
+            .map(|t| t.elapsed().as_secs() < 2)
+            .unwrap_or(false);
+        let copy_flash_lines = self.copy_flash_lines;
+
         let footer_widget = ui::footer::Footer {
             active_pane: self.active_pane,
             editor_mode: self.preview.mode,
@@ -3018,6 +3047,8 @@ impl App {
             selection_mode: self.terminal_selection.active,
             autosave: self.config.ui.autosave,
             autosave_flash,
+            copy_flash,
+            copy_flash_lines,
         };
         frame.render_widget(footer_widget, footer);
 
@@ -3821,6 +3852,29 @@ impl App {
 
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
             let _ = clipboard.set_text(text);
+        }
+    }
+
+    /// Copy the last N lines from the active terminal pane to the system clipboard.
+    /// N is configured via config.pty.copy_lines_count (default: 50).
+    /// Sets copy flash state for footer indicator.
+    fn copy_last_lines_to_clipboard(&mut self) {
+        let count = self.config.pty.copy_lines_count;
+        let pane = self.active_pane;
+        if let Some(pty) = self.terminals.get(&pane) {
+            let lines: Vec<String> = pty
+                .extract_last_n_lines(count)
+                .into_iter()
+                .filter(|l| !l.is_empty())
+                .collect();
+            if !lines.is_empty() {
+                let text = lines.join("\n");
+                if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                    let _ = clipboard.set_text(text);
+                    self.last_copy_time = Some(std::time::Instant::now());
+                    self.copy_flash_lines = lines.len();
+                }
+            }
         }
     }
 

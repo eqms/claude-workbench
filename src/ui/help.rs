@@ -517,6 +517,12 @@ fn help_content() -> Vec<Line<'static>> {
             Span::styled("  Ctrl+S       ", Style::default().fg(Color::Cyan)),
             Span::raw("Start Selection Mode"),
         ]),
+        Line::from(vec![
+            Span::styled("  F9           ", Style::default().fg(Color::Cyan)),
+            Span::raw(
+                "Copy last N lines to clipboard (N: copy_lines_count in config.yaml, default: 50)",
+            ),
+        ]),
         Line::from(""),
         Line::from(Span::styled(
             "  CLI Navigation:",
