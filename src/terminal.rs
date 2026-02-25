@@ -5,9 +5,57 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+/// Callbacks for handling terminal queries (DSR, DA) that require responses
+/// back to the child process running inside the PTY.
+pub struct PtyCallbacks {
+    pending_responses: Vec<Vec<u8>>,
+}
+
+impl PtyCallbacks {
+    fn new() -> Self {
+        Self {
+            pending_responses: Vec::new(),
+        }
+    }
+
+    fn drain_responses(&mut self) -> Vec<Vec<u8>> {
+        std::mem::take(&mut self.pending_responses)
+    }
+}
+
+impl vt100::Callbacks for PtyCallbacks {
+    fn unhandled_csi(
+        &mut self,
+        screen: &mut vt100::Screen,
+        i1: Option<u8>,
+        _i2: Option<u8>,
+        params: &[&[u16]],
+        c: char,
+    ) {
+        let param = params.first().and_then(|p| p.first()).copied().unwrap_or(0);
+        match (i1, c) {
+            // DSR/CPR: \x1b[6n or \x1b[?6n → respond \x1b[{row+1};{col+1}R
+            (None, 'n') | (Some(b'?'), 'n') if param == 6 => {
+                let (row, col) = screen.cursor_position();
+                self.pending_responses
+                    .push(format!("\x1b[{};{}R", row + 1, col + 1).into_bytes());
+            }
+            // DA: \x1b[c / \x1b[0c → respond \x1b[?1;2c (VT100 with AVO)
+            (None, 'c') if param == 0 => {
+                self.pending_responses.push(b"\x1b[?1;2c".to_vec());
+            }
+            // DA2: \x1b[>c / \x1b[>0c → respond \x1b[>0;0;0c
+            (Some(b'>'), 'c') if param == 0 => {
+                self.pending_responses.push(b"\x1b[>0;0;0c".to_vec());
+            }
+            _ => {}
+        }
+    }
+}
+
 pub struct PseudoTerminal {
-    pub parser: Arc<Mutex<vt100::Parser>>,
-    pub writer: Box<dyn Write + Send>,
+    pub parser: Arc<Mutex<vt100::Parser<PtyCallbacks>>>,
+    pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
     pub master: Box<dyn portable_pty::MasterPty + Send>,
     /// Flag indicating if the PTY process has exited (reader thread got EOF)
     pub exited: Arc<AtomicBool>,
@@ -23,36 +71,18 @@ impl PseudoTerminal {
             pixel_height: 0,
         })?;
 
-        let parser = Arc::new(Mutex::new(vt100::Parser::new(rows, cols, 1000)));
+        let parser = Arc::new(Mutex::new(vt100::Parser::new_with_callbacks(
+            rows,
+            cols,
+            1000,
+            PtyCallbacks::new(),
+        )));
         let exited = Arc::new(AtomicBool::new(false));
         let mut reader = pair.master.try_clone_reader()?;
         let parser_clone = parser.clone();
         let exited_clone = exited.clone();
 
-        // Spawn a background thread to read from PTY and update the parser
-        thread::spawn(move || {
-            let mut buffer = [0u8; 4096];
-            loop {
-                match reader.read(&mut buffer) {
-                    Ok(0) => {
-                        // EOF - process has exited
-                        exited_clone.store(true, Ordering::SeqCst);
-                        break;
-                    }
-                    Ok(n) => {
-                        let mut parser = parser_clone.lock().unwrap();
-                        parser.process(&buffer[..n]);
-                    }
-                    Err(_) => {
-                        // Error - process probably exited
-                        exited_clone.store(true, Ordering::SeqCst);
-                        break;
-                    }
-                }
-            }
-        });
-
-        // Spawn the command
+        // Spawn the command before taking the writer, so we have the slave end
         let cmd_str = &command[0];
         let args = &command[1..];
         let mut cmd = CommandBuilder::new(cmd_str);
@@ -77,7 +107,44 @@ impl PseudoTerminal {
         // We drop _child here, it runs in background.
         // In a real app we might want to keep it to check exit status.
 
-        let writer = pair.master.take_writer()?;
+        let writer: Arc<Mutex<Box<dyn Write + Send>>> =
+            Arc::new(Mutex::new(pair.master.take_writer()?));
+        let writer_clone = writer.clone();
+
+        // Spawn a background thread to read from PTY, update the parser,
+        // and write back responses for terminal queries (DSR/CPR, DA)
+        thread::spawn(move || {
+            let mut buffer = [0u8; 4096];
+            loop {
+                match reader.read(&mut buffer) {
+                    Ok(0) => {
+                        // EOF - process has exited
+                        exited_clone.store(true, Ordering::SeqCst);
+                        break;
+                    }
+                    Ok(n) => {
+                        let responses = {
+                            let mut parser = parser_clone.lock().unwrap();
+                            parser.process(&buffer[..n]);
+                            parser.callbacks_mut().drain_responses()
+                        };
+                        if !responses.is_empty() {
+                            if let Ok(mut w) = writer_clone.lock() {
+                                for response in responses {
+                                    let _ = w.write_all(&response);
+                                }
+                                let _ = w.flush();
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Error - process probably exited
+                        exited_clone.store(true, Ordering::SeqCst);
+                        break;
+                    }
+                }
+            }
+        });
 
         Ok(Self {
             parser,
@@ -117,8 +184,9 @@ impl PseudoTerminal {
                 screen.set_scrollback(0);
             }
         }
-        self.writer.write_all(input)?;
-        self.writer.flush()?;
+        let mut writer = self.writer.lock().unwrap();
+        writer.write_all(input)?;
+        writer.flush()?;
         Ok(())
     }
 
