@@ -64,6 +64,7 @@ No overhead. Maximum performance. Built by a developer, for developers.
 - Claude fullscreen mode when all panes hidden (F1/F2/F5/F6 toggles)
 - **Interactive pane resizing** - drag pane borders with mouse
 - **Horizontal scrolling** - in Preview and Edit mode for long lines
+- **F9 Copy Last N Lines** - copy last N terminal lines to clipboard (configurable, default 50)
 - **Self-update** - automatic update check from GitHub Releases
 - Mouse and keyboard navigation throughout
 
@@ -87,7 +88,7 @@ cargo build --release
 | Key | Action |
 |-----|--------|
 | F1-F6 | Switch between panes |
-| F9 | File menu (new, rename, delete, etc.) |
+| F9 | File menu in File Browser / **Copy last N lines** to clipboard in Terminal panes |
 | F12 | Help (full shortcut reference) |
 | Ctrl+P | Fuzzy file finder |
 | Ctrl+Q | Quit |
@@ -96,6 +97,15 @@ cargo build --release
 | Ctrl+C | Copy selection to System Clipboard |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
+
+### What's New in v0.59.0
+
+**F9 „Copy Last N Lines"** — Press F9 in any terminal pane (Claude, LazyGit, Terminal) to copy the last N lines of output to the system clipboard. Configurable via `pty.copy_lines_count` (default: 50). Footer shows a green „✓ N lines" flash for 2 seconds. F9 in the File Browser still opens the file menu as before.
+
+```yaml
+pty:
+  copy_lines_count: 50  # Increase for longer outputs, e.g. 100 or 200
+```
 
 ### Configuration
 
@@ -201,6 +211,7 @@ Kein Overhead. Maximale Performance. Von einem Entwickler, für Entwickler.
 - Claude Vollbildmodus wenn alle Bereiche ausgeblendet (F1/F2/F5/F6 Umschaltung)
 - **Interaktives Pane-Resizing** - Bereichsgrenzen per Maus ziehen
 - **Horizontales Scrollen** - in Vorschau und Editor für lange Zeilen
+- **F9 Letzte N Zeilen kopieren** - letzten N Terminal-Zeilen ins Clipboard kopieren (konfigurierbar, Standard 50)
 - **Selbst-Update** - automatische Update-Prüfung von GitHub Releases
 - Maus- und Tastaturnavigation durchgehend
 
@@ -224,7 +235,7 @@ cargo build --release
 | Taste | Aktion |
 |-------|--------|
 | F1-F6 | Zwischen Bereichen wechseln |
-| F9 | Datei-Menü (neu, umbenennen, löschen, etc.) |
+| F9 | Datei-Menü im Dateibrowser / **Letzte N Zeilen kopieren** in Terminal-Bereichen |
 | F12 | Hilfe (vollständige Shortcut-Referenz) |
 | Ctrl+P | Fuzzy-Dateisuche |
 | Ctrl+Q | Beenden |
@@ -233,6 +244,15 @@ cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.59.0
+
+**F9 „Letzte N Zeilen kopieren"** — F9 in einem Terminal-Bereich (Claude, LazyGit, Terminal) kopiert die letzten N Ausgabe-Zeilen in die Zwischenablage. Konfigurierbar über `pty.copy_lines_count` (Standard: 50). Der Footer zeigt 2 Sekunden lang einen grünen „✓ N Zeilen"-Flash. F9 im Dateibrowser öffnet weiterhin das Datei-Menü.
+
+```yaml
+pty:
+  copy_lines_count: 50  # Für längere Ausgaben erhöhen, z.B. 100 oder 200
+```
 
 ### Konfiguration
 
