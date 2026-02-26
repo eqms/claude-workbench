@@ -1,5 +1,14 @@
 # Release Notes
 
+## Version 0.59.1 (26.02.2026)
+
+### Fixed
+- **Terminal-Kopie verliert Leerzeichen**: Beim Kopieren von Text aus Terminal-Panes
+  (Maus-Selektion und F9 „Copy Last N Lines") wurden Leerzeichen zwischen Wörtern
+  entfernt. Ursache: Die vt100-Crate gibt für Space-Zellen `""` statt `" "` zurück.
+  Fix: Helper-Methode `push_cell_content()` ersetzt leere Zellinhalte durch Leerzeichen
+  in `extract_lines()`, `extract_last_n_lines()` und `extract_char_range()`.
+
 ## Version 0.59.0 (25.02.2026)
 
 ### Added

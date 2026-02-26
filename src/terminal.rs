@@ -208,6 +208,18 @@ impl PseudoTerminal {
         }
     }
 
+    /// Push cell content to line, treating empty cells as spaces.
+    /// The vt100 crate returns "" for space cells (len=0), so we
+    /// must fall back to ' ' to preserve whitespace between words.
+    fn push_cell_content(line: &mut String, cell: &vt100::Cell) {
+        let text = cell.contents();
+        if text.is_empty() {
+            line.push(' ');
+        } else {
+            line.push_str(text);
+        }
+    }
+
     /// Extract text content from specified line range (screen-relative, 0-based)
     /// Returns lines as strings with trailing whitespace trimmed
     pub fn extract_lines(&self, start: usize, end: usize) -> Vec<String> {
@@ -224,7 +236,7 @@ impl PseudoTerminal {
             let mut line = String::new();
             for col in 0..cols {
                 if let Some(cell) = screen.cell(row as u16, col) {
-                    line.push_str(cell.contents());
+                    Self::push_cell_content(&mut line, cell);
                 }
             }
             // Trim trailing whitespace but preserve leading
@@ -257,7 +269,7 @@ impl PseudoTerminal {
             let mut line = String::new();
             for col in 0..cols {
                 if let Some(cell) = screen.cell(row as u16, col) {
-                    line.push_str(cell.contents());
+                    Self::push_cell_content(&mut line, cell);
                 }
             }
             lines.push(line.trim_end().to_string());
@@ -305,7 +317,7 @@ impl PseudoTerminal {
                     break;
                 }
                 if let Some(cell) = screen.cell(row as u16, col as u16) {
-                    line.push_str(cell.contents());
+                    Self::push_cell_content(&mut line, cell);
                 }
             }
 
