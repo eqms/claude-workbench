@@ -127,7 +127,10 @@ impl App {
         if should_show_permission_dialog {
             // Delay Claude PTY creation until permission mode is selected
             claude_pty_pending = true;
-            permission_mode_dialog.open_with_default(config.claude.default_permission_mode);
+            permission_mode_dialog.open_with_default(
+                config.claude.default_permission_mode,
+                config.claude.remote_control,
+            );
             claude_command_str = String::new();
         } else {
             // Use configured default permission mode or Default
@@ -381,6 +384,11 @@ impl App {
 
         // Only add permission flags if using claude command (not shell)
         if !config.pty.claude_command.is_empty() {
+            // Remote control: insert subcommand after base command
+            if config.claude.remote_control {
+                cmd.push("remote-control".to_string());
+            }
+
             if mode.is_yolo() {
                 // YOLO mode: --dangerously-skip-permissions flag
                 if !cmd
@@ -438,8 +446,10 @@ impl App {
 
         if should_show_permission_dialog {
             self.claude_pty_pending = true;
-            self.permission_mode_dialog
-                .open_with_default(self.config.claude.default_permission_mode);
+            self.permission_mode_dialog.open_with_default(
+                self.config.claude.default_permission_mode,
+                self.config.claude.remote_control,
+            );
         } else {
             let mode = self
                 .config
@@ -1888,13 +1898,19 @@ impl App {
                                     KeyCode::Enter => {
                                         // Confirm selected mode and save to config
                                         let mode = self.permission_mode_dialog.selected_mode();
+                                        let remote = self.permission_mode_dialog.remote_control;
                                         self.permission_mode_dialog.confirm();
                                         self.config.claude.default_permission_mode = Some(mode);
+                                        self.config.claude.remote_control = remote;
                                         let _ = crate::config::save_config(&self.config);
                                         if self.claude_pty_pending {
                                             self.init_claude_pty(mode);
                                         }
                                         self.active_pane = PaneId::Claude;
+                                    }
+                                    KeyCode::Char(' ') => {
+                                        // Toggle remote control checkbox
+                                        self.permission_mode_dialog.toggle_remote_control();
                                     }
                                     KeyCode::Up | KeyCode::Char('k') => {
                                         self.permission_mode_dialog.prev()

@@ -87,6 +87,9 @@ pub struct ClaudeConfig {
     /// Show permission mode selection dialog at startup (default: true)
     #[serde(default = "default_show_permission_dialog")]
     pub show_permission_dialog: bool,
+    /// Enable remote control mode (claude remote-control) for session sharing
+    #[serde(default)]
+    pub remote_control: bool,
 }
 
 impl Default for ClaudeConfig {
@@ -95,6 +98,7 @@ impl Default for ClaudeConfig {
             startup_prefixes: Vec::new(),
             default_permission_mode: None,
             show_permission_dialog: true, // Dialog is shown by default
+            remote_control: false,
         }
     }
 }

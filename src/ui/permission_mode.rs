@@ -14,21 +14,32 @@ pub struct PermissionModeState {
     pub visible: bool,
     pub selected: usize,
     pub confirmed: bool,
+    /// Remote control toggle state
+    pub remote_control: bool,
+    /// Last highlighted mode index (for when cursor is on toggle row)
+    last_mode_index: usize,
 }
 
 impl PermissionModeState {
     /// Open the dialog
     pub fn open(&mut self) {
-        self.open_with_default(None);
+        self.open_with_default(None, false);
     }
 
-    /// Open the dialog with a pre-selected default mode
-    pub fn open_with_default(&mut self, default: Option<ClaudePermissionMode>) {
+    /// Open the dialog with a pre-selected default mode and remote control state
+    pub fn open_with_default(
+        &mut self,
+        default: Option<ClaudePermissionMode>,
+        remote_control: bool,
+    ) {
         self.visible = true;
         self.confirmed = false;
-        self.selected = default
+        self.remote_control = remote_control;
+        let idx = default
             .and_then(|mode| ClaudePermissionMode::all().iter().position(|m| *m == mode))
             .unwrap_or(0);
+        self.selected = idx;
+        self.last_mode_index = idx;
     }
 
     /// Close the dialog without confirming
@@ -47,21 +58,44 @@ impl PermissionModeState {
     pub fn prev(&mut self) {
         if self.selected > 0 {
             self.selected -= 1;
+            if !self.is_on_toggle() {
+                self.last_mode_index = self.selected;
+            }
         }
     }
 
     /// Move selection down
     pub fn next(&mut self) {
-        let modes = ClaudePermissionMode::all();
-        if self.selected < modes.len().saturating_sub(1) {
+        let max_index = ClaudePermissionMode::all().len(); // modes.len() = toggle row
+        if self.selected < max_index {
             self.selected += 1;
+            if !self.is_on_toggle() {
+                self.last_mode_index = self.selected;
+            }
+        }
+    }
+
+    /// Check if the remote control toggle row is selected
+    pub fn is_on_toggle(&self) -> bool {
+        self.selected == ClaudePermissionMode::all().len()
+    }
+
+    /// Toggle remote control state (only when on toggle row)
+    pub fn toggle_remote_control(&mut self) {
+        if self.is_on_toggle() {
+            self.remote_control = !self.remote_control;
         }
     }
 
     /// Get the selected permission mode
     pub fn selected_mode(&self) -> ClaudePermissionMode {
         let modes = ClaudePermissionMode::all();
-        modes.get(self.selected).copied().unwrap_or_default()
+        let idx = if self.is_on_toggle() {
+            self.last_mode_index
+        } else {
+            self.selected
+        };
+        modes.get(idx).copied().unwrap_or_default()
     }
 }
 
@@ -73,9 +107,9 @@ pub fn render(frame: &mut Frame, area: Rect, state: &PermissionModeState) {
 
     let modes = ClaudePermissionMode::all();
 
-    // Calculate popup size
+    // Calculate popup size (extra space for separator + toggle + spacing)
     let popup_width: u16 = 68;
-    let popup_height: u16 = (modes.len() as u16 + 8).min(20);
+    let popup_height: u16 = (modes.len() as u16 + 11).min(22);
 
     // Center the popup
     let popup_x = area.x + (area.width.saturating_sub(popup_width)) / 2;
@@ -85,10 +119,11 @@ pub fn render(frame: &mut Frame, area: Rect, state: &PermissionModeState) {
     // Clear background
     frame.render_widget(Clear, popup_area);
 
-    // Create layout
+    // Create layout with toggle section
     let chunks = Layout::vertical([
         Constraint::Length(3), // Title + instruction
-        Constraint::Min(1),    // List
+        Constraint::Min(1),    // Mode list
+        Constraint::Length(3), // Separator + toggle
         Constraint::Length(2), // Footer
     ])
     .split(popup_area);
@@ -181,16 +216,71 @@ pub fn render(frame: &mut Frame, area: Rect, state: &PermissionModeState) {
     let list = List::new(items);
     frame.render_widget(list, list_area);
 
+    // Toggle section: separator line + remote control checkbox
+    let toggle_area = Rect::new(
+        chunks[2].x + 1,
+        chunks[2].y,
+        chunks[2].width.saturating_sub(2),
+        chunks[2].height,
+    );
+
+    let on_toggle = state.is_on_toggle();
+    let separator = "─".repeat(toggle_area.width.saturating_sub(1) as usize);
+    let checkbox = if state.remote_control { "x" } else { " " };
+    let selector = if on_toggle { "▸ " } else { "  " };
+
+    let toggle_style = Style::default()
+        .fg(if on_toggle {
+            Color::Yellow
+        } else {
+            Color::White
+        })
+        .add_modifier(if on_toggle {
+            Modifier::BOLD
+        } else {
+            Modifier::empty()
+        });
+
+    let toggle_lines = vec![
+        Line::from(Span::styled(
+            separator,
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(vec![
+            Span::styled(
+                selector,
+                Style::default().fg(if on_toggle {
+                    Color::Yellow
+                } else {
+                    Color::DarkGray
+                }),
+            ),
+            Span::styled(format!("[{}] ", checkbox), toggle_style),
+            Span::styled("Remote Control", toggle_style),
+            Span::styled(
+                " - Session von anderen Geräten",
+                Style::default().fg(Color::Gray),
+            ),
+        ]),
+    ];
+    let toggle_paragraph = Paragraph::new(toggle_lines);
+    frame.render_widget(toggle_paragraph, toggle_area);
+
     // Footer with controls
     let footer_area = Rect::new(
-        chunks[2].x + 2,
-        chunks[2].y,
-        chunks[2].width.saturating_sub(4),
+        chunks[3].x + 2,
+        chunks[3].y,
+        chunks[3].width.saturating_sub(4),
         1,
     );
     let footer = Line::from(vec![
         Span::styled(" Enter ", Style::default().bg(Color::Cyan).fg(Color::Black)),
         Span::raw(" Wählen  "),
+        Span::styled(
+            " Space ",
+            Style::default().bg(Color::DarkGray).fg(Color::White),
+        ),
+        Span::raw(" Toggle  "),
         Span::styled(
             " Esc ",
             Style::default().bg(Color::DarkGray).fg(Color::White),
@@ -200,7 +290,7 @@ pub fn render(frame: &mut Frame, area: Rect, state: &PermissionModeState) {
             " ↑↓ ",
             Style::default().bg(Color::DarkGray).fg(Color::White),
         ),
-        Span::raw(" Navigieren"),
+        Span::raw(" Nav"),
     ]);
     frame.render_widget(Paragraph::new(footer), footer_area);
 }
