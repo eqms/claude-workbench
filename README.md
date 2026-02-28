@@ -71,13 +71,15 @@ No overhead. Maximum performance. Built by a developer, for developers.
 ### Quick Start
 
 ```bash
-# Download for your platform from Releases
-# https://github.com/eqms/claude-workbench/releases
+# Install via Homebrew (macOS / Linux)
+brew install eqms/claude-workbench/claude-workbench
+
+# Or use the installer script
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
 
 # Or build from source
 git clone https://github.com/eqms/claude-workbench.git
-cd claude-workbench
-cargo build --release
+cd claude-workbench && cargo build --release
 ./target/release/claude-workbench
 ```
 
@@ -232,13 +234,15 @@ Kein Overhead. Maximale Performance. Von einem Entwickler, für Entwickler.
 ### Schnellstart
 
 ```bash
-# Binary für Ihre Plattform von Releases herunterladen
-# https://github.com/eqms/claude-workbench/releases
+# Installation via Homebrew (macOS / Linux)
+brew install eqms/claude-workbench/claude-workbench
+
+# Oder Installer-Skript verwenden
+curl -fsSL https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install.sh | bash
 
 # Oder aus Quellcode bauen
 git clone https://github.com/eqms/claude-workbench.git
-cd claude-workbench
-cargo build --release
+cd claude-workbench && cargo build --release
 ./target/release/claude-workbench
 ```
 

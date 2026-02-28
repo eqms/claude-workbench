@@ -21,6 +21,16 @@ irm https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install
 
 **Or download manually** from the [Releases](https://github.com/eqms/claude-workbench/releases) page.
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew install eqms/claude-workbench/claude-workbench
+```
+
+To update: `brew upgrade claude-workbench`
+
+Homebrew handles macOS quarantine removal automatically.
+
 ### Installer Options
 
 The install scripts support several options:
@@ -213,6 +223,16 @@ irm https://raw.githubusercontent.com/eqms/claude-workbench/main/scripts/install
 ```
 
 **Oder manuell herunterladen** von der [Releases](https://github.com/eqms/claude-workbench/releases)-Seite.
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew install eqms/claude-workbench/claude-workbench
+```
+
+Zum Aktualisieren: `brew upgrade claude-workbench`
+
+Homebrew entfernt die macOS-Quarantäne automatisch.
 
 ### Installer-Optionen
 

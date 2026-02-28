@@ -189,6 +189,11 @@ jobs:
 
             ### Installation
 
+            **Homebrew (macOS / Linux):**
+            ```bash
+            brew install eqms/claude-workbench/claude-workbench
+            ```
+
             **Unix (Linux/macOS):**
             ```bash
             # Download and extract
