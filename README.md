@@ -98,9 +98,13 @@ cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.60.1
+
+**Remote Control Fix** — The `remote-control` subcommand was removed (not a valid Claude CLI command). When Remote Control is enabled, the workbench now automatically sends a Space key 2 seconds after Claude starts, triggering the QR code display for remote access.
+
 ### What's New in v0.60.0
 
-**Remote Control Toggle** — The Permission Mode dialog now includes a Remote Control checkbox below the 5 permission modes. When enabled, Claude Code starts in remote control mode (`claude remote-control`), allowing the session to be continued from other devices (browser, phone). Toggle with Space, the setting is persisted in `config.yaml`.
+**Remote Control Toggle** — The Permission Mode dialog now includes a Remote Control checkbox below the 5 permission modes. When enabled, the QR code for remote access is automatically displayed after Claude starts. Toggle with Space, the setting is persisted in `config.yaml`.
 
 ```yaml
 claude:
@@ -144,7 +148,7 @@ file_browser:
 
 # Optional: Claude startup prefixes and remote control
 claude:
-  remote_control: false  # Start with remote-control subcommand
+  remote_control: false  # Auto-show QR code for remote access after start
   startup_prefixes:
     - name: "Code Review"
       prefix: "/review"
@@ -255,9 +259,13 @@ cargo build --release
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
 
+### Neu in v0.60.1
+
+**Remote Control Fix** — Der `remote-control` Subcommand wurde entfernt (kein gültiger Claude CLI-Befehl). Bei aktiviertem Remote Control wird nun automatisch 2 Sekunden nach Claude-Start die Leertaste gesendet, um den QR-Code für den Remote-Zugriff anzuzeigen.
+
 ### Neu in v0.60.0
 
-**Remote Control Toggle** — Der Berechtigungsmodus-Dialog enthält nun eine Remote Control Checkbox unterhalb der 5 Modi. Wenn aktiviert, startet Claude Code im Remote Control Modus (`claude remote-control`), sodass die Session von anderen Geräten (Browser, Handy) weitergenutzt werden kann. Umschalten mit Leertaste, die Einstellung wird in `config.yaml` gespeichert.
+**Remote Control Toggle** — Der Berechtigungsmodus-Dialog enthält nun eine Remote Control Checkbox unterhalb der 5 Modi. Wenn aktiviert, wird der QR-Code für den Remote-Zugriff automatisch nach dem Claude-Start angezeigt. Umschalten mit Leertaste, die Einstellung wird in `config.yaml` gespeichert.
 
 ```yaml
 claude:
@@ -301,7 +309,7 @@ file_browser:
 
 # Optional: Claude Startup-Präfixe und Remote Control
 claude:
-  remote_control: false  # Mit remote-control Subcommand starten
+  remote_control: false  # QR-Code für Remote-Zugriff automatisch anzeigen
   startup_prefixes:
     - name: "Code Review"
       prefix: "/review"

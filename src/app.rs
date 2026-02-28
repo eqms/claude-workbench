@@ -101,6 +101,8 @@ pub struct App {
     // Flash state for F9 "✓ N Zeilen" copy indicator (2s duration)
     pub last_copy_time: Option<std::time::Instant>,
     pub copy_flash_lines: usize,
+    // Timer for auto-sending Space to Claude PTY to show QR code (remote control)
+    pub remote_space_timer: Option<std::time::Instant>,
 }
 
 impl App {
@@ -116,6 +118,7 @@ impl App {
         let mut claude_pty_pending = false;
         let mut permission_mode_dialog = ui::permission_mode::PermissionModeState::default();
         let mut claude_permission_mode = ClaudePermissionMode::Default;
+        let mut remote_space_timer: Option<std::time::Instant> = None;
 
         // Determine if we should show permission mode dialog
         // Don't show if wizard needs to run first (first-time setup)
@@ -146,6 +149,10 @@ impl App {
             match PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
                 Ok(pty) => {
                     terminals.insert(PaneId::Claude, pty);
+                    // Start timer for auto-Space to show QR code when remote control is enabled
+                    if config.claude.remote_control {
+                        remote_space_timer = Some(std::time::Instant::now());
+                    }
                 }
                 Err(e) => {
                     claude_error = Some(format!(
@@ -230,6 +237,7 @@ impl App {
             last_autosave_time: None,
             last_copy_time: None,
             copy_flash_lines: 0,
+            remote_space_timer,
         };
 
         // Open wizard on first run
@@ -384,11 +392,6 @@ impl App {
 
         // Only add permission flags if using claude command (not shell)
         if !config.pty.claude_command.is_empty() {
-            // Remote control: insert subcommand after base command
-            if config.claude.remote_control {
-                cmd.push("remote-control".to_string());
-            }
-
             if mode.is_yolo() {
                 // YOLO mode: --dangerously-skip-permissions flag
                 if !cmd
@@ -425,6 +428,10 @@ impl App {
             Ok(pty) => {
                 self.terminals.insert(PaneId::Claude, pty);
                 self.claude_error = None;
+                // Start timer for auto-Space to show QR code when remote control is enabled
+                if self.config.claude.remote_control {
+                    self.remote_space_timer = Some(std::time::Instant::now());
+                }
             }
             Err(e) => {
                 self.claude_error = Some(format!(
@@ -500,6 +507,16 @@ impl App {
             // Poll for async update check and update results
             self.poll_update_check();
             self.poll_update_result();
+
+            // Auto-send Space to Claude PTY to show QR code (remote control)
+            if let Some(timer) = self.remote_space_timer {
+                if timer.elapsed() >= std::time::Duration::from_secs(2) {
+                    if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
+                        let _ = pty.write_input(b" ");
+                    }
+                    self.remote_space_timer = None;
+                }
+            }
 
             terminal.draw(|frame| self.draw(frame))?;
 

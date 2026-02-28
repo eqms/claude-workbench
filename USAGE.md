@@ -166,7 +166,7 @@ At startup, a dialog lets you choose the Claude Code permission mode. Below the 
 | Space | Toggle Remote Control checkbox |
 | Esc | Use default mode |
 
-When Remote Control is enabled, Claude Code starts with the `remote-control` subcommand (`claude remote-control --permission-mode X`), allowing the session to be accessed from other devices (browser, phone). The setting is saved in `config.yaml` under `claude.remote_control`.
+When Remote Control is enabled, the workbench automatically sends a Space key 2 seconds after Claude starts, triggering the QR code display for remote access. The session can then be accessed from other devices (browser, phone). The setting is saved in `config.yaml` under `claude.remote_control`.
 
 ### File Browser Features
 
@@ -406,7 +406,7 @@ Beim Start erscheint ein Dialog zur Auswahl des Claude Code Berechtigungsmodus. 
 | Leertaste | Remote Control Checkbox umschalten |
 | Esc | Standard-Modus verwenden |
 
-Wenn Remote Control aktiviert ist, startet Claude Code mit dem `remote-control` Subcommand (`claude remote-control --permission-mode X`), sodass die Session von anderen Geräten (Browser, Handy) zugänglich ist. Die Einstellung wird in `config.yaml` unter `claude.remote_control` gespeichert.
+Wenn Remote Control aktiviert ist, sendet die Workbench automatisch 2 Sekunden nach dem Claude-Start die Leertaste, um den QR-Code für den Remote-Zugriff anzuzeigen. Die Session kann dann von anderen Geräten (Browser, Handy) genutzt werden. Die Einstellung wird in `config.yaml` unter `claude.remote_control` gespeichert.
 
 ### Dateibrowser-Funktionen
 

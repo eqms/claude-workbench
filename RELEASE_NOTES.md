@@ -1,12 +1,19 @@
 # Release Notes
 
+## Version 0.60.1 (28.02.2026)
+
+### Fixed
+- **Remote Control Toggle**: `claude remote-control` ist kein gültiger CLI-Subcommand.
+  Der ungültige Subcommand wurde entfernt. Stattdessen wird nach dem Claude-Start
+  automatisch nach 2 Sekunden die Leertaste gesendet, um den QR-Code für den
+  Remote-Zugriff anzuzeigen.
+
 ## Version 0.60.0 (28.02.2026)
 
 ### Added
 - **Remote Control Toggle** im Permission Mode Dialog: Neue Checkbox unterhalb der
-  5 Permission-Modi erlaubt es, Claude Code im Remote Control Modus zu starten
-  (`claude remote-control`). Session kann dann von anderen Geräten (Browser, Handy)
-  weitergenutzt werden.
+  5 Permission-Modi erlaubt es, Claude Code im Remote Control Modus zu starten.
+  Session kann dann von anderen Geräten (Browser, Handy) weitergenutzt werden.
 - **Space-Taste** schaltet den Remote Control Toggle im Dialog um.
 - **Config-Persistierung**: `remote_control: true/false` wird in `config.yaml` gespeichert
   und beim nächsten Start wiederhergestellt.
