@@ -98,6 +98,15 @@ cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.60.0
+
+**Remote Control Toggle** — The Permission Mode dialog now includes a Remote Control checkbox below the 5 permission modes. When enabled, Claude Code starts in remote control mode (`claude remote-control`), allowing the session to be continued from other devices (browser, phone). Toggle with Space, the setting is persisted in `config.yaml`.
+
+```yaml
+claude:
+  remote_control: true  # Enable remote control mode (default: false)
+```
+
 ### What's New in v0.59.0
 
 **F9 „Copy Last N Lines"** — Press F9 in any terminal pane (Claude, LazyGit, Terminal) to copy the last N lines of output to the system clipboard. Configurable via `pty.copy_lines_count` (default: 50). Footer shows a green „✓ N lines" flash for 2 seconds. F9 in the File Browser still opens the file menu as before.
@@ -133,8 +142,9 @@ file_browser:
   date_format: "%d.%m.%Y %H:%M:%S"
   auto_refresh_ms: 2000
 
-# Optional: Claude startup prefixes
+# Optional: Claude startup prefixes and remote control
 claude:
+  remote_control: false  # Start with remote-control subcommand
   startup_prefixes:
     - name: "Code Review"
       prefix: "/review"
@@ -245,6 +255,15 @@ cargo build --release
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
 
+### Neu in v0.60.0
+
+**Remote Control Toggle** — Der Berechtigungsmodus-Dialog enthält nun eine Remote Control Checkbox unterhalb der 5 Modi. Wenn aktiviert, startet Claude Code im Remote Control Modus (`claude remote-control`), sodass die Session von anderen Geräten (Browser, Handy) weitergenutzt werden kann. Umschalten mit Leertaste, die Einstellung wird in `config.yaml` gespeichert.
+
+```yaml
+claude:
+  remote_control: true  # Remote Control Modus aktivieren (Standard: false)
+```
+
 ### Neu in v0.59.0
 
 **F9 „Letzte N Zeilen kopieren"** — F9 in einem Terminal-Bereich (Claude, LazyGit, Terminal) kopiert die letzten N Ausgabe-Zeilen in die Zwischenablage. Konfigurierbar über `pty.copy_lines_count` (Standard: 50). Der Footer zeigt 2 Sekunden lang einen grünen „✓ N Zeilen"-Flash. F9 im Dateibrowser öffnet weiterhin das Datei-Menü.
@@ -280,8 +299,9 @@ file_browser:
   date_format: "%d.%m.%Y %H:%M:%S"
   auto_refresh_ms: 2000
 
-# Optional: Claude Startup-Präfixe
+# Optional: Claude Startup-Präfixe und Remote Control
 claude:
+  remote_control: false  # Mit remote-control Subcommand starten
   startup_prefixes:
     - name: "Code Review"
       prefix: "/review"

@@ -155,6 +155,19 @@ pty:
 
 When all upper panes (File Browser, Preview, LazyGit, Terminal) are hidden, Claude Code automatically uses the full screen. Toggle panes with F1, F2, F5, F6 to enter/exit fullscreen mode.
 
+### Permission Mode Dialog
+
+At startup, a dialog lets you choose the Claude Code permission mode. Below the 5 modes, a **Remote Control** toggle is available.
+
+| Key | Action |
+|-----|--------|
+| ↑/↓ | Navigate between modes and toggle |
+| Enter | Confirm selection |
+| Space | Toggle Remote Control checkbox |
+| Esc | Use default mode |
+
+When Remote Control is enabled, Claude Code starts with the `remote-control` subcommand (`claude remote-control --permission-mode X`), allowing the session to be accessed from other devices (browser, phone). The setting is saved in `config.yaml` under `claude.remote_control`.
+
 ### File Browser Features
 
 #### Git Status Integration
@@ -381,6 +394,19 @@ pty:
 ### Claude Vollbildmodus
 
 Wenn alle oberen Bereiche (Dateibrowser, Vorschau, LazyGit, Terminal) ausgeblendet sind, nutzt Claude Code automatisch den gesamten Bildschirm. Bereiche mit F1, F2, F5, F6 ein-/ausblenden um den Vollbildmodus zu aktivieren/deaktivieren.
+
+### Berechtigungsmodus-Dialog
+
+Beim Start erscheint ein Dialog zur Auswahl des Claude Code Berechtigungsmodus. Unterhalb der 5 Modi befindet sich ein **Remote Control** Toggle.
+
+| Taste | Aktion |
+|-------|--------|
+| ↑/↓ | Zwischen Modi und Toggle navigieren |
+| Enter | Auswahl bestätigen |
+| Leertaste | Remote Control Checkbox umschalten |
+| Esc | Standard-Modus verwenden |
+
+Wenn Remote Control aktiviert ist, startet Claude Code mit dem `remote-control` Subcommand (`claude remote-control --permission-mode X`), sodass die Session von anderen Geräten (Browser, Handy) zugänglich ist. Die Einstellung wird in `config.yaml` unter `claude.remote_control` gespeichert.
 
 ### Dateibrowser-Funktionen
 
