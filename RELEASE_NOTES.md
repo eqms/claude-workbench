@@ -1,5 +1,13 @@
 # Release Notes
 
+## Version 0.62.0 (28.02.2026)
+
+### Fixed
+- **Remote Control**: Claude wird jetzt normal interaktiv gestartet (mit `--permission-mode`),
+  anstatt als `claude remote-control` Server-Modus. Nach 4 Sekunden Startup-Delay wird
+  `/remote-control` als Slash-Command an das Claude PTY gesendet. So wird Remote Control
+  innerhalb einer interaktiven Session aktiviert, ohne "Start Session Block" Error.
+
 ## Version 0.60.1 (28.02.2026)
 
 ### Fixed
