@@ -178,7 +178,7 @@ pub fn get_context_button_positions(
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
-            ("F9", "CopyLast", FooterAction::CopyLastLines),
+            ("F9/\u{21e7}9", "Copy", FooterAction::CopyLastLines),
             ("^P", "Find", FooterAction::FuzzyFind),
             ("F12", "Help", FooterAction::Help),
         ]
@@ -267,7 +267,7 @@ impl Widget for Footer {
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
-                ("F9", "CopyLast"),
+                ("F9/\u{21e7}9", "Copy"),
                 ("^P", "Find"),
                 ("F12", "Help"),
             ]

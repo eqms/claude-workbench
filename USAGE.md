@@ -24,6 +24,7 @@
 | F7 | Claude Settings (~/.claude) |
 | F8 | Settings |
 | F9 | File Menu (File Browser) / Copy last N lines to clipboard (Terminal panes) |
+| Shift+F9 | Copy last N lines with interactive count input (Terminal panes) |
 | F10 | About |
 | F12 | Help |
 | Esc | Close Dialogs/Help |
@@ -113,6 +114,7 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 | \\ + Enter | Insert newline in Claude Code (F4) |
 | Ctrl+S | Start selection |
 | F9 | Copy last N lines to clipboard (N = `pty.copy_lines_count`, default 50) |
+| Shift+F9 | Copy last N lines with interactive count input |
 | Shift+PgUp/PgDn | Scroll 10 lines |
 | Shift+Up/Down | Scroll 1 line |
 | Alt+Left/Right | Word navigation |
@@ -138,6 +140,8 @@ Configure the number of lines in `config.yaml`:
 pty:
   copy_lines_count: 50  # Default: 50. Increase for longer outputs (e.g. 100, 200)
 ```
+
+Press **Shift+F9** to open an input dialog where you can enter a custom line count. The dialog pre-fills with the configured default value.
 
 **Note:** F9 in the File Browser still opens the File Menu — the key is context-sensitive.
 
@@ -264,6 +268,7 @@ When copying to Claude, output is automatically filtered:
 | F7 | Claude Einstellungen (~/.claude) |
 | F8 | Einstellungen |
 | F9 | Datei-Menü (Dateibrowser) / Letzte N Zeilen ins Clipboard kopieren (Terminal-Bereiche) |
+| Shift+F9 | Letzte N Zeilen mit interaktiver Eingabe kopieren (Terminal-Bereiche) |
 | F10 | Über |
 | F12 | Hilfe |
 | Esc | Dialoge/Hilfe schließen |
@@ -353,6 +358,7 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | \\ + Enter | Zeilenumbruch im Claude Code (F4) |
 | Ctrl+S | Auswahl starten |
 | F9 | Letzte N Zeilen ins Clipboard kopieren (N = `pty.copy_lines_count`, Standard 50) |
+| Shift+F9 | Letzte N Zeilen mit interaktiver Eingabe kopieren |
 | Shift+PgUp/PgDn | 10 Zeilen scrollen |
 | Shift+Up/Down | 1 Zeile scrollen |
 | Alt+Links/Rechts | Wort-Navigation |
@@ -378,6 +384,8 @@ Anzahl der Zeilen in `config.yaml` konfigurieren:
 pty:
   copy_lines_count: 50  # Standard: 50. Für längere Ausgaben erhöhen (z.B. 100, 200)
 ```
+
+Mit **Shift+F9** öffnet sich ein Eingabedialog, in dem eine eigene Zeilenanzahl eingegeben werden kann. Der Dialog ist mit dem konfigurierten Standardwert vorausgefüllt.
 
 **Hinweis:** F9 im Dateibrowser öffnet weiterhin das Datei-Menü — die Taste ist kontextsensitiv.
 

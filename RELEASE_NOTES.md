@@ -1,5 +1,21 @@
 # Release Notes
 
+## Version 0.63.0 (06.03.2026)
+
+### Fixed
+- **Doppelklick-Focus-Bug (Claude Pane)**: Klick auf das Claude-Pane setzt jetzt sofort
+  den Fokus, auch wenn der Startup-Dialog angezeigt wird. Bisher blieb der Fokus auf dem
+  vorherigen Pane, bis ein zweiter Klick erfolgte.
+- **Startup-Dialog blockiert Pane-Wechsel**: Wenn der Claude Startup-Dialog sichtbar war
+  und auf ein anderes Pane (z.B. Terminal) geklickt wurde, erzwang der Dialog-Dismissal
+  den Fokus auf Claude. Jetzt schließt der Klick den Dialog und der Fokus geht korrekt
+  an das angeklickte Pane.
+
+### Added
+- **Shift+F9 Interactive Copy**: Neuer Input-Dialog zur Laufzeit-Eingabe der Zeilenanzahl
+  für "Copy Last N Lines". F9 bleibt schnell (Default aus config.yaml), Shift+F9 öffnet
+  Dialog mit editierbarem Default-Wert.
+
 ## Version 0.62.0 (28.02.2026)
 
 ### Fixed

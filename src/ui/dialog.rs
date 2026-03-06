@@ -51,6 +51,8 @@ pub enum DialogAction {
     GitPull {
         repo_root: std::path::PathBuf,
     },
+    /// Copy last N lines from terminal (line count from dialog input)
+    CopyLastLines,
     /// Navigate to a specific path
     GoToPath,
 }

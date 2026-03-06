@@ -519,9 +519,11 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  F9           ", Style::default().fg(Color::Cyan)),
-            Span::raw(
-                "Copy last N lines to clipboard (N: copy_lines_count in config.yaml, default: 50)",
-            ),
+            Span::raw("Copy last N lines to clipboard (default from config.yaml)"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Shift+F9     ", Style::default().fg(Color::Cyan)),
+            Span::raw("Copy last N lines (interactive: enter custom line count)"),
         ]),
         Line::from(""),
         Line::from(Span::styled(

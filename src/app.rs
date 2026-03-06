@@ -650,11 +650,11 @@ impl App {
                                     continue;
                                 }
 
-                                // Claude startup dialog - click outside closes and focuses Claude
+                                // Claude startup dialog - click outside closes it
+                                // Do NOT set active_pane or continue - let click fall through
+                                // to normal pane hit-testing logic
                                 if self.claude_startup.visible {
                                     self.claude_startup.close();
-                                    self.active_pane = PaneId::Claude;
-                                    continue;
                                 }
 
                                 // Setup wizard - block all background clicks
@@ -889,8 +889,8 @@ impl App {
                                     } else {
                                         // Normal click starts character-level mouse text selection
                                         self.mouse_selection.start(PaneId::Claude, x, y, claude);
-                                        self.active_pane = PaneId::Claude;
                                     }
+                                    self.active_pane = PaneId::Claude;
                                 } else if is_inside(lazygit, x, y) {
                                     // Normal click starts character-level mouse text selection
                                     self.mouse_selection.start(PaneId::LazyGit, x, y, lazygit);
@@ -1857,7 +1857,35 @@ impl App {
                                 continue;
                             }
 
-                            if key.code == KeyCode::F(9) {
+                            // Shift+F9: Copy last N lines with interactive count input
+                            if key.code == KeyCode::F(9)
+                                && key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::SHIFT)
+                            {
+                                if matches!(
+                                    self.active_pane,
+                                    PaneId::Claude | PaneId::LazyGit | PaneId::Terminal
+                                ) {
+                                    let default_count =
+                                        self.config.pty.copy_lines_count.to_string();
+                                    let cursor_pos = default_count.chars().count();
+                                    self.dialog.dialog_type = ui::dialog::DialogType::Input {
+                                        title: "Copy last N lines".to_string(),
+                                        value: default_count,
+                                        cursor: cursor_pos,
+                                        action: ui::dialog::DialogAction::CopyLastLines,
+                                    };
+                                }
+                                continue;
+                            }
+
+                            // F9: Copy last N lines (terminal panes) or File Menu (file browser/preview)
+                            if key.code == KeyCode::F(9)
+                                && !key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::SHIFT)
+                            {
                                 if matches!(
                                     self.active_pane,
                                     PaneId::Claude | PaneId::LazyGit | PaneId::Terminal
@@ -3611,6 +3639,15 @@ impl App {
                     }
                 }
             }
+            DialogAction::CopyLastLines => {
+                if let Some(count_str) = value {
+                    if let Ok(count) = count_str.trim().parse::<usize>() {
+                        if count > 0 {
+                            self.copy_last_lines_to_clipboard_n(count);
+                        }
+                    }
+                }
+            }
             DialogAction::GoToPath => {
                 if let Some(path_str) = value {
                     if !path_str.is_empty() {
@@ -3895,6 +3932,10 @@ impl App {
     /// Sets copy flash state for footer indicator.
     fn copy_last_lines_to_clipboard(&mut self) {
         let count = self.config.pty.copy_lines_count;
+        self.copy_last_lines_to_clipboard_n(count);
+    }
+
+    fn copy_last_lines_to_clipboard_n(&mut self, count: usize) {
         let pane = self.active_pane;
         if let Some(pty) = self.terminals.get(&pane) {
             let lines: Vec<String> = pty
