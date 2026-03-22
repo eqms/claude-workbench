@@ -118,6 +118,14 @@ pub struct UiConfig {
     pub theme: String,
     #[serde(default)]
     pub autosave: bool,
+    #[serde(default = "default_true")]
+    pub show_file_browser: bool,
+    #[serde(default)]
+    pub show_terminal: bool,
+    #[serde(default)]
+    pub show_lazygit: bool,
+    #[serde(default = "default_true")]
+    pub show_preview: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -168,6 +176,10 @@ impl Default for Config {
             ui: UiConfig {
                 theme: "default".into(),
                 autosave: false,
+                show_file_browser: true,
+                show_terminal: false,
+                show_lazygit: false,
+                show_preview: true,
             },
             layout: LayoutConfig::default(),
             file_browser: FileBrowserConfig::default(),

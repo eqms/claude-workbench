@@ -1,5 +1,6 @@
 pub mod app;
 pub mod browser;
+pub mod clipboard;
 pub mod config;
 pub mod filter;
 pub mod git;

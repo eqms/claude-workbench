@@ -567,9 +567,7 @@ impl PreviewState {
             // Get the selected text from the yank buffer (which was just populated by editor.copy())
             let yank_text = editor.yank_text();
             if !yank_text.is_empty() {
-                if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    let _ = clipboard.set_text(yank_text.to_string());
-                }
+                crate::clipboard::copy_to_clipboard(&yank_text.to_string());
             }
             // Don't cancel selection after copy - user might want to see what was copied
         }
@@ -595,9 +593,7 @@ impl PreviewState {
             };
 
             if !text_to_copy.is_empty() {
-                if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    let _ = clipboard.set_text(text_to_copy);
-                }
+                crate::clipboard::copy_to_clipboard(&text_to_copy);
             }
 
             self.block_marking = false;
@@ -608,12 +604,8 @@ impl PreviewState {
     /// Paste text from system clipboard at cursor position
     pub fn paste_from_clipboard(&mut self) {
         if let Some(editor) = &mut self.editor {
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                if let Ok(text) = clipboard.get_text() {
-                    if !text.is_empty() {
-                        editor.insert_str(&text);
-                    }
-                }
+            if let Some(text) = crate::clipboard::paste_from_clipboard() {
+                editor.insert_str(&text);
             }
         }
     }

@@ -1,5 +1,33 @@
 # Release Notes
 
+## Version 0.64.0 (22.03.2026)
+
+### Added
+- **Clipboard OSC 52 Fallback**: Clipboard funktioniert jetzt über SSH und auf headless
+  Linux-Systemen (Debian 13 etc.). Arboard wird als Primary verwendet, bei Fehler automatisch
+  OSC 52 Escape Sequences als Fallback. Neues Modul `src/clipboard.rs` konsolidiert alle
+  Clipboard-Operationen.
+- **UI-State Persistenz**: Pane-Sichtbarkeit (F1 FileBrowser, F2 Preview, F5 LazyGit,
+  F6 Terminal) wird in `config.yaml` gespeichert und beim nächsten Start wiederhergestellt.
+- **Ctrl+F9 Alias**: Interaktiver "Copy Last N Lines" Dialog wird jetzt sowohl mit
+  Shift+F9 als auch Ctrl+F9 geöffnet.
+
+### Fixed
+- F9 Copy Flash-Indikator erscheint jetzt immer (auch bei OSC 52 Fallback)
+- Clipboard-Aufrufe in Preview-Editor (copy_block, move_block, paste) nutzen
+  zentrale Clipboard-Utility
+
+## Version 0.63.1 (22.03.2026)
+
+### Fixed
+- **Security Audit**: 5 Findings behoben:
+  1. Shell Injection in `dependency_checker.rs` (shell_escape für Argumente)
+  2. Temp File Leakage (HTML-Preview-Dateien werden bei App-Exit gelöscht)
+  3. Panicking `unwrap()` auf User-Input-Pfad durch `if let` ersetzt
+  4. Path Traversal in New File/Directory/Rename Dialog (Dateinamen-Validierung)
+  5. Supply Chain: `cross` auf v0.2.5 gepinnt in `release.yml`
+- Clippy-Fix: `saturating_sub` in `terminal.rs`
+
 ## Version 0.63.0 (06.03.2026)
 
 ### Fixed

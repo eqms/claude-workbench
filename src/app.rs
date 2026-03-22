@@ -188,6 +188,12 @@ impl App {
         // Check if wizard should open (first run)
         let should_open_wizard = !config.setup.wizard_completed;
 
+        // Read pane visibility from config (before config is moved into struct)
+        let show_file_browser = config.ui.show_file_browser;
+        let show_terminal = config.ui.show_terminal;
+        let show_lazygit = config.ui.show_lazygit;
+        let show_preview = config.ui.show_preview;
+
         let mut app = Self {
             config,
             session,
@@ -198,10 +204,10 @@ impl App {
             file_browser,
             preview: PreviewState::new(),
             help: HelpState::default(),
-            show_file_browser: true,
-            show_terminal: false,
-            show_lazygit: false,
-            show_preview: true,
+            show_file_browser,
+            show_terminal,
+            show_lazygit,
+            show_preview,
             last_refresh: std::time::Instant::now(),
             menu: MenuBar::default(),
             dialog: Dialog::default(),
@@ -920,6 +926,10 @@ impl App {
                                                 FooterAction::ToggleFiles => {
                                                     self.show_file_browser =
                                                         !self.show_file_browser;
+                                                    self.config.ui.show_file_browser =
+                                                        self.show_file_browser;
+                                                    let _ =
+                                                        crate::config::save_config(&self.config);
                                                     if self.show_file_browser {
                                                         self.active_pane = PaneId::FileBrowser;
                                                     } else if self.active_pane
@@ -930,6 +940,9 @@ impl App {
                                                 }
                                                 FooterAction::TogglePreview => {
                                                     self.show_preview = !self.show_preview;
+                                                    self.config.ui.show_preview = self.show_preview;
+                                                    let _ =
+                                                        crate::config::save_config(&self.config);
                                                     if self.show_preview {
                                                         self.active_pane = PaneId::Preview;
                                                     } else if self.active_pane == PaneId::Preview {
@@ -960,12 +973,19 @@ impl App {
                                                 }
                                                 FooterAction::ToggleGit => {
                                                     self.show_lazygit = !self.show_lazygit;
+                                                    self.config.ui.show_lazygit = self.show_lazygit;
+                                                    let _ =
+                                                        crate::config::save_config(&self.config);
                                                     if self.show_lazygit {
                                                         self.active_pane = PaneId::LazyGit;
                                                     }
                                                 }
                                                 FooterAction::ToggleTerm => {
                                                     self.show_terminal = !self.show_terminal;
+                                                    self.config.ui.show_terminal =
+                                                        self.show_terminal;
+                                                    let _ =
+                                                        crate::config::save_config(&self.config);
                                                     if self.show_terminal {
                                                         self.active_pane = PaneId::Terminal;
                                                     }
@@ -1868,11 +1888,14 @@ impl App {
                                 continue;
                             }
 
-                            // Shift+F9: Copy last N lines with interactive count input
+                            // Shift+F9 or Ctrl+F9: Copy last N lines with interactive count input
                             if key.code == KeyCode::F(9)
-                                && key
+                                && (key
                                     .modifiers
                                     .contains(crossterm::event::KeyModifiers::SHIFT)
+                                    || key
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::CONTROL))
                             {
                                 if matches!(
                                     self.active_pane,
@@ -1896,6 +1919,9 @@ impl App {
                                 && !key
                                     .modifiers
                                     .contains(crossterm::event::KeyModifiers::SHIFT)
+                                && !key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL)
                             {
                                 if matches!(
                                     self.active_pane,
@@ -2059,6 +2085,8 @@ impl App {
                             match key.code {
                                 KeyCode::F(1) => {
                                     self.show_file_browser = !self.show_file_browser;
+                                    self.config.ui.show_file_browser = self.show_file_browser;
+                                    let _ = crate::config::save_config(&self.config);
                                     if self.show_file_browser {
                                         self.active_pane = PaneId::FileBrowser;
                                     } else if self.active_pane == PaneId::FileBrowser {
@@ -2067,6 +2095,8 @@ impl App {
                                 }
                                 KeyCode::F(2) => {
                                     self.show_preview = !self.show_preview;
+                                    self.config.ui.show_preview = self.show_preview;
+                                    let _ = crate::config::save_config(&self.config);
                                     if self.show_preview {
                                         self.active_pane = PaneId::Preview;
                                     } else if self.active_pane == PaneId::Preview {
@@ -2091,6 +2121,8 @@ impl App {
                                 KeyCode::F(5) => {
                                     let was_hidden = !self.show_lazygit;
                                     self.show_lazygit = !self.show_lazygit;
+                                    self.config.ui.show_lazygit = self.show_lazygit;
+                                    let _ = crate::config::save_config(&self.config);
                                     if self.show_lazygit {
                                         self.active_pane = PaneId::LazyGit;
                                         // Restart LazyGit in current directory when showing
@@ -2104,6 +2136,8 @@ impl App {
                                 KeyCode::F(6) => {
                                     let was_hidden = !self.show_terminal;
                                     self.show_terminal = !self.show_terminal;
+                                    self.config.ui.show_terminal = self.show_terminal;
+                                    let _ = crate::config::save_config(&self.config);
                                     if self.show_terminal {
                                         self.active_pane = PaneId::Terminal;
                                         // Sync directory when showing terminal
@@ -3508,16 +3542,14 @@ impl App {
             MenuAction::CopyAbsolutePath => {
                 if let Some(selected) = self.file_browser.selected_file() {
                     let path = selected.to_string_lossy().to_string();
-                    let encoded = base64_encode(&path);
-                    print!("\x1b]52;c;{}\x07", encoded);
+                    crate::clipboard::copy_to_clipboard(&path);
                 }
             }
             MenuAction::CopyRelativePath => {
                 if let Some(selected) = self.file_browser.selected_file() {
                     if let Ok(rel) = selected.strip_prefix(&self.file_browser.current_dir) {
                         let path = rel.to_string_lossy().to_string();
-                        let encoded = base64_encode(&path);
-                        print!("\x1b]52;c;{}\x07", encoded);
+                        crate::clipboard::copy_to_clipboard(&path);
                     }
                 }
             }
@@ -3955,9 +3987,7 @@ impl App {
         // Join lines and copy to system clipboard
         let text = lines.join("\n");
 
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            let _ = clipboard.set_text(text);
-        }
+        crate::clipboard::copy_to_clipboard(&text);
     }
 
     /// Copy the last N lines from the active terminal pane to the system clipboard.
@@ -3978,11 +4008,9 @@ impl App {
                 .collect();
             if !lines.is_empty() {
                 let text = lines.join("\n");
-                if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    let _ = clipboard.set_text(text);
-                    self.last_copy_time = Some(std::time::Instant::now());
-                    self.copy_flash_lines = lines.len();
-                }
+                crate::clipboard::copy_to_clipboard(&text);
+                self.last_copy_time = Some(std::time::Instant::now());
+                self.copy_flash_lines = lines.len();
             }
         }
     }
@@ -4059,9 +4087,7 @@ impl App {
         }
 
         // Copy to system clipboard
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            let _ = clipboard.set_text(text);
-        }
+        crate::clipboard::copy_to_clipboard(&text);
     }
 
     /// Position preview editor cursor based on mouse click coordinates
@@ -4247,35 +4273,4 @@ impl App {
             let _ = pty.write_input(escaped.as_bytes());
         }
     }
-}
-
-fn base64_encode(input: &str) -> String {
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let bytes = input.as_bytes();
-    let mut result = String::new();
-
-    for chunk in bytes.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = chunk.get(1).map(|&b| b as u32).unwrap_or(0);
-        let b2 = chunk.get(2).map(|&b| b as u32).unwrap_or(0);
-
-        let n = (b0 << 16) | (b1 << 8) | b2;
-
-        result.push(CHARSET[((n >> 18) & 0x3F) as usize] as char);
-        result.push(CHARSET[((n >> 12) & 0x3F) as usize] as char);
-
-        if chunk.len() > 1 {
-            result.push(CHARSET[((n >> 6) & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
-        }
-
-        if chunk.len() > 2 {
-            result.push(CHARSET[(n & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
-        }
-    }
-
-    result
 }
