@@ -103,7 +103,12 @@ fn check_command(name: &str, args: &[&str], required: bool) -> DependencyStatus 
 
     // If direct execution fails, try via user's shell in interactive mode
     // This handles shell functions/aliases like Claude Code
-    let shell_cmd = format!("{} {}", name, args.join(" "));
+    // Use shell-escaped arguments to prevent injection
+    let shell_cmd = std::iter::once(name.to_string())
+        .chain(args.iter().map(|a| a.to_string()))
+        .map(|a| shell_escape::escape(std::borrow::Cow::Owned(a)).into_owned())
+        .collect::<Vec<_>>()
+        .join(" ");
 
     // Get user's default shell from $SHELL environment variable
     let user_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());

@@ -258,11 +258,7 @@ impl PseudoTerminal {
         screen.set_scrollback(0);
 
         let (rows, cols) = screen.size();
-        let start_row = if rows as usize > count {
-            rows as usize - count
-        } else {
-            0
-        };
+        let start_row = (rows as usize).saturating_sub(count);
 
         let mut lines = Vec::new();
         for row in start_row..rows as usize {

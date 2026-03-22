@@ -103,6 +103,8 @@ pub struct App {
     pub copy_flash_lines: usize,
     // Pending /remote-control slash command (sent after 4s startup delay)
     pub remote_control_send_time: Option<std::time::Instant>,
+    // Temp files created for browser previews (cleaned up on exit)
+    pub temp_preview_files: Vec<std::path::PathBuf>,
 }
 
 impl App {
@@ -236,6 +238,7 @@ impl App {
             last_copy_time: None,
             copy_flash_lines: 0,
             remote_control_send_time: remote_control_time,
+            temp_preview_files: Vec::new(),
         };
 
         // Open wizard on first run
@@ -978,8 +981,16 @@ impl App {
                                                         if browser::can_preview_in_browser(&path) {
                                                             let preview_path =
                                                                 if browser::is_markdown(&path) {
-                                                                    browser::markdown_to_html(&path)
-                                                                        .unwrap_or(path)
+                                                                    match browser::markdown_to_html(
+                                                                        &path,
+                                                                    ) {
+                                                                        Ok(p) => {
+                                                                            self.temp_preview_files
+                                                                                .push(p.clone());
+                                                                            p
+                                                                        }
+                                                                        Err(_) => path,
+                                                                    }
                                                                 } else {
                                                                     path
                                                                 };
@@ -2153,11 +2164,15 @@ impl App {
                                                         if browser::can_preview_in_browser(&path) {
                                                             let preview_path =
                                                                 if browser::is_markdown(&path) {
-                                                                    browser::markdown_to_html(&path)
-                                                                        .unwrap_or(path)
+                                                                    match browser::markdown_to_html(&path) {
+                                                                        Ok(p) => { self.temp_preview_files.push(p.clone()); p }
+                                                                        Err(_) => path,
+                                                                    }
                                                                 } else if browser::can_syntax_highlight(&path) {
-                                                                    browser::text_to_html(&path)
-                                                                        .unwrap_or(path)
+                                                                    match browser::text_to_html(&path) {
+                                                                        Ok(p) => { self.temp_preview_files.push(p.clone()); p }
+                                                                        Err(_) => path,
+                                                                    }
                                                                 } else {
                                                                     path
                                                                 };
@@ -2928,7 +2943,17 @@ impl App {
                 } // End Match
             }
         }
+        // Clean up temporary preview files
+        self.cleanup_temp_files();
+
         Ok(self.should_restart)
+    }
+
+    /// Remove temporary HTML files created for browser previews
+    fn cleanup_temp_files(&self) {
+        for path in &self.temp_preview_files {
+            let _ = std::fs::remove_file(path);
+        }
     }
 
     /// Handle scrollbar drag: convert mouse Y position to scroll position for a pane
@@ -3515,13 +3540,21 @@ impl App {
         }
     }
 
+    /// Check if a filename is safe (no path traversal)
+    fn is_safe_filename(name: &str) -> bool {
+        !name.contains("..")
+            && !name.starts_with('/')
+            && !name.starts_with('\\')
+            && !name.contains('\0')
+    }
+
     fn execute_dialog_action(&mut self, action: ui::dialog::DialogAction, value: Option<String>) {
         use ui::dialog::DialogAction;
 
         match action {
             DialogAction::NewFile => {
                 if let Some(name) = value {
-                    if !name.is_empty() {
+                    if !name.is_empty() && Self::is_safe_filename(&name) {
                         let new_path = self.file_browser.current_dir.join(&name);
                         let _ = std::fs::write(&new_path, "");
                         self.file_browser.refresh();
@@ -3530,7 +3563,7 @@ impl App {
             }
             DialogAction::NewDirectory => {
                 if let Some(name) = value {
-                    if !name.is_empty() {
+                    if !name.is_empty() && Self::is_safe_filename(&name) {
                         let new_path = self.file_browser.current_dir.join(&name);
                         if let Err(e) = std::fs::create_dir(&new_path) {
                             eprintln!("Failed to create directory: {}", e);
@@ -3542,7 +3575,7 @@ impl App {
             }
             DialogAction::RenameFile { old_path } => {
                 if let Some(new_name) = value {
-                    if !new_name.is_empty() {
+                    if !new_name.is_empty() && Self::is_safe_filename(&new_name) {
                         let new_path = old_path
                             .parent()
                             .map(|p| p.join(&new_name))

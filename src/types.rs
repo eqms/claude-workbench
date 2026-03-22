@@ -803,15 +803,16 @@ impl SearchState {
 
         // Find byte position of char to remove
         let byte_start: usize = text.chars().take(cursor - 1).map(|c| c.len_utf8()).sum();
-        let char_to_remove = text.chars().nth(cursor - 1).unwrap();
-        let byte_end = byte_start + char_to_remove.len_utf8();
-        text.replace_range(byte_start..byte_end, "");
+        if let Some(char_to_remove) = text.chars().nth(cursor - 1) {
+            let byte_end = byte_start + char_to_remove.len_utf8();
+            text.replace_range(byte_start..byte_end, "");
 
-        // Move cursor back
-        if self.focus_on_replace {
-            self.replace_cursor -= 1;
-        } else {
-            self.query_cursor -= 1;
+            // Move cursor back
+            if self.focus_on_replace {
+                self.replace_cursor -= 1;
+            } else {
+                self.query_cursor -= 1;
+            }
         }
     }
 
@@ -836,9 +837,10 @@ impl SearchState {
 
         // Find byte position of char to remove
         let byte_start: usize = text.chars().take(cursor).map(|c| c.len_utf8()).sum();
-        let char_to_remove = text.chars().nth(cursor).unwrap();
-        let byte_end = byte_start + char_to_remove.len_utf8();
-        text.replace_range(byte_start..byte_end, "");
+        if let Some(char_to_remove) = text.chars().nth(cursor) {
+            let byte_end = byte_start + char_to_remove.len_utf8();
+            text.replace_range(byte_start..byte_end, "");
+        }
         // Cursor stays in place
     }
 
