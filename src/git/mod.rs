@@ -204,7 +204,8 @@ pub fn check_remote_changes_async(
             return;
         }
 
-        let fetch_output = fetch_result.unwrap();
+        // Safe: Err case handled above with early return
+        let fetch_output = fetch_result.expect("guarded by Err check above");
         if !fetch_output.status.success() {
             // Fetch failed - might be no network or no remote
             let stderr = String::from_utf8_lossy(&fetch_output.stderr).to_string();

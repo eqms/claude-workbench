@@ -128,14 +128,19 @@ pub fn markdown_to_html(md_path: &Path) -> Result<PathBuf> {
         .replace("{title}", title)
         .replace("{content}", &html_content);
 
-    // Create temp file with cryptographically random name (prevents symlink attacks)
+    // Create temp file and write content via file handle (prevents TOCTOU/symlink attacks).
+    // We write before keep() so the data goes through the secure file descriptor,
+    // not through the path which could be swapped by an attacker.
     let named_temp = tempfile::Builder::new()
         .prefix("cwb-preview-")
         .suffix(".html")
         .tempfile()?;
-    let (_, temp_path) = named_temp.keep()?;
 
-    std::fs::write(&temp_path, html)?;
+    use std::io::Write;
+    // Write via the file handle, not the path
+    let (mut file, temp_path) = named_temp.keep()?;
+    file.write_all(html.as_bytes())?;
+    file.flush()?;
     Ok(temp_path)
 }
 
@@ -144,7 +149,12 @@ fn fix_image_paths(html: &str, base_dir: &Path) -> String {
     use regex::Regex;
 
     // Match src="..." attributes in img tags (handles both relative and absolute paths)
-    let img_re = Regex::new(r#"<img\s+([^>]*?)src="([^"]+)"([^>]*)>"#).unwrap();
+    // Static regex: compiled once, cannot fail on this known-good pattern
+    use std::sync::LazyLock;
+    static IMG_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"<img\s+([^>]*?)src="([^"]+)"([^>]*)>"#).expect("valid regex")
+    });
+    let img_re = &*IMG_RE;
 
     img_re
         .replace_all(html, |caps: &regex::Captures| {

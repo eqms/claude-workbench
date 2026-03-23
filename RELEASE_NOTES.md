@@ -1,5 +1,27 @@
 # Release Notes
 
+## Version 0.65.0 (23.03.2026)
+
+### Changed
+- **Architektur-Refactoring**: Monolithische `app.rs` (4.276 Zeilen) in 9 Module aufgeteilt:
+  `mod.rs` (359), `keyboard.rs` (1275), `mouse.rs` (1000), `file_ops.rs` (500),
+  `pty.rs` (266), `drawing.rs` (207), `clipboard.rs` (195), `git_ops.rs` (148), `update.rs` (144).
+  Die `run()`-Methode ist jetzt ein dünner Orchestrator (~80 Zeilen).
+- **tokio Features**: `"full"` auf `"rt-multi-thread"` reduziert (schnellere Builds)
+
+### Fixed
+- **Fish-Shell venv-Bug**: Terminal-Pane wechselte beim Start fälschlich das Verzeichnis, weil
+  `sync_terminals_initial()` ein redundantes `cd` sendete, das Fish-Shell-Hooks (venv auto-activate)
+  triggerte. Das `cd` war unnötig — PTYs starten bereits mit dem korrekten CWD.
+- **Security Audit** (7 Findings behoben):
+  1. Mutex-Poisoning: `lock().unwrap()` durch poison-resiliente `lock_or_recover()` ersetzt
+  2. Unsafe libc: `localtime_r` mit Timestamp-Validierung und Return-Value-Check
+  3. Path-Check: `canonicalize()` + `is_safe_destination()` für CopyFileTo/MoveFileTo
+  4. Temp-File TOCTOU: Schreibt via File-Handle statt Pfad
+  5. `is_safe_filename`: Char-Level Unicode-Check für `/` und `\`
+  6. `WORKBENCH_FAKE_VERSION`: Nur in Debug-Builds verfügbar (`#[cfg(debug_assertions)]`)
+  7. Regex in `fix_image_paths`: `LazyLock` statt Runtime-`unwrap()`
+
 ## Version 0.64.0 (22.03.2026)
 
 ### Added

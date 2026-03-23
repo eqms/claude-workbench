@@ -2,8 +2,17 @@ use anyhow::Result;
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
+
+/// Lock a mutex, recovering from poisoning.
+/// If another thread panicked while holding the lock, we still get access
+/// to the data rather than propagating the panic.
+fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 /// Callbacks for handling terminal queries (DSR, DA) that require responses
 /// back to the child process running inside the PTY.
@@ -124,7 +133,7 @@ impl PseudoTerminal {
                     }
                     Ok(n) => {
                         let responses = {
-                            let mut parser = parser_clone.lock().unwrap();
+                            let mut parser = lock_or_recover(&parser_clone);
                             parser.process(&buffer[..n]);
                             parser.callbacks_mut().drain_responses()
                         };
@@ -156,7 +165,7 @@ impl PseudoTerminal {
 
     pub fn resize(&mut self, rows: u16, cols: u16) -> Result<()> {
         {
-            let parser = self.parser.lock().unwrap();
+            let parser = lock_or_recover(&self.parser);
             let screen = parser.screen();
             let (curr_rows, curr_cols) = screen.size();
             if curr_rows == rows && curr_cols == cols {
@@ -170,7 +179,7 @@ impl PseudoTerminal {
             pixel_width: 0,
             pixel_height: 0,
         })?;
-        let mut parser = self.parser.lock().unwrap();
+        let mut parser = lock_or_recover(&self.parser);
         parser.screen_mut().set_size(rows, cols);
         Ok(())
     }
@@ -178,27 +187,27 @@ impl PseudoTerminal {
     pub fn write_input(&mut self, input: &[u8]) -> Result<()> {
         // If typing, reset scrollback
         {
-            let mut parser = self.parser.lock().unwrap();
+            let mut parser = lock_or_recover(&self.parser);
             let screen = parser.screen_mut();
             if screen.scrollback() > 0 {
                 screen.set_scrollback(0);
             }
         }
-        let mut writer = self.writer.lock().unwrap();
+        let mut writer = lock_or_recover(&self.writer);
         writer.write_all(input)?;
         writer.flush()?;
         Ok(())
     }
 
     pub fn scroll_up(&self, lines: usize) {
-        let mut parser = self.parser.lock().unwrap();
+        let mut parser = lock_or_recover(&self.parser);
         let screen = parser.screen_mut();
         let current = screen.scrollback();
         screen.set_scrollback(current + lines);
     }
 
     pub fn scroll_down(&self, lines: usize) {
-        let mut parser = self.parser.lock().unwrap();
+        let mut parser = lock_or_recover(&self.parser);
         let screen = parser.screen_mut();
         let current = screen.scrollback();
         if current >= lines {
@@ -223,7 +232,7 @@ impl PseudoTerminal {
     /// Extract text content from specified line range (screen-relative, 0-based)
     /// Returns lines as strings with trailing whitespace trimmed
     pub fn extract_lines(&self, start: usize, end: usize) -> Vec<String> {
-        let parser = self.parser.lock().unwrap();
+        let parser = lock_or_recover(&self.parser);
         let screen = parser.screen();
         let (rows, cols) = screen.size();
 
@@ -250,7 +259,7 @@ impl PseudoTerminal {
     /// Temporarily sets scrollback to 0 to access the bottom of the buffer,
     /// then restores the original scrollback position.
     pub fn extract_last_n_lines(&self, count: usize) -> Vec<String> {
-        let mut parser = self.parser.lock().unwrap();
+        let mut parser = lock_or_recover(&self.parser);
         let screen = parser.screen_mut();
 
         // Save and reset scrollback to see most recent output
@@ -289,7 +298,7 @@ impl PseudoTerminal {
         end_row: usize,
         end_col: usize,
     ) -> String {
-        let parser = self.parser.lock().unwrap();
+        let parser = lock_or_recover(&self.parser);
         let screen = parser.screen();
         let (rows, cols) = screen.size();
 
@@ -331,14 +340,14 @@ impl PseudoTerminal {
 
     /// Get the current visible cursor row (0-based)
     pub fn cursor_row(&self) -> u16 {
-        let parser = self.parser.lock().unwrap();
+        let parser = lock_or_recover(&self.parser);
         let screen = parser.screen();
         screen.cursor_position().0
     }
 
     /// Get current scrollback offset
     pub fn scrollback(&self) -> usize {
-        let parser = self.parser.lock().unwrap();
+        let parser = lock_or_recover(&self.parser);
         parser.screen().scrollback()
     }
 
@@ -346,7 +355,7 @@ impl PseudoTerminal {
     pub fn set_scrollback_position(&self, ratio: f64) {
         let max_scrollback = 1000usize;
         let target = ((1.0 - ratio) * max_scrollback as f64) as usize;
-        let mut parser = self.parser.lock().unwrap();
+        let mut parser = lock_or_recover(&self.parser);
         let screen = parser.screen_mut();
         screen.set_scrollback(target);
     }

@@ -14,21 +14,35 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-/// Format file modification date for display using local timezone
+/// Format file modification date for display using local timezone.
+/// Validates timestamp range to avoid undefined behavior in libc calls.
 fn format_file_date(utc_secs: u64) -> String {
+    // Validate timestamp range to prevent UB in localtime_r/localtime_s.
+    // Max safe value: 2038-01-19 on 32-bit, but we cap at year 9999 for sanity.
+    const MAX_SAFE_TIMESTAMP: u64 = 253_402_300_799; // 9999-12-31 23:59:59 UTC
+    if utc_secs > MAX_SAFE_TIMESTAMP {
+        return "??. ??.???? ??:??".to_string();
+    }
+
     let time_t = utc_secs as libc::time_t;
+
+    // On 32-bit platforms, time_t is i32 and overflows after 2038-01-19
+    #[cfg(target_pointer_width = "32")]
+    if utc_secs > i32::MAX as u64 {
+        return "??. ??.???? ??:??".to_string();
+    }
+
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
 
     // Platform-specific timezone conversion
     #[cfg(unix)]
-    unsafe {
-        libc::localtime_r(&time_t, &mut tm);
-    }
+    let ok = unsafe { !libc::localtime_r(&time_t, &mut tm).is_null() };
 
     #[cfg(windows)]
-    unsafe {
-        // Windows uses localtime_s with swapped argument order
-        libc::localtime_s(&mut tm, &time_t);
+    let ok = unsafe { libc::localtime_s(&mut tm, &time_t) == 0 };
+
+    if !ok {
+        return "??. ??.???? ??:??".to_string();
     }
 
     // tm_year is years since 1900, tm_mon is 0-11

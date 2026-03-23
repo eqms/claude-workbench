@@ -114,7 +114,10 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
             return;
         }
 
-        let parser = pty.parser.lock().unwrap();
+        let parser = pty
+            .parser
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let screen = parser.screen();
 
         // Get selection range - keyboard selection is line-based, mouse selection is char-based

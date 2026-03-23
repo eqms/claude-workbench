@@ -1,12 +1,12 @@
 [package]
 name = "claude-workbench"
-version = "0.64.0"
+version = "0.65.0"
 edition = "2021"
 
 [dependencies]
 ratatui = "0.30.0" # Bumped to match modern deps
 crossterm = "0.28.1"
-tokio = { version = "1.44.0", features = ["full"] }
+tokio = { version = "1.44.0", features = ["rt-multi-thread"] }
 anyhow = "1.0.98"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml_ng = "0.9"

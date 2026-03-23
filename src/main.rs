@@ -38,7 +38,9 @@ struct Args {
     #[arg(long)]
     check_update: bool,
 
-    /// Fake current version for testing (e.g., "0.37.0")
+    /// Fake current version for testing (e.g., "0.37.0").
+    /// Only available in debug builds to prevent update-suppression attacks.
+    #[cfg(debug_assertions)]
     #[arg(long, env = "WORKBENCH_FAKE_VERSION")]
     fake_version: Option<String>,
 
@@ -143,9 +145,15 @@ fn main() -> Result<()> {
     // Parse args early - before tokio runtime
     let args = Args::parse();
 
+    // Extract fake_version (only available in debug builds)
+    #[cfg(debug_assertions)]
+    let fake_version = args.fake_version;
+    #[cfg(not(debug_assertions))]
+    let fake_version: Option<String> = None;
+
     // Handle --check-update CLI mode (exit without starting TUI or tokio)
     if args.check_update {
-        return run_update_check_cli(args.fake_version);
+        return run_update_check_cli(fake_version);
     }
 
     // Handle --update-to CLI mode (update to specific version and exit)
@@ -158,7 +166,7 @@ fn main() -> Result<()> {
         .enable_all()
         .build()
         .expect("Failed to create tokio runtime")
-        .block_on(async_main(args.fake_version))
+        .block_on(async_main(fake_version))
 }
 
 async fn async_main(fake_version: Option<String>) -> Result<()> {
