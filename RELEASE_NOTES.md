@@ -1,5 +1,21 @@
 # Release Notes
 
+## Version 0.66.0 (23.03.2026)
+
+### Added
+- **F3 Preview Maximize/Restore**: Neuer Fullscreen-Editor-Modus — F3 blendet alle anderen Panes aus
+  und maximiert die Preview-Pane. Erneutes F3 stellt das vorherige Layout wieder her.
+  - `SavedLayout` Struct speichert Sichtbarkeits-Flags vor dem Maximieren
+  - F1/F2/F5/F6 räumen den Maximize-State automatisch auf
+  - Preview wird eingeblendet + maximiert, falls vorher versteckt
+  - Maximize-State ist transient (wird nicht in Config persistiert)
+
+### Changed
+- **F3 Tastenbelegung**: Von "Refresh File Browser" (redundant, Auto-Refresh vorhanden) zu "Maximize/Restore Preview"
+- **FooterAction::Refresh** → `FooterAction::MaximizePreview` umbenannt
+- **Help-Screen**: F3-Beschreibung in allen 3 Abschnitten aktualisiert (Global, Navigation, File Browser)
+- **USAGE.md**: F3-Shortcuts in EN und DE Sektion aktualisiert
+
 ## Version 0.65.0 (23.03.2026)
 
 ### Changed

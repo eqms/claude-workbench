@@ -501,9 +501,8 @@ impl App {
                                         self.active_pane = PaneId::FileBrowser;
                                     }
                                 }
-                                FooterAction::Refresh => {
-                                    self.file_browser.refresh();
-                                    self.update_preview();
+                                FooterAction::MaximizePreview => {
+                                    self.toggle_preview_maximize();
                                 }
                                 FooterAction::FocusClaude => {
                                     if !self.claude_startup.shown_this_session

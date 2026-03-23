@@ -130,7 +130,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
-            Span::raw("Refresh File Browser"),
+            Span::raw("Maximize/Restore Preview (fullscreen editor)"),
         ]),
         Line::from(vec![
             Span::styled("  F9           ", Style::default().fg(Color::Cyan)),
@@ -187,6 +187,10 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Preview Pane (syntax highlighting)"),
         ]),
         Line::from(vec![
+            Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
+            Span::raw("Maximize/Restore Preview (hides all other panes)"),
+        ]),
+        Line::from(vec![
             Span::styled("  F4           ", Style::default().fg(Color::Cyan)),
             Span::raw("Claude Code (PTY)"),
         ]),
@@ -241,7 +245,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
-            Span::raw("Refresh file list"),
+            Span::raw("Maximize/Restore Preview"),
         ]),
         Line::from(vec![
             Span::styled("  F9           ", Style::default().fg(Color::Cyan)),

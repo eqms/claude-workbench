@@ -17,7 +17,7 @@
 | Ctrl+Shift+W | Setup Wizard |
 | F1 | Toggle File Browser |
 | F2 | Toggle Preview Pane |
-| F3 | Refresh File Browser |
+| F3 | Maximize/Restore Preview (fullscreen editor) |
 | F4 | Focus Claude Code |
 | F5 | Toggle LazyGit (restarts in current directory) |
 | F6 | Toggle User Terminal (syncs to current directory) |
@@ -261,7 +261,7 @@ When copying to Claude, output is automatically filtered:
 | Ctrl+Shift+W | Setup-Assistent |
 | F1 | Dateibrowser ein-/ausblenden |
 | F2 | Vorschau-Bereich umschalten |
-| F3 | Dateibrowser aktualisieren |
+| F3 | Vorschau maximieren/wiederherstellen (Fullscreen-Editor) |
 | F4 | Claude Code fokussieren |
 | F5 | LazyGit umschalten (startet im aktuellen Verzeichnis neu) |
 | F6 | Benutzer-Terminal umschalten (wechselt ins aktuelle Verzeichnis) |

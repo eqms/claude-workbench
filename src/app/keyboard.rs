@@ -535,6 +535,9 @@ impl App {
         // Global Focus Switching
         match key.code {
             KeyCode::F(1) => {
+                if self.preview_maximized {
+                    self.preview_maximized = false;
+                }
                 self.show_file_browser = !self.show_file_browser;
                 self.config.ui.show_file_browser = self.show_file_browser;
                 let _ = crate::config::save_config(&self.config);
@@ -545,6 +548,13 @@ impl App {
                 }
             }
             KeyCode::F(2) => {
+                if self.preview_maximized {
+                    // Exit maximize mode first, restore layout
+                    self.show_file_browser = self.preview_saved_layout.show_file_browser;
+                    self.show_lazygit = self.preview_saved_layout.show_lazygit;
+                    self.show_terminal = self.preview_saved_layout.show_terminal;
+                    self.preview_maximized = false;
+                }
                 self.show_preview = !self.show_preview;
                 self.config.ui.show_preview = self.show_preview;
                 let _ = crate::config::save_config(&self.config);
@@ -555,8 +565,7 @@ impl App {
                 }
             }
             KeyCode::F(3) => {
-                self.file_browser.refresh();
-                self.update_preview();
+                self.toggle_preview_maximize();
             }
             KeyCode::F(4) => {
                 // Show startup dialog if prefixes configured and not yet shown
@@ -570,6 +579,9 @@ impl App {
                 }
             }
             KeyCode::F(5) => {
+                if self.preview_maximized {
+                    self.preview_maximized = false;
+                }
                 let was_hidden = !self.show_lazygit;
                 self.show_lazygit = !self.show_lazygit;
                 self.config.ui.show_lazygit = self.show_lazygit;
@@ -585,6 +597,9 @@ impl App {
                 }
             }
             KeyCode::F(6) => {
+                if self.preview_maximized {
+                    self.preview_maximized = false;
+                }
                 let was_hidden = !self.show_terminal;
                 self.show_terminal = !self.show_terminal;
                 self.config.ui.show_terminal = self.show_terminal;

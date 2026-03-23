@@ -12,40 +12,40 @@ use crate::types::{EditorMode, PaneId};
 /// Action identifiers for footer button clicks
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FooterAction {
-    ToggleFiles,    // F1
-    TogglePreview,  // F2
-    Refresh,        // F3
-    FocusClaude,    // F4
-    ToggleGit,      // F5
-    ToggleTerm,     // F6
-    FileMenu,       // F9
-    FuzzyFind,      // ^P
-    OpenFile,       // o
-    OpenFinder,     // O
-    Settings,       // F8
-    About,          // F10
-    Help,           // F12
-    Edit,           // E (Preview mode)
-    StartSelect,    // ^S (starts selection)
-    Save,           // ^S (Edit mode - save)
-    ExitEdit,       // Esc (Edit mode)
-    Undo,           // ^Z
-    Redo,           // ^Y
-    SelectDown,     // j/↓ (selection mode)
-    SelectUp,       // k/↑ (selection mode)
-    SelectCopy,     // Enter/y (selection mode)
-    SelectCancel,   // Esc (selection mode)
-    ToggleHidden,   // . (toggle hidden files)
-    ToggleBlock,    // ^F3 (MC Edit: toggle block marking)
-    CopyBlock,      // ^F5 (MC Edit: copy block)
-    MoveBlock,      // ^F6 (MC Edit: cut block)
-    DeleteBlock,    // ^F8 (MC Edit: delete block)
-    PlatformPaste,  // ^V / Cmd+V (Paste from clipboard)
-    Search,         // / or ^F (Search)
-    SearchReplace,  // ^H (Search & Replace in Edit mode)
-    ToggleAutosave, // ^A (Toggle autosave)
-    CopyLastLines,  // F9 in terminal panes - copy last N lines to clipboard
-    None,           // No action (non-clickable)
+    ToggleFiles,     // F1
+    TogglePreview,   // F2
+    MaximizePreview, // F3
+    FocusClaude,     // F4
+    ToggleGit,       // F5
+    ToggleTerm,      // F6
+    FileMenu,        // F9
+    FuzzyFind,       // ^P
+    OpenFile,        // o
+    OpenFinder,      // O
+    Settings,        // F8
+    About,           // F10
+    Help,            // F12
+    Edit,            // E (Preview mode)
+    StartSelect,     // ^S (starts selection)
+    Save,            // ^S (Edit mode - save)
+    ExitEdit,        // Esc (Edit mode)
+    Undo,            // ^Z
+    Redo,            // ^Y
+    SelectDown,      // j/↓ (selection mode)
+    SelectUp,        // k/↑ (selection mode)
+    SelectCopy,      // Enter/y (selection mode)
+    SelectCancel,    // Esc (selection mode)
+    ToggleHidden,    // . (toggle hidden files)
+    ToggleBlock,     // ^F3 (MC Edit: toggle block marking)
+    CopyBlock,       // ^F5 (MC Edit: copy block)
+    MoveBlock,       // ^F6 (MC Edit: cut block)
+    DeleteBlock,     // ^F8 (MC Edit: delete block)
+    PlatformPaste,   // ^V / Cmd+V (Paste from clipboard)
+    Search,          // / or ^F (Search)
+    SearchReplace,   // ^H (Search & Replace in Edit mode)
+    ToggleAutosave,  // ^A (Toggle autosave)
+    CopyLastLines,   // F9 in terminal panes - copy last N lines to clipboard
+    None,            // No action (non-clickable)
 }
 
 pub struct Footer {
@@ -146,7 +146,7 @@ pub fn get_context_button_positions(
             ("^A", auto_label, FooterAction::ToggleAutosave),
             ("^H", "S&R", FooterAction::SearchReplace),
             ("F1", "Files", FooterAction::ToggleFiles),
-            ("F3", "Refresh", FooterAction::Refresh),
+            ("F3", "MaxPrev", FooterAction::MaximizePreview),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
@@ -159,7 +159,7 @@ pub fn get_context_button_positions(
             ("/", "Search", FooterAction::Search),
             ("^S", "Select", FooterAction::StartSelect),
             ("F1", "Files", FooterAction::ToggleFiles),
-            ("F3", "Refresh", FooterAction::Refresh),
+            ("F3", "MaxPrev", FooterAction::MaximizePreview),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
@@ -174,7 +174,7 @@ pub fn get_context_button_positions(
             ("^S", "Select", FooterAction::StartSelect),
             ("F1", "Files", FooterAction::ToggleFiles),
             ("F2", "Preview", FooterAction::TogglePreview),
-            ("F3", "Refresh", FooterAction::Refresh),
+            ("F3", "MaxPrev", FooterAction::MaximizePreview),
             ("F4", "Claude", FooterAction::FocusClaude),
             ("F5", "Git", FooterAction::ToggleGit),
             ("F6", "Term", FooterAction::ToggleTerm),
@@ -233,7 +233,7 @@ impl Widget for Footer {
                 ("^A", auto_label),
                 ("^H", "S&R"),
                 ("F1", "Files"),
-                ("F3", "Refresh"),
+                ("F3", "MaxPrev"),
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
@@ -247,7 +247,7 @@ impl Widget for Footer {
                 ("/", "Search"),
                 ("^S", "Select"),
                 ("F1", "Files"),
-                ("F3", "Refresh"),
+                ("F3", "MaxPrev"),
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
@@ -263,7 +263,7 @@ impl Widget for Footer {
                 ("^S", "Select"),
                 ("F1", "Files"),
                 ("F2", "Preview"),
-                ("F3", "Refresh"),
+                ("F3", "MaxPrev"),
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),

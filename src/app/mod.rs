@@ -43,6 +43,24 @@ pub(crate) struct LayoutRects {
     pub footer: Rect,
 }
 
+/// Saved pane visibility state for preview maximize/restore
+#[derive(Debug, Clone, Copy)]
+pub struct SavedLayout {
+    pub show_file_browser: bool,
+    pub show_lazygit: bool,
+    pub show_terminal: bool,
+}
+
+impl Default for SavedLayout {
+    fn default() -> Self {
+        Self {
+            show_file_browser: true,
+            show_lazygit: false,
+            show_terminal: false,
+        }
+    }
+}
+
 pub struct App {
     pub config: Config,
     pub session: SessionState,
@@ -57,6 +75,9 @@ pub struct App {
     pub show_terminal: bool,
     pub show_lazygit: bool,
     pub show_preview: bool,
+    // Preview maximize mode (F3 toggle)
+    pub preview_maximized: bool,
+    pub preview_saved_layout: SavedLayout,
     pub last_refresh: std::time::Instant,
     pub menu: MenuBar,
     pub dialog: Dialog,
@@ -221,6 +242,8 @@ impl App {
             show_terminal,
             show_lazygit,
             show_preview,
+            preview_maximized: false,
+            preview_saved_layout: SavedLayout::default(),
             last_refresh: std::time::Instant::now(),
             menu: MenuBar::default(),
             dialog: Dialog::default(),
@@ -278,6 +301,36 @@ impl App {
         app.start_update_check();
 
         app
+    }
+
+    /// Toggle preview maximize mode (F3): hides all panes except Preview, or restores previous layout
+    pub(crate) fn toggle_preview_maximize(&mut self) {
+        if self.preview_maximized {
+            // Restore saved layout
+            self.show_file_browser = self.preview_saved_layout.show_file_browser;
+            self.show_lazygit = self.preview_saved_layout.show_lazygit;
+            self.show_terminal = self.preview_saved_layout.show_terminal;
+            self.preview_maximized = false;
+        } else {
+            // Ensure preview is visible
+            if !self.show_preview {
+                self.show_preview = true;
+                self.config.ui.show_preview = true;
+                let _ = crate::config::save_config(&self.config);
+            }
+            // Save current layout state
+            self.preview_saved_layout = SavedLayout {
+                show_file_browser: self.show_file_browser,
+                show_lazygit: self.show_lazygit,
+                show_terminal: self.show_terminal,
+            };
+            // Hide all other panes
+            self.show_file_browser = false;
+            self.show_lazygit = false;
+            self.show_terminal = false;
+            self.preview_maximized = true;
+            self.active_pane = PaneId::Preview;
+        }
     }
 
     fn update_preview(&mut self) {
