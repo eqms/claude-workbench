@@ -1,5 +1,6 @@
 //! Settings menu UI and state
 
+use crate::app_detector::{self, DetectedApp};
 use crate::config::Config;
 use crate::setup::templates::{get_builtin_templates, Template};
 use ratatui::{
@@ -83,6 +84,52 @@ pub enum SettingsField {
     LazygitPath,
     Browser,
     ExternalEditor,
+    ExportDir,
+}
+
+// ── Dropdown types ─────────────────────────────────────────────────────
+
+/// A single item in the app selection dropdown
+#[derive(Debug, Clone)]
+pub struct DropdownItem {
+    /// Display text shown in the list
+    pub display: String,
+    /// Value to store in config
+    pub value: String,
+    /// Whether this is the "Custom path..." fallback entry
+    pub is_custom: bool,
+}
+
+/// State for the browser/editor selection dropdown
+#[derive(Debug, Clone)]
+pub struct AppDropdownState {
+    pub field: SettingsField,
+    pub items: Vec<DropdownItem>,
+    pub selected_idx: usize,
+    pub scroll_offset: usize,
+}
+
+impl AppDropdownState {
+    /// Maximum visible items before scrolling
+    const MAX_VISIBLE: usize = 12;
+
+    pub fn move_up(&mut self) {
+        if self.selected_idx > 0 {
+            self.selected_idx -= 1;
+            if self.selected_idx < self.scroll_offset {
+                self.scroll_offset = self.selected_idx;
+            }
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        if self.selected_idx + 1 < self.items.len() {
+            self.selected_idx += 1;
+            if self.selected_idx >= self.scroll_offset + Self::MAX_VISIBLE {
+                self.scroll_offset = self.selected_idx + 1 - Self::MAX_VISIBLE;
+            }
+        }
+    }
 }
 
 /// Settings menu state
@@ -108,8 +155,15 @@ pub struct SettingsState {
     pub lazygit_path: String,
     pub browser: String,
     pub external_editor: String,
+    pub export_dir: String,
     pub selected_template_idx: usize,
     pub available_templates: Vec<Template>,
+
+    // App detection (cached)
+    pub dropdown: Option<AppDropdownState>,
+    pub detected_browsers: Vec<DetectedApp>,
+    pub detected_editors: Vec<DetectedApp>,
+    pub apps_detected: bool,
 
     // Track if changes were made
     pub has_changes: bool,
@@ -137,8 +191,13 @@ impl Default for SettingsState {
             lazygit_path: "lazygit".to_string(),
             browser: String::new(),
             external_editor: String::new(),
+            export_dir: String::new(),
             selected_template_idx: 0,
             available_templates: templates,
+            dropdown: None,
+            detected_browsers: Vec::new(),
+            detected_editors: Vec::new(),
+            apps_detected: false,
             has_changes: false,
         }
     }
@@ -174,6 +233,7 @@ impl SettingsState {
             .unwrap_or_else(|| "lazygit".to_string());
         self.browser = config.ui.browser.clone();
         self.external_editor = config.ui.external_editor.clone();
+        self.export_dir = config.ui.export_dir.clone();
         self.has_changes = false;
     }
 
@@ -192,6 +252,7 @@ impl SettingsState {
         config.pty.lazygit_command = vec![self.lazygit_path.clone()];
         config.ui.browser = self.browser.clone();
         config.ui.external_editor = self.external_editor.clone();
+        config.ui.export_dir = self.export_dir.clone();
     }
 
     pub fn open(&mut self, config: &Config) {
@@ -200,11 +261,20 @@ impl SettingsState {
         self.category = SettingsCategory::General;
         self.selected_idx = 0;
         self.editing = None;
+        self.dropdown = None;
+
+        // Detect installed apps once
+        if !self.apps_detected {
+            self.detected_browsers = app_detector::detect_browsers();
+            self.detected_editors = app_detector::detect_editors();
+            self.apps_detected = true;
+        }
     }
 
     pub fn close(&mut self) {
         self.visible = false;
         self.editing = None;
+        self.dropdown = None;
         self.input_buffer.clear();
     }
 
@@ -222,7 +292,7 @@ impl SettingsState {
         match self.category {
             SettingsCategory::General => 6, // shell, scrollback, hidden, autosave, auto-refresh, check updates
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
-            SettingsCategory::Paths => 4,   // claude, lazygit, browser, external_editor
+            SettingsCategory::Paths => 5,   // claude, lazygit, browser, external_editor, export_dir
             SettingsCategory::Templates => self.available_templates.len(),
             SettingsCategory::About => 0,
         }
@@ -269,12 +339,26 @@ impl SettingsState {
                 1 => Some(SettingsField::LazygitPath),
                 2 => Some(SettingsField::Browser),
                 3 => Some(SettingsField::ExternalEditor),
+                4 => Some(SettingsField::ExportDir),
                 _ => None,
             },
             _ => None,
         };
 
         if let Some(f) = field {
+            // Browser and ExternalEditor open a dropdown instead of text input
+            match &f {
+                SettingsField::Browser => {
+                    self.open_browser_dropdown();
+                    return;
+                }
+                SettingsField::ExternalEditor => {
+                    self.open_editor_dropdown();
+                    return;
+                }
+                _ => {}
+            }
+
             self.input_buffer = match &f {
                 SettingsField::ShellPath => self.shell_path.clone(),
                 SettingsField::ScrollbackLines => self.scrollback_lines.to_string(),
@@ -287,14 +371,135 @@ impl SettingsState {
                 SettingsField::ClaudeHeight => self.claude_height.to_string(),
                 SettingsField::ClaudePath => self.claude_path.clone(),
                 SettingsField::LazygitPath => self.lazygit_path.clone(),
-                SettingsField::Browser => self.browser.clone(),
-                SettingsField::ExternalEditor => self.external_editor.clone(),
+                SettingsField::ExportDir => self.export_dir.clone(),
+                SettingsField::Browser | SettingsField::ExternalEditor => unreachable!(),
                 SettingsField::CheckForUpdates => {
                     unreachable!("CheckForUpdates is an action, not a field")
                 }
             };
             self.editing = Some(f);
         }
+    }
+
+    /// Start text-based editing for a field (used by "Custom path..." dropdown option)
+    pub fn start_text_editing(&mut self, field: SettingsField) {
+        self.input_buffer = match &field {
+            SettingsField::Browser => self.browser.clone(),
+            SettingsField::ExternalEditor => self.external_editor.clone(),
+            _ => String::new(),
+        };
+        self.editing = Some(field);
+    }
+
+    /// Open dropdown for browser selection
+    fn open_browser_dropdown(&mut self) {
+        let mut items = vec![DropdownItem {
+            display: "(system default)".to_string(),
+            value: String::new(),
+            is_custom: false,
+        }];
+
+        for app in &self.detected_browsers {
+            items.push(DropdownItem {
+                display: app.display_name.clone(),
+                value: app.command.clone(),
+                is_custom: false,
+            });
+        }
+
+        items.push(DropdownItem {
+            display: "Custom path...".to_string(),
+            value: String::new(),
+            is_custom: true,
+        });
+
+        // Pre-select the current value
+        let selected_idx = items
+            .iter()
+            .position(|item| !item.is_custom && item.value == self.browser)
+            .unwrap_or(0);
+
+        self.dropdown = Some(AppDropdownState {
+            field: SettingsField::Browser,
+            items,
+            selected_idx,
+            scroll_offset: 0,
+        });
+    }
+
+    /// Open dropdown for editor selection
+    fn open_editor_dropdown(&mut self) {
+        let mut items = vec![DropdownItem {
+            display: "(not configured)".to_string(),
+            value: String::new(),
+            is_custom: false,
+        }];
+
+        for app in &self.detected_editors {
+            items.push(DropdownItem {
+                display: app.display_name.clone(),
+                value: app.command.clone(),
+                is_custom: false,
+            });
+        }
+
+        items.push(DropdownItem {
+            display: "Custom path...".to_string(),
+            value: String::new(),
+            is_custom: true,
+        });
+
+        // Pre-select the current value
+        let selected_idx = items
+            .iter()
+            .position(|item| !item.is_custom && item.value == self.external_editor)
+            .unwrap_or(0);
+
+        self.dropdown = Some(AppDropdownState {
+            field: SettingsField::ExternalEditor,
+            items,
+            selected_idx,
+            scroll_offset: 0,
+        });
+    }
+
+    /// Move dropdown selection up
+    pub fn dropdown_move_up(&mut self) {
+        if let Some(dd) = &mut self.dropdown {
+            dd.move_up();
+        }
+    }
+
+    /// Move dropdown selection down
+    pub fn dropdown_move_down(&mut self) {
+        if let Some(dd) = &mut self.dropdown {
+            dd.move_down();
+        }
+    }
+
+    /// Confirm dropdown selection. Returns true if "Custom path..." was selected
+    /// (caller should then handle text input mode).
+    pub fn dropdown_confirm(&mut self) -> bool {
+        if let Some(dd) = self.dropdown.take() {
+            if let Some(item) = dd.items.get(dd.selected_idx) {
+                if item.is_custom {
+                    // Open text input for custom path
+                    self.start_text_editing(dd.field);
+                    return true;
+                }
+                match dd.field {
+                    SettingsField::Browser => {
+                        self.browser = item.value.clone();
+                    }
+                    SettingsField::ExternalEditor => {
+                        self.external_editor = item.value.clone();
+                    }
+                    _ => {}
+                }
+                self.has_changes = true;
+            }
+        }
+        false
     }
 
     /// Toggle boolean field or select template
@@ -365,6 +570,7 @@ impl SettingsState {
                 SettingsField::LazygitPath => self.lazygit_path = value,
                 SettingsField::Browser => self.browser = value,
                 SettingsField::ExternalEditor => self.external_editor = value,
+                SettingsField::ExportDir => self.export_dir = value,
                 SettingsField::CheckForUpdates => {} // Action, not a field to edit
             }
             self.has_changes = true;
@@ -380,6 +586,11 @@ impl SettingsState {
     /// Get selected template (if any)
     pub fn selected_template(&self) -> Option<&Template> {
         self.available_templates.get(self.selected_template_idx)
+    }
+
+    /// Check if dropdown is currently active
+    pub fn has_dropdown(&self) -> bool {
+        self.dropdown.is_some()
     }
 }
 
@@ -415,6 +626,11 @@ pub fn render(frame: &mut Frame, area: Rect, state: &SettingsState) {
     render_category_tabs(frame, layout[0], state);
     render_category_content(frame, layout[1], state);
     render_footer(frame, layout[2], state);
+
+    // Render dropdown overlay on top if active
+    if state.dropdown.is_some() {
+        render_app_dropdown(frame, popup_area, state);
+    }
 }
 
 fn render_category_tabs(frame: &mut Frame, area: Rect, state: &SettingsState) {
@@ -532,12 +748,28 @@ fn render_paths(frame: &mut Frame, area: Rect, state: &SettingsState) {
     let browser_display = if state.browser.is_empty() {
         "(system default)".to_string()
     } else {
-        state.browser.clone()
+        // Show friendly name if we can match the command to a detected app
+        state
+            .detected_browsers
+            .iter()
+            .find(|app| app.command == state.browser)
+            .map(|app| format!("{} ({})", app.display_name, app.command))
+            .unwrap_or_else(|| state.browser.clone())
     };
     let editor_display = if state.external_editor.is_empty() {
         "(not configured)".to_string()
     } else {
-        state.external_editor.clone()
+        state
+            .detected_editors
+            .iter()
+            .find(|app| app.command == state.external_editor)
+            .map(|app| format!("{} ({})", app.display_name, app.command))
+            .unwrap_or_else(|| state.external_editor.clone())
+    };
+    let export_dir_display = if state.export_dir.is_empty() {
+        "~/Downloads (default)".to_string()
+    } else {
+        state.export_dir.clone()
     };
 
     let items = vec![
@@ -555,18 +787,25 @@ fn render_paths(frame: &mut Frame, area: Rect, state: &SettingsState) {
             state.editing.as_ref() == Some(&SettingsField::LazygitPath),
             &state.input_buffer,
         ),
-        format_setting(
+        format_dropdown_setting(
             "Browser",
             &browser_display,
             state.selected_idx == 2,
             state.editing.as_ref() == Some(&SettingsField::Browser),
             &state.input_buffer,
         ),
-        format_setting(
+        format_dropdown_setting(
             "External Editor",
             &editor_display,
             state.selected_idx == 3,
             state.editing.as_ref() == Some(&SettingsField::ExternalEditor),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Export Directory",
+            &export_dir_display,
+            state.selected_idx == 4,
+            state.editing.as_ref() == Some(&SettingsField::ExportDir),
             &state.input_buffer,
         ),
     ];
@@ -611,7 +850,7 @@ fn render_about(frame: &mut Frame, area: Rect) {
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         )),
-        Line::from("Version: 0.6.1"),
+        Line::from(format!("Version: {}", env!("CARGO_PKG_VERSION"))),
         Line::from(""),
         Line::from("A TUI multiplexer for Claude Code development"),
         Line::from(""),
@@ -638,8 +877,10 @@ fn render_about(frame: &mut Frame, area: Rect) {
 }
 
 fn render_footer(frame: &mut Frame, area: Rect, state: &SettingsState) {
-    let text = if state.editing.is_some() {
-        "Enter: Save │ Esc: Cancel"
+    let text = if state.dropdown.is_some() {
+        "j/k: Navigate │ Enter: Select │ Esc: Cancel"
+    } else if state.editing.is_some() {
+        "Enter: Save │ Esc: Cancel │ Ctrl+V: Paste"
     } else if state.category == SettingsCategory::Templates {
         "Tab: Category │ j/k: Navigate │ Enter: Select │ s: Save & Close │ Esc: Close"
     } else {
@@ -653,6 +894,80 @@ fn render_footer(frame: &mut Frame, area: Rect, state: &SettingsState) {
     frame.render_widget(footer, area);
 }
 
+/// Render the app selection dropdown overlay
+fn render_app_dropdown(frame: &mut Frame, popup_area: Rect, state: &SettingsState) {
+    let dd = match &state.dropdown {
+        Some(dd) => dd,
+        None => return,
+    };
+
+    let title = match dd.field {
+        SettingsField::Browser => " Select Browser ",
+        SettingsField::ExternalEditor => " Select Editor ",
+        _ => " Select ",
+    };
+
+    // Get current value to mark active item
+    let current_value = match dd.field {
+        SettingsField::Browser => &state.browser,
+        SettingsField::ExternalEditor => &state.external_editor,
+        _ => &state.browser,
+    };
+
+    // Calculate dropdown dimensions
+    let dd_width = popup_area.width.saturating_sub(8).min(60);
+    let visible_items = dd.items.len().min(AppDropdownState::MAX_VISIBLE);
+    let dd_height = (visible_items as u16) + 2; // +2 for borders
+
+    // Center the dropdown over the settings popup
+    let dd_x = popup_area.x + (popup_area.width.saturating_sub(dd_width)) / 2;
+    let dd_y = popup_area.y + (popup_area.height.saturating_sub(dd_height)) / 2;
+
+    let dd_area = Rect::new(dd_x, dd_y, dd_width, dd_height);
+
+    // Clear and draw border
+    frame.render_widget(Clear, dd_area);
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+    let inner = block.inner(dd_area);
+    frame.render_widget(block, dd_area);
+
+    // Build list items with scrolling
+    let items: Vec<ListItem> = dd
+        .items
+        .iter()
+        .enumerate()
+        .skip(dd.scroll_offset)
+        .take(visible_items)
+        .map(|(i, item)| {
+            let is_selected = i == dd.selected_idx;
+            let is_active = !item.is_custom && item.value == *current_value;
+
+            let marker = if is_active { "● " } else { "  " };
+
+            let style = if is_selected {
+                Style::default().fg(Color::Black).bg(Color::Cyan)
+            } else if item.is_custom {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::ITALIC)
+            } else if is_active {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default()
+            };
+
+            let text = format!("{}{}", marker, item.display);
+            ListItem::new(Line::from(text)).style(style)
+        })
+        .collect();
+
+    let list = List::new(items);
+    frame.render_widget(list, inner);
+}
+
 fn format_setting(
     label: &str,
     value: &str,
@@ -664,6 +979,30 @@ fn format_setting(
         format!("{}█", input_buffer)
     } else {
         value.to_string()
+    };
+
+    let style = if selected {
+        Style::default().fg(Color::Black).bg(Color::Cyan)
+    } else {
+        Style::default()
+    };
+
+    let text = format!("{:<25} {}", format!("{}:", label), display_value);
+    ListItem::new(Line::from(text)).style(style)
+}
+
+/// Format a dropdown-enabled setting (shows ▼ indicator when not editing)
+fn format_dropdown_setting(
+    label: &str,
+    value: &str,
+    selected: bool,
+    editing: bool,
+    input_buffer: &str,
+) -> ListItem<'static> {
+    let display_value = if editing {
+        format!("{}█", input_buffer)
+    } else {
+        format!("{} ▼", value)
     };
 
     let style = if selected {
@@ -729,5 +1068,47 @@ mod tests {
 
         state.move_up();
         assert_eq!(state.selected_idx, 0);
+    }
+
+    #[test]
+    fn test_paths_item_count() {
+        let state = SettingsState::default();
+        // Paths: claude, lazygit, browser, external_editor, export_dir = 5
+        assert_eq!(state.item_count(), 6); // General is default
+    }
+
+    #[test]
+    fn test_dropdown_confirm_sets_browser() {
+        let mut state = SettingsState::default();
+        state.detected_browsers = vec![DetectedApp {
+            display_name: "Firefox".to_string(),
+            command: "open -a Firefox".to_string(),
+        }];
+
+        state.open_browser_dropdown();
+        assert!(state.dropdown.is_some());
+
+        // Select Firefox (index 1, after "(system default)")
+        if let Some(dd) = &mut state.dropdown {
+            dd.selected_idx = 1;
+        }
+        state.dropdown_confirm();
+        assert_eq!(state.browser, "open -a Firefox");
+        assert!(state.has_changes);
+    }
+
+    #[test]
+    fn test_dropdown_custom_returns_true() {
+        let mut state = SettingsState::default();
+        state.detected_browsers = vec![];
+
+        state.open_browser_dropdown();
+        // Select "Custom path..." (last item, index 1 since no browsers detected)
+        if let Some(dd) = &mut state.dropdown {
+            dd.selected_idx = 1; // (system default) + Custom path...
+        }
+        let is_custom = state.dropdown_confirm();
+        assert!(is_custom);
+        assert!(state.editing.is_some()); // Text editing mode activated
     }
 }

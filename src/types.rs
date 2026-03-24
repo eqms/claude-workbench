@@ -911,3 +911,21 @@ pub struct GitRemoteState {
     /// Whether a check is currently in progress
     pub checking: bool,
 }
+
+/// State for the Markdown export format chooser (Ctrl+X)
+#[derive(Debug, Clone)]
+pub struct ExportChooserState {
+    pub visible: bool,
+    pub source_path: std::path::PathBuf,
+    pub selected: usize, // 0 = Markdown, 1 = PDF
+}
+
+impl Default for ExportChooserState {
+    fn default() -> Self {
+        Self {
+            visible: false,
+            source_path: std::path::PathBuf::new(),
+            selected: 0,
+        }
+    }
+}

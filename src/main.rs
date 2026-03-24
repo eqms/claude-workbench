@@ -1,4 +1,5 @@
 pub mod app;
+pub mod app_detector;
 pub mod browser;
 pub mod clipboard;
 pub mod config;

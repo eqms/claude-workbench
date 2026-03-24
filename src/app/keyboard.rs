@@ -133,6 +133,56 @@ impl App {
             return;
         }
 
+        // Export format chooser handling
+        if self.export_chooser.visible {
+            match key.code {
+                KeyCode::Esc => self.export_chooser.visible = false,
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if self.export_chooser.selected > 0 {
+                        self.export_chooser.selected -= 1;
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if self.export_chooser.selected < 1 {
+                        self.export_chooser.selected += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    let format = if self.export_chooser.selected == 0 {
+                        crate::browser::pdf_export::ExportFormat::Markdown
+                    } else {
+                        crate::browser::pdf_export::ExportFormat::Pdf
+                    };
+                    let source = self.export_chooser.source_path.clone();
+                    self.export_chooser.visible = false;
+
+                    // Open path dialog for target location
+                    let export_dir =
+                        crate::browser::pdf_export::resolve_export_dir(&self.config.ui.export_dir);
+                    let filename =
+                        crate::browser::pdf_export::default_export_filename(&source, format);
+                    let target = export_dir.join(&filename);
+                    let target_str = target.to_string_lossy().to_string();
+                    let cursor = target_str.len();
+                    self.dialog.dialog_type = ui::dialog::DialogType::Input {
+                        title: format!(
+                            "Export as {}",
+                            if format == crate::browser::pdf_export::ExportFormat::Pdf {
+                                "PDF"
+                            } else {
+                                "Markdown"
+                            }
+                        ),
+                        value: target_str,
+                        cursor,
+                        action: ui::dialog::DialogAction::ExportMarkdown { source, format },
+                    };
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // Dialog handling (highest priority)
         if self.dialog.is_active() {
             match &self.dialog.dialog_type {
@@ -161,7 +211,31 @@ impl App {
                         KeyCode::Right => self.dialog.cursor_right(),
                         KeyCode::Home => self.dialog.cursor_home(),
                         KeyCode::End => self.dialog.cursor_end(),
-                        KeyCode::Char(c) => self.dialog.insert_char(c),
+                        KeyCode::Char(c) => {
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL)
+                            {
+                                match c {
+                                    'v' => {
+                                        // Ctrl+V: Paste from clipboard
+                                        if let Some(text) = crate::clipboard::paste_from_clipboard()
+                                        {
+                                            for ch in text.chars() {
+                                                self.dialog.insert_char(ch);
+                                            }
+                                        }
+                                    }
+                                    'c' => {
+                                        // Ctrl+C: Cancel dialog
+                                        self.dialog.close();
+                                    }
+                                    _ => {}
+                                }
+                            } else {
+                                self.dialog.insert_char(c);
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -428,6 +502,24 @@ impl App {
                 action: crate::ui::dialog::DialogAction::OpenMarkdownPreview,
             };
             return;
+        }
+
+        // Ctrl+X: Export current Markdown file (show format chooser)
+        if key.code == KeyCode::Char('x')
+            && key
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            if let Some(path) = &self.preview.current_file {
+                if self.preview.is_markdown {
+                    self.export_chooser = crate::types::ExportChooserState {
+                        visible: true,
+                        source_path: path.clone(),
+                        selected: 0,
+                    };
+                    return;
+                }
+            }
         }
 
         // Ctrl+E: Open selected file in external GUI editor

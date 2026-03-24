@@ -132,6 +132,9 @@ pub struct UiConfig {
     /// External GUI editor command (empty = not configured)
     #[serde(default)]
     pub external_editor: String,
+    /// Default export directory for Markdown/PDF exports (empty = ~/Downloads)
+    #[serde(default)]
+    pub export_dir: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -188,6 +191,7 @@ impl Default for Config {
                 show_preview: true,
                 browser: String::new(),
                 external_editor: String::new(),
+                export_dir: String::new(),
             },
             layout: LayoutConfig::default(),
             file_browser: FileBrowserConfig::default(),

@@ -139,6 +139,8 @@ pub struct App {
     pub remote_control_send_time: Option<std::time::Instant>,
     // Temp files created for browser previews (cleaned up on exit)
     pub temp_preview_files: Vec<std::path::PathBuf>,
+    // Export format chooser (Ctrl+X on Markdown files)
+    pub export_chooser: crate::types::ExportChooserState,
 }
 
 impl App {
@@ -281,6 +283,7 @@ impl App {
             copy_flash_lines: 0,
             remote_control_send_time: remote_control_time,
             temp_preview_files: Vec::new(),
+            export_chooser: crate::types::ExportChooserState::default(),
         };
 
         // Open wizard on first run

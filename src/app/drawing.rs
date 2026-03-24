@@ -195,6 +195,10 @@ impl App {
             ui::settings::render(frame, area, &self.settings);
         }
 
+        if self.export_chooser.visible {
+            render_export_chooser(frame, area, &self.export_chooser);
+        }
+
         if self.claude_startup.visible {
             ui::claude_startup::render(frame, area, &self.claude_startup);
         }
@@ -207,5 +211,64 @@ impl App {
 
         // Render drag ghost on top of everything
         ui::drag_ghost::render(frame, &self.drag_state);
+    }
+}
+
+/// Render the export format chooser popup (Ctrl+X on Markdown files)
+fn render_export_chooser(frame: &mut Frame, area: Rect, state: &crate::types::ExportChooserState) {
+    use ratatui::{
+        style::{Color, Style},
+        text::{Line, Span},
+        widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
+    };
+
+    let popup_width: u16 = 40;
+    let popup_height: u16 = 7; // border + title + 2 items + spacer + footer
+    let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+    let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+    let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" Export Format ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let items: Vec<ListItem> = vec![
+        {
+            let marker = if state.selected == 0 { "● " } else { "○ " };
+            let style = if state.selected == 0 {
+                Style::default().fg(Color::Black).bg(Color::Cyan)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(format!("{}Markdown (.md)", marker))).style(style)
+        },
+        {
+            let marker = if state.selected == 1 { "● " } else { "○ " };
+            let style = if state.selected == 1 {
+                Style::default().fg(Color::Black).bg(Color::Cyan)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(format!("{}PDF (.pdf)", marker))).style(style)
+        },
+    ];
+
+    let list_area = Rect::new(inner.x, inner.y, inner.width, 2);
+    let list = List::new(items);
+    frame.render_widget(list, list_area);
+
+    // Footer hint
+    if inner.height > 3 {
+        let footer_area = Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1);
+        let footer = Paragraph::new(Span::styled(
+            "j/k: Select │ Enter: OK │ Esc: Cancel",
+            Style::default().fg(Color::DarkGray),
+        ));
+        frame.render_widget(footer, footer_area);
     }
 }

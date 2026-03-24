@@ -1,5 +1,38 @@
 # Release Notes
 
+## Version 0.69.0 (24.03.2026)
+
+### Added
+- **App-Dropdown for Browser/Editor** — Settings → Paths shows auto-detected installed browsers
+  and editors in a dropdown menu instead of manual path input. Supports macOS (app bundle detection)
+  and Linux (which-based detection). Includes Safari, Firefox, Chrome, Brave, Arc, Zen Browser,
+  VS Code, Cursor, Zed, Sublime Text, Neovim, and more. "Custom path..." fallback for manual entry.
+- **Ctrl+X: Markdown Export** — Export current Markdown file as Markdown copy or PDF. Two-step dialog:
+  format chooser (MD/PDF) followed by target path dialog with tab-completion. PDF generation via
+  Chrome headless `--print-to-pdf` or wkhtmltopdf fallback. Print-optimized HTML template with
+  document header (title, author, date) and footer.
+- **Export Directory** — New `export_dir` config field and Settings → Paths entry. Defaults to
+  ~/Downloads. Configurable target directory for Markdown/PDF exports.
+- **Ctrl+V Paste in Dialogs** — Clipboard paste support in all input dialogs (Ctrl+O path dialog,
+  file operations, settings text fields). Uses existing `paste_from_clipboard()` arboard integration.
+- **Ctrl+C Cancel in Dialogs** — Ctrl+C now closes input dialogs (consistent with terminal behavior).
+
+### Changed
+- **Settings → Paths**: Expanded from 4 to 5 items (+ Export Directory). Browser and External Editor
+  fields now show `▼` dropdown indicator and display friendly app names with command in parentheses.
+- **Command Splitting Bugfix**: `open_file_with_browser()` and `open_file_with_editor()` now correctly
+  parse commands like `open -a "Brave Browser"` via quote-aware shell word splitting. Previously,
+  the entire string was passed as a single binary name to `Command::new()`.
+- **About Version**: Settings → About now shows version dynamically via `env!("CARGO_PKG_VERSION")`
+  instead of hardcoded string.
+- **Chrome --no-sandbox**: Only applied on Linux (containerized environments), not on macOS.
+- **Export Error Feedback**: Export failures show a confirm dialog with error message instead of
+  being silently swallowed.
+
+### New Files
+- `src/app_detector.rs` — Platform-specific browser/editor detection (macOS + Linux)
+- `src/browser/pdf_export.rs` — Markdown→PDF export via Chrome headless or wkhtmltopdf
+
 ## Version 0.68.0 (24.03.2026)
 
 ### Added

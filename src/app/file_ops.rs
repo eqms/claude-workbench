@@ -364,6 +364,63 @@ impl App {
                     }
                 }
             }
+            DialogAction::ExportMarkdown { source, format } => {
+                if let Some(target_str) = value {
+                    if !target_str.is_empty() {
+                        // Expand tilde
+                        let expanded = if target_str.starts_with('~') {
+                            if let Some(home) = dirs::home_dir() {
+                                target_str.replacen('~', &home.display().to_string(), 1)
+                            } else {
+                                target_str.to_string()
+                            }
+                        } else {
+                            target_str.to_string()
+                        };
+                        let target_path = std::path::PathBuf::from(&expanded);
+
+                        // Ensure parent directory exists
+                        if let Some(parent) = target_path.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+
+                        let title = source
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("Export")
+                            .to_string();
+
+                        let options = crate::browser::pdf_export::ExportOptions {
+                            title,
+                            author: "Claude Workbench".to_string(),
+                            date: chrono_date_now(),
+                            format,
+                        };
+
+                        match crate::browser::pdf_export::export_markdown(
+                            &source,
+                            &target_path,
+                            &options,
+                        ) {
+                            Ok(path) => {
+                                // Flash success indicator
+                                self.copy_flash_lines = 0; // reuse flash mechanism
+                                self.last_copy_time = Some(std::time::Instant::now());
+                                // Open the exported file
+                                let _ = crate::browser::opener::open_file(&path);
+                            }
+                            Err(e) => {
+                                // Show error to user via confirm dialog
+                                self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                    title: "Export Failed".to_string(),
+                                    message: format!("{}", e),
+                                    action: ui::dialog::DialogAction::DiscardEditorChanges,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -491,7 +548,21 @@ impl App {
     }
 
     /// Handle settings input
-    pub(super) fn handle_settings_input(&mut self, code: KeyCode, _modifiers: KeyModifiers) {
+    pub(super) fn handle_settings_input(&mut self, code: KeyCode, modifiers: KeyModifiers) {
+        // Dropdown handling (highest priority)
+        if self.settings.has_dropdown() {
+            match code {
+                KeyCode::Esc => self.settings.dropdown = None,
+                KeyCode::Up | KeyCode::Char('k') => self.settings.dropdown_move_up(),
+                KeyCode::Down | KeyCode::Char('j') => self.settings.dropdown_move_down(),
+                KeyCode::Enter => {
+                    self.settings.dropdown_confirm();
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // If editing a field
         if self.settings.editing.is_some() {
             match code {
@@ -500,7 +571,21 @@ impl App {
                 KeyCode::Backspace => {
                     self.settings.input_buffer.pop();
                 }
-                KeyCode::Char(c) => self.settings.input_buffer.push(c),
+                KeyCode::Char(c) => {
+                    if modifiers.contains(KeyModifiers::CONTROL) {
+                        match c {
+                            'v' => {
+                                if let Some(text) = crate::clipboard::paste_from_clipboard() {
+                                    self.settings.input_buffer.push_str(&text);
+                                }
+                            }
+                            'c' => self.settings.cancel_editing(),
+                            _ => {}
+                        }
+                    } else {
+                        self.settings.input_buffer.push(c);
+                    }
+                }
                 _ => {}
             }
             return;
@@ -544,4 +629,33 @@ impl App {
             _ => {}
         }
     }
+}
+
+/// Get current date as DD.MM.YYYY string
+fn chrono_date_now() -> String {
+    use std::time::SystemTime;
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let time_t = now as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    #[cfg(not(target_os = "windows"))]
+    {
+        unsafe {
+            libc::localtime_r(&time_t, &mut tm);
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        unsafe {
+            libc::localtime_s(&mut tm, &time_t);
+        }
+    }
+    format!(
+        "{:02}.{:02}.{}",
+        tm.tm_mday,
+        tm.tm_mon + 1,
+        tm.tm_year + 1900
+    )
 }

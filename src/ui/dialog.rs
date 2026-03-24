@@ -57,6 +57,11 @@ pub enum DialogAction {
     GoToPath,
     /// Open a Markdown file as HTML preview in browser
     OpenMarkdownPreview,
+    /// Export current Markdown file (value is target path)
+    ExportMarkdown {
+        source: std::path::PathBuf,
+        format: crate::browser::pdf_export::ExportFormat,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

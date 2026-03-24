@@ -84,7 +84,11 @@ pub fn open_file_with_browser(path: &Path, browser: &str) -> Result<()> {
     if browser.is_empty() {
         open_file(path)
     } else {
-        std::process::Command::new(browser).arg(path).spawn()?;
+        let (program, args) = split_command(browser);
+        std::process::Command::new(&program)
+            .args(&args)
+            .arg(path)
+            .spawn()?;
         Ok(())
     }
 }
@@ -94,8 +98,43 @@ pub fn open_file_with_editor(path: &Path, editor: &str) -> Result<()> {
     if editor.is_empty() {
         anyhow::bail!("No external editor configured");
     }
-    std::process::Command::new(editor).arg(path).spawn()?;
+    let (program, args) = split_command(editor);
+    std::process::Command::new(&program)
+        .args(&args)
+        .arg(path)
+        .spawn()?;
     Ok(())
+}
+
+/// Split a command string into program and arguments with quote-aware parsing.
+/// Handles patterns like: "firefox", "open -a Firefox", "open -a \"Brave Browser\""
+fn split_command(cmd: &str) -> (String, Vec<String>) {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let chars = cmd.chars().peekable();
+
+    for c in chars {
+        match c {
+            '"' => in_quotes = !in_quotes,
+            ' ' if !in_quotes => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(c),
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    if tokens.is_empty() {
+        (cmd.to_string(), Vec::new())
+    } else {
+        let program = tokens.remove(0);
+        (program, tokens)
+    }
 }
 
 /// Check if file is a markdown file

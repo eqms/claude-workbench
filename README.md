@@ -66,6 +66,9 @@ No overhead. Maximum performance. Built by a developer, for developers.
 - **Horizontal scrolling** - in Preview and Edit mode for long lines
 - **F9 Copy Last N Lines** - copy last N terminal lines to clipboard (configurable, default 50)
 - **Self-update** - automatic update check from GitHub Releases
+- **App Dropdown** - auto-detect installed browsers/editors in Settings (macOS + Linux)
+- **Ctrl+X Markdown Export** - export as Markdown copy or PDF (via Chrome headless / wkhtmltopdf)
+- **Ctrl+V Paste** - clipboard paste in all input dialogs
 - Mouse and keyboard navigation throughout
 
 ### Quick Start
@@ -99,6 +102,13 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Copy selection to System Clipboard |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
+
+### What's New in v0.69.0
+
+- **App Dropdown for Browser/Editor** — Settings → Paths now auto-detects installed browsers and editors. Select from a dropdown instead of typing paths manually. Supports macOS (app bundle detection) and Linux (which-based). "Custom path..." fallback for manual entry.
+- **Ctrl+X: Markdown Export** — Export current Markdown file as Markdown copy or PDF. Format chooser dialog, configurable export directory (Settings → Paths → Export Directory, default: ~/Downloads). PDF via Chrome headless or wkhtmltopdf.
+- **Ctrl+V Paste in Dialogs** — Clipboard paste now works in all input dialogs (Ctrl+O, file operations, settings fields).
+- **Command Splitting Bugfix** — Browser/editor commands like `open -a "Brave Browser"` now work correctly.
 
 ### What's New in v0.60.1
 
@@ -229,6 +239,9 @@ Kein Overhead. Maximale Performance. Von einem Entwickler, für Entwickler.
 - **Horizontales Scrollen** - in Vorschau und Editor für lange Zeilen
 - **F9 Letzte N Zeilen kopieren** - letzten N Terminal-Zeilen ins Clipboard kopieren (konfigurierbar, Standard 50)
 - **Selbst-Update** - automatische Update-Prüfung von GitHub Releases
+- **App-Dropdown** - automatische Erkennung installierter Browser/Editoren in Settings (macOS + Linux)
+- **Ctrl+X Markdown-Export** - Export als Markdown-Kopie oder PDF (via Chrome headless / wkhtmltopdf)
+- **Ctrl+V Einfügen** - Clipboard-Paste in allen Eingabedialogen
 - Maus- und Tastaturnavigation durchgehend
 
 ### Schnellstart
@@ -262,6 +275,13 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.69.0
+
+- **App-Dropdown für Browser/Editor** — Settings → Paths erkennt jetzt automatisch installierte Browser und Editoren. Auswahl per Dropdown statt manuelle Pfadeingabe. macOS (App-Bundle-Erkennung) und Linux (which-basiert). "Custom path..." Fallback für manuelle Eingabe.
+- **Ctrl+X: Markdown-Export** — Aktuelle Markdown-Datei als Markdown-Kopie oder PDF exportieren. Format-Auswahl-Dialog, konfigurierbares Export-Verzeichnis (Settings → Paths → Export Directory, Standard: ~/Downloads). PDF via Chrome headless oder wkhtmltopdf.
+- **Ctrl+V Einfügen in Dialogen** — Clipboard-Paste funktioniert jetzt in allen Eingabedialogen (Ctrl+O, Dateioperationen, Settings-Felder).
+- **Command-Splitting Bugfix** — Browser/Editor-Befehle wie `open -a "Brave Browser"` funktionieren jetzt korrekt.
 
 ### Neu in v0.60.1
 
