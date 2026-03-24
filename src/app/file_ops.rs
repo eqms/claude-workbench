@@ -344,6 +344,53 @@ impl App {
                     }
                 }
             }
+            DialogAction::OpenMarkdownPreview => {
+                if let Some(path_str) = value {
+                    if !path_str.is_empty() {
+                        // Expand tilde to home directory
+                        let expanded = if path_str.starts_with('~') {
+                            if let Some(home) = dirs::home_dir() {
+                                path_str.replacen('~', &home.display().to_string(), 1)
+                            } else {
+                                path_str.to_string()
+                            }
+                        } else {
+                            path_str.to_string()
+                        };
+                        let target = std::path::PathBuf::from(&expanded);
+                        if target.is_file() {
+                            self.open_in_browser(&target);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Open a file in the configured browser (with Markdown→HTML conversion)
+    pub(crate) fn open_in_browser(&mut self, path: &std::path::Path) {
+        use crate::browser;
+        if browser::can_preview_in_browser(path) {
+            let preview_path = if browser::is_markdown(path) {
+                match browser::markdown_to_html(path) {
+                    Ok(p) => {
+                        self.temp_preview_files.push(p.clone());
+                        p
+                    }
+                    Err(_) => path.to_path_buf(),
+                }
+            } else if browser::can_syntax_highlight(path) {
+                match browser::text_to_html(path) {
+                    Ok(p) => {
+                        self.temp_preview_files.push(p.clone());
+                        p
+                    }
+                    Err(_) => path.to_path_buf(),
+                }
+            } else {
+                path.to_path_buf()
+            };
+            let _ = browser::open_file_with_browser(&preview_path, &self.config.ui.browser);
         }
     }
 

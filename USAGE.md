@@ -14,6 +14,8 @@
 |-----|--------|
 | Ctrl+Q/C | Quit |
 | Ctrl+P | Fuzzy Finder |
+| Ctrl+O | Open Markdown Preview (path dialog with tab-complete) |
+| Ctrl+E | Open in External Editor (configure in Settings F8) |
 | Ctrl+Shift+W | Setup Wizard |
 | F1 | Toggle File Browser |
 | F2 | Toggle Preview Pane |
@@ -258,6 +260,8 @@ When copying to Claude, output is automatically filtered:
 |-------|--------|
 | Ctrl+Q/C | Beenden |
 | Ctrl+P | Fuzzy-Finder |
+| Ctrl+O | Markdown-Preview öffnen (Pfad-Dialog mit Tab-Vervollständigung) |
+| Ctrl+E | In externem Editor öffnen (konfigurierbar in Einstellungen F8) |
 | Ctrl+Shift+W | Setup-Assistent |
 | F1 | Dateibrowser ein-/ausblenden |
 | F2 | Vorschau-Bereich umschalten |

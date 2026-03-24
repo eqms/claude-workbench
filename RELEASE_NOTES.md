@@ -1,5 +1,24 @@
 # Release Notes
 
+## Version 0.68.0 (24.03.2026)
+
+### Added
+- **Ctrl+O: Open Markdown Preview** — Dialog mit Tab-Completion zum Öffnen beliebiger Markdown-Dateien
+  als HTML-Preview im Browser. Vorausgefüllt mit `~/.claude/plans/` für Claude-Pläne.
+  Unterstützt Tilde-Expansion und alle previewbaren Dateitypen.
+- **Ctrl+E: External Editor** — Öffnet die ausgewählte Datei im konfigurierten externen GUI-Editor
+  (z.B. VS Code, Sublime Text). Konfigurierbar in Settings (F8) → Paths.
+- **Browser-Konfiguration** — Neues `browser`-Feld in Config und Settings → Paths. Die `o`-Taste
+  nutzt jetzt den konfigurierten Browser statt nur den System-Default.
+- **External Editor-Konfiguration** — Neues `external_editor`-Feld in Config und Settings → Paths.
+
+### Changed
+- **Settings → Paths**: Kategorie von 2 auf 4 Items erweitert (+ Browser, External Editor)
+- **Footer (FileBrowser)**: Zeigt `^O` (OpenMD) und `^E` (Editor) Shortcuts
+- **Help-Screen**: Neue Ctrl+O und Ctrl+E Shortcuts dokumentiert
+- **Browser-Opener**: Neues `open_file_with_browser()` und `open_file_with_editor()` in opener.rs
+- **Refactoring**: Browser-Preview-Logik in wiederverwendbare `App::open_in_browser()` Methode extrahiert
+
 ## Version 0.67.0 (24.03.2026)
 
 ### Changed

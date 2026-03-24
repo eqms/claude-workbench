@@ -126,6 +126,12 @@ pub struct UiConfig {
     pub show_lazygit: bool,
     #[serde(default = "default_true")]
     pub show_preview: bool,
+    /// Browser command for opening files (empty = system default)
+    #[serde(default)]
+    pub browser: String,
+    /// External GUI editor command (empty = not configured)
+    #[serde(default)]
+    pub external_editor: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -180,6 +186,8 @@ impl Default for Config {
                 show_terminal: false,
                 show_lazygit: false,
                 show_preview: true,
+                browser: String::new(),
+                external_editor: String::new(),
             },
             layout: LayoutConfig::default(),
             file_browser: FileBrowserConfig::default(),

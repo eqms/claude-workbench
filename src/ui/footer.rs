@@ -288,6 +288,8 @@ impl Widget for Footer {
                 ("F5", "Git"),
                 ("F6", "Term"),
                 ("F9", "Menu"),
+                ("^O", "OpenMD"),
+                ("^E", "Editor"),
                 ("^P", "Find"),
                 ("F12", "Help"),
             ]

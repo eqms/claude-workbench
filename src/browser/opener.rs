@@ -79,6 +79,25 @@ pub fn can_preview_in_browser(path: &Path) -> bool {
     crate::browser::syntax::can_syntax_highlight(path)
 }
 
+/// Opens a file with a specific browser, or falls back to system default
+pub fn open_file_with_browser(path: &Path, browser: &str) -> Result<()> {
+    if browser.is_empty() {
+        open_file(path)
+    } else {
+        std::process::Command::new(browser).arg(path).spawn()?;
+        Ok(())
+    }
+}
+
+/// Opens a file with an external GUI editor
+pub fn open_file_with_editor(path: &Path, editor: &str) -> Result<()> {
+    if editor.is_empty() {
+        anyhow::bail!("No external editor configured");
+    }
+    std::process::Command::new(editor).arg(path).spawn()?;
+    Ok(())
+}
+
 /// Check if file is a markdown file
 pub fn is_markdown(path: &Path) -> bool {
     let ext = path

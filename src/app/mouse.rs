@@ -535,20 +535,7 @@ impl App {
                                 }
                                 FooterAction::OpenFile => {
                                     if let Some(path) = self.file_browser.selected_file() {
-                                        if browser::can_preview_in_browser(&path) {
-                                            let preview_path = if browser::is_markdown(&path) {
-                                                match browser::markdown_to_html(&path) {
-                                                    Ok(p) => {
-                                                        self.temp_preview_files.push(p.clone());
-                                                        p
-                                                    }
-                                                    Err(_) => path,
-                                                }
-                                            } else {
-                                                path
-                                            };
-                                            let _ = browser::open_file(&preview_path);
-                                        }
+                                        self.open_in_browser(&path);
                                     }
                                 }
                                 FooterAction::OpenFinder => {

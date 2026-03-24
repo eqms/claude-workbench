@@ -81,6 +81,8 @@ pub enum SettingsField {
     // Paths
     ClaudePath,
     LazygitPath,
+    Browser,
+    ExternalEditor,
 }
 
 /// Settings menu state
@@ -104,6 +106,8 @@ pub struct SettingsState {
     pub claude_height: u16,
     pub claude_path: String,
     pub lazygit_path: String,
+    pub browser: String,
+    pub external_editor: String,
     pub selected_template_idx: usize,
     pub available_templates: Vec<Template>,
 
@@ -131,6 +135,8 @@ impl Default for SettingsState {
             claude_height: 40,
             claude_path: "claude".to_string(),
             lazygit_path: "lazygit".to_string(),
+            browser: String::new(),
+            external_editor: String::new(),
             selected_template_idx: 0,
             available_templates: templates,
             has_changes: false,
@@ -166,6 +172,8 @@ impl SettingsState {
             .first()
             .cloned()
             .unwrap_or_else(|| "lazygit".to_string());
+        self.browser = config.ui.browser.clone();
+        self.external_editor = config.ui.external_editor.clone();
         self.has_changes = false;
     }
 
@@ -182,6 +190,8 @@ impl SettingsState {
         config.layout.claude_height_percent = self.claude_height;
         config.pty.claude_command = vec![self.claude_path.clone()];
         config.pty.lazygit_command = vec![self.lazygit_path.clone()];
+        config.ui.browser = self.browser.clone();
+        config.ui.external_editor = self.external_editor.clone();
     }
 
     pub fn open(&mut self, config: &Config) {
@@ -212,7 +222,7 @@ impl SettingsState {
         match self.category {
             SettingsCategory::General => 6, // shell, scrollback, hidden, autosave, auto-refresh, check updates
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
-            SettingsCategory::Paths => 2,   // claude, lazygit
+            SettingsCategory::Paths => 4,   // claude, lazygit, browser, external_editor
             SettingsCategory::Templates => self.available_templates.len(),
             SettingsCategory::About => 0,
         }
@@ -257,6 +267,8 @@ impl SettingsState {
             SettingsCategory::Paths => match self.selected_idx {
                 0 => Some(SettingsField::ClaudePath),
                 1 => Some(SettingsField::LazygitPath),
+                2 => Some(SettingsField::Browser),
+                3 => Some(SettingsField::ExternalEditor),
                 _ => None,
             },
             _ => None,
@@ -275,6 +287,8 @@ impl SettingsState {
                 SettingsField::ClaudeHeight => self.claude_height.to_string(),
                 SettingsField::ClaudePath => self.claude_path.clone(),
                 SettingsField::LazygitPath => self.lazygit_path.clone(),
+                SettingsField::Browser => self.browser.clone(),
+                SettingsField::ExternalEditor => self.external_editor.clone(),
                 SettingsField::CheckForUpdates => {
                     unreachable!("CheckForUpdates is an action, not a field")
                 }
@@ -349,6 +363,8 @@ impl SettingsState {
                 }
                 SettingsField::ClaudePath => self.claude_path = value,
                 SettingsField::LazygitPath => self.lazygit_path = value,
+                SettingsField::Browser => self.browser = value,
+                SettingsField::ExternalEditor => self.external_editor = value,
                 SettingsField::CheckForUpdates => {} // Action, not a field to edit
             }
             self.has_changes = true;
@@ -513,6 +529,17 @@ fn render_layout(frame: &mut Frame, area: Rect, state: &SettingsState) {
 }
 
 fn render_paths(frame: &mut Frame, area: Rect, state: &SettingsState) {
+    let browser_display = if state.browser.is_empty() {
+        "(system default)".to_string()
+    } else {
+        state.browser.clone()
+    };
+    let editor_display = if state.external_editor.is_empty() {
+        "(not configured)".to_string()
+    } else {
+        state.external_editor.clone()
+    };
+
     let items = vec![
         format_setting(
             "Claude CLI Path",
@@ -526,6 +553,20 @@ fn render_paths(frame: &mut Frame, area: Rect, state: &SettingsState) {
             &state.lazygit_path,
             state.selected_idx == 1,
             state.editing.as_ref() == Some(&SettingsField::LazygitPath),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Browser",
+            &browser_display,
+            state.selected_idx == 2,
+            state.editing.as_ref() == Some(&SettingsField::Browser),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "External Editor",
+            &editor_display,
+            state.selected_idx == 3,
+            state.editing.as_ref() == Some(&SettingsField::ExternalEditor),
             &state.input_buffer,
         ),
     ];

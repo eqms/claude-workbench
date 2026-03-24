@@ -129,6 +129,14 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Re-run Setup Wizard"),
         ]),
         Line::from(vec![
+            Span::styled("  Ctrl+O       ", Style::default().fg(Color::Cyan)),
+            Span::raw("Open Markdown Preview (path dialog with tab-complete)"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+E       ", Style::default().fg(Color::Cyan)),
+            Span::raw("Open in External Editor (configure in Settings)"),
+        ]),
+        Line::from(vec![
             Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
             Span::raw("Maximize/Restore Preview (fullscreen editor)"),
         ]),

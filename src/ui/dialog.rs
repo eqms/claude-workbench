@@ -55,6 +55,8 @@ pub enum DialogAction {
     CopyLastLines,
     /// Navigate to a specific path
     GoToPath,
+    /// Open a Markdown file as HTML preview in browser
+    OpenMarkdownPreview,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -421,8 +423,10 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
         } => {
             // Get completions for GoToPath dialog
             let completions = dialog.get_path_completions();
-            let has_completions =
-                matches!(action, DialogAction::GoToPath) && !completions.is_empty();
+            let has_completions = matches!(
+                action,
+                DialogAction::GoToPath | DialogAction::OpenMarkdownPreview
+            ) && !completions.is_empty();
 
             // Dynamic height: base 5 + completion list rows (max 8)
             let completion_rows = if has_completions {
@@ -477,7 +481,10 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
             );
 
             // Help text (with Tab hint for GoToPath)
-            let help_text = if matches!(action, DialogAction::GoToPath) {
+            let help_text = if matches!(
+                action,
+                DialogAction::GoToPath | DialogAction::OpenMarkdownPreview
+            ) {
                 "Tab: Complete | Enter: Confirm | Esc: Cancel"
             } else {
                 "Enter: Confirm | Esc: Cancel"

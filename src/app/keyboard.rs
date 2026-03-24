@@ -145,9 +145,13 @@ impl App {
                             self.dialog.close();
                             self.execute_dialog_action(act, Some(val));
                         }
-                        // Tab: Path completion for GoToPath dialog
+                        // Tab: Path completion for GoToPath and OpenMarkdownPreview dialogs
                         KeyCode::Tab => {
-                            if matches!(action, ui::dialog::DialogAction::GoToPath) {
+                            if matches!(
+                                action,
+                                ui::dialog::DialogAction::GoToPath
+                                    | ui::dialog::DialogAction::OpenMarkdownPreview
+                            ) {
                                 self.dialog.try_complete_path();
                             }
                         }
@@ -407,6 +411,41 @@ impl App {
             return;
         }
 
+        // Ctrl+O: Open Markdown file by path (dialog with tab-completion)
+        if key.code == KeyCode::Char('o')
+            && key
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            let default_path = dirs::home_dir()
+                .map(|h| format!("{}/.claude/plans/", h.display()))
+                .unwrap_or_default();
+            let cursor = default_path.len();
+            self.dialog.dialog_type = crate::ui::dialog::DialogType::Input {
+                title: "Open Markdown Preview".to_string(),
+                value: default_path,
+                cursor,
+                action: crate::ui::dialog::DialogAction::OpenMarkdownPreview,
+            };
+            return;
+        }
+
+        // Ctrl+E: Open selected file in external GUI editor
+        if key.code == KeyCode::Char('e')
+            && key
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            if let Some(path) = self.file_browser.selected_file() {
+                let editor = &self.config.ui.external_editor;
+                if !editor.is_empty() {
+                    let _ = crate::browser::open_file_with_editor(&path, editor);
+                }
+                // If empty: silently ignored — configure via Settings (F8) → Paths
+            }
+            return;
+        }
+
         // F8: Open settings
         if key.code == KeyCode::F(8) {
             self.settings.open(&self.config);
@@ -653,28 +692,7 @@ impl App {
                             // Open file in browser/external viewer
                             KeyCode::Char('o') => {
                                 if let Some(path) = self.file_browser.selected_file() {
-                                    if crate::browser::can_preview_in_browser(&path) {
-                                        let preview_path = if crate::browser::is_markdown(&path) {
-                                            match crate::browser::markdown_to_html(&path) {
-                                                Ok(p) => {
-                                                    self.temp_preview_files.push(p.clone());
-                                                    p
-                                                }
-                                                Err(_) => path,
-                                            }
-                                        } else if crate::browser::can_syntax_highlight(&path) {
-                                            match crate::browser::text_to_html(&path) {
-                                                Ok(p) => {
-                                                    self.temp_preview_files.push(p.clone());
-                                                    p
-                                                }
-                                                Err(_) => path,
-                                            }
-                                        } else {
-                                            path
-                                        };
-                                        let _ = crate::browser::open_file(&preview_path);
-                                    }
+                                    self.open_in_browser(&path);
                                 }
                             }
                             // Open current directory in file manager
