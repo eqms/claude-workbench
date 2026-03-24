@@ -7,8 +7,21 @@ pub fn compute_layout(
     show_terminal: bool,
     show_lazygit: bool,
     show_preview: bool,
+    preview_maximized: bool,
     layout_config: &LayoutConfig,
 ) -> (Rect, Rect, Rect, Rect, Rect, Rect) {
+    // Fullscreen mode: Preview gets the entire terminal area
+    if preview_maximized {
+        return (
+            Rect::default(), // files
+            area,            // preview = entire terminal
+            Rect::default(), // claude
+            Rect::default(), // lazygit
+            Rect::default(), // terminal
+            Rect::default(), // footer
+        );
+    }
+
     // Use config values for layout percentages
     let claude_pct = layout_config.claude_height_percent;
     let file_pct = layout_config.file_browser_width_percent;

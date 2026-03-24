@@ -381,6 +381,7 @@ impl App {
                                 self.show_terminal,
                                 self.show_lazygit,
                                 self.show_preview,
+                                self.preview_maximized,
                                 &self.config.layout,
                             );
                         let rects = LayoutRects {

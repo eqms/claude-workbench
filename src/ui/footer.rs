@@ -57,6 +57,7 @@ pub struct Footer {
     pub autosave_flash: bool,
     pub copy_flash: bool,
     pub copy_flash_lines: usize,
+    pub preview_maximized: bool,
 }
 
 /// Format current date/time for footer display
@@ -116,6 +117,7 @@ impl Default for Footer {
             autosave_flash: false,
             copy_flash: false,
             copy_flash_lines: 0,
+            preview_maximized: false,
         }
     }
 }
@@ -215,6 +217,12 @@ impl Widget for Footer {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Dynamic autosave button label
         let auto_label = if self.autosave { "Auto:ON" } else { "Auto:OFF" };
+        // Dynamic F3 label: "Max" or "Restore"
+        let f3_label = if self.preview_maximized {
+            "Restore"
+        } else {
+            "MaxPrev"
+        };
 
         // Context-dependent key display
         let keys: Vec<(&str, &str)> = if self.selection_mode {
@@ -233,7 +241,7 @@ impl Widget for Footer {
                 ("^A", auto_label),
                 ("^H", "S&R"),
                 ("F1", "Files"),
-                ("F3", "MaxPrev"),
+                ("F3", f3_label),
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
@@ -247,7 +255,7 @@ impl Widget for Footer {
                 ("/", "Search"),
                 ("^S", "Select"),
                 ("F1", "Files"),
-                ("F3", "MaxPrev"),
+                ("F3", f3_label),
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),
@@ -263,7 +271,7 @@ impl Widget for Footer {
                 ("^S", "Select"),
                 ("F1", "Files"),
                 ("F2", "Preview"),
-                ("F3", "MaxPrev"),
+                ("F3", f3_label),
                 ("F4", "Claude"),
                 ("F5", "Git"),
                 ("F6", "Term"),

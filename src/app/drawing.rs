@@ -23,6 +23,7 @@ impl App {
             self.show_terminal,
             self.show_lazygit,
             self.show_preview,
+            self.preview_maximized,
             &self.config.layout,
         );
 
@@ -141,17 +142,20 @@ impl App {
             .unwrap_or(false);
         let copy_flash_lines = self.copy_flash_lines;
 
-        let footer_widget = ui::footer::Footer {
-            active_pane: self.active_pane,
-            editor_mode: self.preview.mode,
-            editor_modified: self.preview.modified,
-            selection_mode: self.terminal_selection.active,
-            autosave: self.config.ui.autosave,
-            autosave_flash,
-            copy_flash,
-            copy_flash_lines,
-        };
-        frame.render_widget(footer_widget, footer);
+        if footer.height > 0 {
+            let footer_widget = ui::footer::Footer {
+                active_pane: self.active_pane,
+                editor_mode: self.preview.mode,
+                editor_modified: self.preview.modified,
+                selection_mode: self.terminal_selection.active,
+                autosave: self.config.ui.autosave,
+                autosave_flash,
+                copy_flash,
+                copy_flash_lines,
+                preview_maximized: self.preview_maximized,
+            };
+            frame.render_widget(footer_widget, footer);
+        }
 
         if self.help.visible {
             ui::help::render(frame, &mut self.help);

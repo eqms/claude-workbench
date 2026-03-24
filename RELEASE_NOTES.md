@@ -1,5 +1,15 @@
 # Release Notes
 
+## Version 0.67.0 (24.03.2026)
+
+### Changed
+- **F3 True Fullscreen**: Preview übernimmt jetzt das **gesamte Terminal** (inkl. Claude-Bereich und Footer).
+  Vorher wurde nur die obere Hälfte maximiert, Claude blieb sichtbar.
+  - `compute_layout` erhält neuen `preview_maximized` Parameter für Early Return
+  - Footer wird im Fullscreen-Modus ausgeblendet (Guard: `footer.height > 0`)
+  - Alle PTYs laufen im Hintergrund weiter, nur die Darstellung wird ausgeblendet
+- **Footer-Label**: F3-Button zeigt "Restore" statt "MaxPrev" wenn Preview maximiert ist
+
 ## Version 0.66.0 (23.03.2026)
 
 ### Added
