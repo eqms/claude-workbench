@@ -195,12 +195,13 @@ impl App {
                             self.dialog.close();
                             self.execute_dialog_action(act, Some(val));
                         }
-                        // Tab: Path completion for GoToPath and OpenMarkdownPreview dialogs
+                        // Tab: Path completion for path input dialogs
                         KeyCode::Tab => {
                             if matches!(
                                 action,
                                 ui::dialog::DialogAction::GoToPath
                                     | ui::dialog::DialogAction::OpenMarkdownPreview
+                                    | ui::dialog::DialogAction::ExportMarkdown { .. }
                             ) {
                                 self.dialog.try_complete_path();
                             }

@@ -406,8 +406,11 @@ impl App {
                                 // Flash success indicator
                                 self.copy_flash_lines = 0; // reuse flash mechanism
                                 self.last_copy_time = Some(std::time::Instant::now());
-                                // Open the exported file
-                                let _ = crate::browser::opener::open_file(&path);
+                                // Open the exported file with configured browser
+                                let _ = crate::browser::opener::open_file_with_browser(
+                                    &path,
+                                    &self.config.ui.browser,
+                                );
                             }
                             Err(e) => {
                                 // Show error to user via confirm dialog
@@ -593,6 +596,13 @@ impl App {
 
         match code {
             KeyCode::Esc => {
+                // Auto-save changes before closing
+                if self.settings.has_changes {
+                    self.settings.apply_to_config(&mut self.config);
+                    if let Err(e) = crate::config::save_config(&self.config) {
+                        eprintln!("Failed to save config: {}", e);
+                    }
+                }
                 self.settings.close();
             }
             KeyCode::Tab => {

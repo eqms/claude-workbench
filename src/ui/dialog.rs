@@ -242,7 +242,10 @@ impl Dialog {
         let current_value = match &self.dialog_type {
             DialogType::Input {
                 value,
-                action: DialogAction::GoToPath,
+                action:
+                    DialogAction::GoToPath
+                    | DialogAction::OpenMarkdownPreview
+                    | DialogAction::ExportMarkdown { .. },
                 ..
             } => value.clone(),
             _ => return false,
@@ -354,7 +357,10 @@ impl Dialog {
         let current_value = match &self.dialog_type {
             DialogType::Input {
                 value,
-                action: DialogAction::GoToPath,
+                action:
+                    DialogAction::GoToPath
+                    | DialogAction::OpenMarkdownPreview
+                    | DialogAction::ExportMarkdown { .. },
                 ..
             } => value.clone(),
             _ => return Vec::new(),
@@ -488,7 +494,9 @@ pub fn render(f: &mut Frame, area: Rect, dialog: &mut Dialog) {
             // Help text (with Tab hint for GoToPath)
             let help_text = if matches!(
                 action,
-                DialogAction::GoToPath | DialogAction::OpenMarkdownPreview
+                DialogAction::GoToPath
+                    | DialogAction::OpenMarkdownPreview
+                    | DialogAction::ExportMarkdown { .. }
             ) {
                 "Tab: Complete | Enter: Confirm | Esc: Cancel"
             } else {
