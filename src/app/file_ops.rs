@@ -147,6 +147,17 @@ impl App {
                     self.add_to_gitignore(&path);
                 }
             }
+            MenuAction::ExportFile => {
+                if let Some(path) = &self.preview.current_file {
+                    if self.preview.is_markdown {
+                        self.export_chooser = crate::types::ExportChooserState {
+                            visible: true,
+                            source_path: path.clone(),
+                            selected: 0,
+                        };
+                    }
+                }
+            }
             MenuAction::None => {}
         }
     }

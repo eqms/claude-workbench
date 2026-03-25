@@ -137,6 +137,10 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Open in External Editor (configure in Settings)"),
         ]),
         Line::from(vec![
+            Span::styled("  Ctrl+X       ", Style::default().fg(Color::Cyan)),
+            Span::raw("Export Markdown/PDF (format chooser)"),
+        ]),
+        Line::from(vec![
             Span::styled("  F3           ", Style::default().fg(Color::Cyan)),
             Span::raw("Maximize/Restore Preview (fullscreen editor)"),
         ]),
@@ -146,7 +150,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("               ", Style::default().fg(Color::Cyan)),
-            Span::raw("u:Dup, c:Copy, m:Move, d:Del, y/Y:Path)"),
+            Span::raw("u:Dup, c:Copy, m:Move, d:Del, y/Y:Path, x:Export)"),
         ]),
         Line::from(vec![
             Span::styled("  F10          ", Style::default().fg(Color::Cyan)),

@@ -20,6 +20,7 @@ pub enum MenuAction {
     CopyRelativePath,
     GoToPath,
     AddToGitignore,
+    ExportFile,
 }
 
 #[derive(Default)]
@@ -35,12 +36,12 @@ impl MenuBar {
     }
 
     pub fn next(&mut self) {
-        self.selected = (self.selected + 1) % 11;
+        self.selected = (self.selected + 1) % 12;
     }
 
     pub fn prev(&mut self) {
         if self.selected == 0 {
-            self.selected = 10;
+            self.selected = 11;
         } else {
             self.selected -= 1;
         }
@@ -59,6 +60,7 @@ impl MenuBar {
             8 => MenuAction::CopyRelativePath,
             9 => MenuAction::GoToPath,
             10 => MenuAction::AddToGitignore,
+            11 => MenuAction::ExportFile,
             _ => MenuAction::None,
         }
     }
@@ -81,6 +83,7 @@ pub fn render(f: &mut Frame, area: Rect, menu: &MenuBar) {
         ("Y", "Copy Rel Path"),
         ("g", "Go to Path"),
         ("i", "Add to .gitignore"),
+        ("x", "Export Markdown/PDF"),
     ];
 
     // Menu popup in center-top

@@ -98,10 +98,20 @@ cd claude-workbench && cargo build --release
 | Ctrl+P | Fuzzy file finder |
 | Ctrl+Q | Quit |
 | E | Edit file (in Preview) |
+| Ctrl+X | Export Markdown/PDF (format chooser) |
+| Ctrl+E | Open in External Editor (context-aware) |
 | Ctrl+S | Selection mode (in Terminal/Preview) |
 | Ctrl+C | Copy selection to System Clipboard |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
+
+### What's New in v0.70.0
+
+- **F9 Menu Export** — File Menu (F9 in File Browser) now has an "Export Markdown/PDF" entry (`x` key) as a direct alternative to Ctrl+X.
+- **Ctrl+E Context-Aware** — Opens the file currently shown in the Preview pane when Preview is active (previously only opened the selected file browser entry).
+- **Fixed: Settings auto-save on Esc** — Settings dialog now correctly persists changes when closed with Esc.
+- **Fixed: Tab completion for all path dialogs** — Tab key completes paths in all dialogs (Ctrl+O, Export Directory, Browser/Editor paths).
+- **Fixed: Browser selection for exports** — The configured browser is now correctly used for Markdown-to-HTML export preview.
 
 ### What's New in v0.69.0
 
@@ -271,10 +281,20 @@ cd claude-workbench && cargo build --release
 | Ctrl+P | Fuzzy-Dateisuche |
 | Ctrl+Q | Beenden |
 | E | Datei bearbeiten (in Vorschau) |
+| Ctrl+X | Markdown/PDF exportieren (Format-Auswahl) |
+| Ctrl+E | In externem Editor öffnen (kontextabhängig) |
 | Ctrl+S | Auswahlmodus (in Terminal/Vorschau) |
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.70.0
+
+- **F9-Menü Export** — Das Datei-Menü (F9 im Dateibrowser) hat jetzt einen „Export Markdown/PDF"-Eintrag (`x`-Taste) als direkte Alternative zu Ctrl+X.
+- **Ctrl+E kontextabhängig** — Öffnet die aktuell in der Vorschau angezeigte Datei, wenn der Vorschau-Bereich aktiv ist (bisher nur die im Dateibrowser markierte Datei).
+- **Behoben: Settings Auto-Save bei Esc** — Der Settings-Dialog speichert Änderungen jetzt korrekt beim Schließen mit Esc.
+- **Behoben: Tab-Vervollständigung in allen Pfad-Dialogen** — Tab vervollständigt Pfade in allen Dialogen (Ctrl+O, Export-Verzeichnis, Browser/Editor-Pfade).
+- **Behoben: Browser-Auswahl für Exporte** — Der konfigurierte Browser wird jetzt korrekt für die Markdown-zu-HTML-Export-Vorschau verwendet.
 
 ### Neu in v0.69.0
 

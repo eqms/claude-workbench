@@ -16,7 +16,7 @@
 | Ctrl+P | Fuzzy Finder |
 | Ctrl+O | Open Markdown Preview (path dialog with tab-complete) |
 | Ctrl+X | Export Markdown as MD/PDF (format chooser + target path) |
-| Ctrl+E | Open in External Editor (configure in Settings F8) |
+| Ctrl+E | Open in External Editor (Preview file when Preview active, otherwise FileBrowser selection; configure in Settings F8) |
 | Ctrl+V | Paste from clipboard (in input dialogs) |
 | Ctrl+Shift+W | Setup Wizard |
 | F1 | Toggle File Browser |
@@ -198,6 +198,7 @@ The status bar shows file size, modification date, and git branch info.
 | c | Copy to... |
 | m | Move to... |
 | d | Delete |
+| x | Export Markdown/PDF (format chooser for Markdown files) |
 | y | Copy absolute path |
 | Y | Copy relative path |
 | g | Go to path |
@@ -264,7 +265,7 @@ When copying to Claude, output is automatically filtered:
 | Ctrl+P | Fuzzy-Finder |
 | Ctrl+O | Markdown-Preview öffnen (Pfad-Dialog mit Tab-Vervollständigung) |
 | Ctrl+X | Markdown als MD/PDF exportieren (Formatwahl + Zielpfad) |
-| Ctrl+E | In externem Editor öffnen (konfigurierbar in Einstellungen F8) |
+| Ctrl+E | In externem Editor öffnen (Vorschau-Datei wenn Vorschau aktiv, sonst Dateibrowser-Auswahl; konfigurierbar in Einstellungen F8) |
 | Ctrl+V | Aus Zwischenablage einfügen (in Eingabedialogen) |
 | Ctrl+Shift+W | Setup-Assistent |
 | F1 | Dateibrowser ein-/ausblenden |
@@ -446,6 +447,7 @@ Die Statusleiste zeigt Dateigröße, Änderungsdatum und Git-Branch-Info.
 | c | Kopieren nach... |
 | m | Verschieben nach... |
 | d | Löschen |
+| x | Markdown/PDF exportieren (Formatwahl für Markdown-Dateien) |
 | y | Absoluten Pfad kopieren |
 | Y | Relativen Pfad kopieren |
 | g | Zu Pfad springen |

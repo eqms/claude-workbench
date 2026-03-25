@@ -309,6 +309,10 @@ impl App {
                     self.menu.visible = false;
                     self.handle_menu_action(ui::menu::MenuAction::AddToGitignore);
                 }
+                KeyCode::Char('x') => {
+                    self.menu.visible = false;
+                    self.handle_menu_action(ui::menu::MenuAction::ExportFile);
+                }
                 _ => {}
             }
             return;
@@ -524,17 +528,22 @@ impl App {
         }
 
         // Ctrl+E: Open selected file in external GUI editor
+        // Context-aware: Preview file when Preview is active, otherwise file browser selection
         if key.code == KeyCode::Char('e')
             && key
                 .modifiers
                 .contains(crossterm::event::KeyModifiers::CONTROL)
         {
-            if let Some(path) = self.file_browser.selected_file() {
+            let path_opt = if self.active_pane == PaneId::Preview {
+                self.preview.current_file.clone()
+            } else {
+                self.file_browser.selected_file()
+            };
+            if let Some(path) = path_opt {
                 let editor = &self.config.ui.external_editor;
                 if !editor.is_empty() {
                     let _ = crate::browser::open_file_with_editor(&path, editor);
                 }
-                // If empty: silently ignored — configure via Settings (F8) → Paths
             }
             return;
         }

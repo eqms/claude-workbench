@@ -1,5 +1,25 @@
 # Release Notes
 
+## Version 0.70.0 (25.03.2026)
+
+### Added
+- **F9 Menu Export** — New "Export Markdown/PDF" entry (`x` key) in File Menu. Opens the format
+  chooser dialog (same as Ctrl+X) for Markdown files shown in Preview pane.
+- **Ctrl+X in F12 Help** — Export shortcut now documented in Global Shortcuts section.
+  F9 description updated with `x:Export`.
+
+### Changed
+- **Ctrl+E Context-Aware** — External editor now opens the Preview pane's current file when
+  Preview is active, instead of always using the File Browser's selected file.
+
+### Fixed
+- **Settings Persistence** — Settings dialog now auto-saves changes on Esc (previously only
+  saved when pressing `s`/`S`, silently discarding changes on Esc).
+- **Tab Completion** — Path tab-completion now works in OpenMarkdown and Export dialogs
+  (previously only worked in GoToPath dialog).
+- **Browser Selection for Export** — Exported files now open with the configured browser
+  instead of system default.
+
 ## Version 0.69.0 (24.03.2026)
 
 ### Added
