@@ -10,6 +10,14 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
+    // Guard: skip rendering for zero-area panes (hidden panes default to 0x0)
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    // Clear area before rendering to prevent stale content from previous frames
+    f.render_widget(ratatui::widgets::Clear, area);
+
     let title = match pane_id {
         PaneId::Claude => " Claude Code ",
         PaneId::LazyGit => " LazyGit ",
@@ -240,54 +248,59 @@ impl Widget for TerminalWidget<'_> {
 
                 let col_idx = c as usize;
 
+                let x = area.x + c;
+                let y = area.y + r;
+                if x >= buf.area.width || y >= buf.area.height {
+                    continue;
+                }
+
                 let cell = self.screen.cell(r, c);
-                if let Some(cell) = cell {
-                    let char_val = cell.contents().chars().next().unwrap_or(' ');
+                if let Some(buf_cell) = buf.cell_mut((x, y)) {
+                    if let Some(cell) = cell {
+                        let char_val = cell.contents().chars().next().unwrap_or(' ');
+                        buf_cell.set_char(char_val);
 
-                    let x = area.x + c;
-                    let y = area.y + r;
-                    if x < buf.area.width && y < buf.area.height {
-                        if let Some(buf_cell) = buf.cell_mut((x, y)) {
-                            buf_cell.set_char(char_val);
+                        // Map Colors
+                        let fg = map_color(cell.fgcolor());
+                        let bg = map_color(cell.bgcolor());
 
-                            // Map Colors
-                            let fg = map_color(cell.fgcolor());
-                            let bg = map_color(cell.bgcolor());
-
-                            let mut style = Style::default();
-                            if let Some(f) = fg {
-                                style = style.fg(f);
-                            }
-                            if let Some(b) = bg {
-                                style = style.bg(b);
-                            }
-
-                            // Apply selection highlighting
-                            // Character-level selection (mouse) takes precedence, then line-based (keyboard)
-                            if self.is_char_selected(row_idx, col_idx) {
-                                // Mouse selection: use inverted colors for better visibility
-                                style = style.bg(Color::LightYellow).fg(Color::Black);
-                            } else if row_selected {
-                                // Keyboard selection: DarkGray background
-                                style = style.bg(Color::DarkGray);
-                            }
-
-                            // Attributes (Bold, Italic, etc.)
-                            if cell.bold() {
-                                style = style.add_modifier(ratatui::style::Modifier::BOLD);
-                            }
-                            if cell.italic() {
-                                style = style.add_modifier(ratatui::style::Modifier::ITALIC);
-                            }
-                            if cell.inverse() {
-                                style = style.add_modifier(ratatui::style::Modifier::REVERSED);
-                            }
-                            if cell.underline() {
-                                style = style.add_modifier(ratatui::style::Modifier::UNDERLINED);
-                            }
-
-                            buf_cell.set_style(style);
+                        let mut style = Style::default();
+                        if let Some(f) = fg {
+                            style = style.fg(f);
                         }
+                        if let Some(b) = bg {
+                            style = style.bg(b);
+                        }
+
+                        // Apply selection highlighting
+                        // Character-level selection (mouse) takes precedence, then line-based (keyboard)
+                        if self.is_char_selected(row_idx, col_idx) {
+                            // Mouse selection: use inverted colors for better visibility
+                            style = style.bg(Color::LightYellow).fg(Color::Black);
+                        } else if row_selected {
+                            // Keyboard selection: DarkGray background
+                            style = style.bg(Color::DarkGray);
+                        }
+
+                        // Attributes (Bold, Italic, etc.)
+                        if cell.bold() {
+                            style = style.add_modifier(ratatui::style::Modifier::BOLD);
+                        }
+                        if cell.italic() {
+                            style = style.add_modifier(ratatui::style::Modifier::ITALIC);
+                        }
+                        if cell.inverse() {
+                            style = style.add_modifier(ratatui::style::Modifier::REVERSED);
+                        }
+                        if cell.underline() {
+                            style = style.add_modifier(ratatui::style::Modifier::UNDERLINED);
+                        }
+
+                        buf_cell.set_style(style);
+                    } else {
+                        // Cell is None (outside vt100 screen) — clear to prevent stale content
+                        buf_cell.set_char(' ');
+                        buf_cell.set_style(Style::reset());
                     }
                 }
             }

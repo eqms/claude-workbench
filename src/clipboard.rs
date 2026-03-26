@@ -36,10 +36,16 @@ pub fn paste_from_clipboard() -> Option<String> {
 
 /// Send text to clipboard via OSC 52 escape sequence.
 /// This writes directly to stdout, bypassing crossterm's buffering.
+/// Sends both BEL (\x07) and ST (\x1b\\) terminators for maximum compatibility.
 fn osc52_copy(text: &str) {
     let encoded = base64_encode(text);
-    let osc52 = format!("\x1b]52;c;{}\x07", encoded);
-    let _ = std::io::stdout().write_all(osc52.as_bytes());
+    // Try BEL terminator first (most common)
+    let osc52_bel = format!("\x1b]52;c;{}\x07", encoded);
+    let _ = std::io::stdout().write_all(osc52_bel.as_bytes());
+    let _ = std::io::stdout().flush();
+    // Also send ST terminator variant (required by some terminals like Terminus)
+    let osc52_st = format!("\x1b]52;c;{}\x1b\\", encoded);
+    let _ = std::io::stdout().write_all(osc52_st.as_bytes());
     let _ = std::io::stdout().flush();
 }
 

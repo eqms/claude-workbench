@@ -1,6 +1,6 @@
 [package]
 name = "claude-workbench"
-version = "0.72.0"
+version = "0.73.0"
 edition = "2021"
 
 [dependencies]
@@ -19,7 +19,7 @@ syntect = { version = "5.2", default-features = false, features = ["default-synt
 tui-markdown = "0.3"
 pulldown-cmark = "0.10"
 shell-escape = "0.1"
-arboard = "3.6"  # Cross-platform clipboard
+arboard = { version = "3.6", features = ["wayland-data-control"] }  # Cross-platform clipboard (X11 + Wayland)
 regex = "1.12"
 libc = "0.2"
 self_update = { version = "0.42", default-features = false, features = [

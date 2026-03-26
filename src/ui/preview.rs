@@ -750,6 +750,11 @@ pub fn render(
     char_selection: Option<((usize, usize), (usize, usize))>,
     autosave: bool,
 ) {
+    // Clear area before rendering to prevent stale content from previous frames
+    if area.width > 0 && area.height > 0 {
+        f.render_widget(ratatui::widgets::Clear, area);
+    }
+
     let title = build_title(state, autosave);
     let selection_active = selection_range.is_some() || char_selection.is_some();
     let (border_style, border_type) =

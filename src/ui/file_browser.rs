@@ -449,6 +449,11 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
     use ratatui::text::{Line, Span};
     use ratatui::widgets::Paragraph;
 
+    // Clear area before rendering to prevent stale content from previous frames
+    if area.width > 0 && area.height > 0 {
+        f.render_widget(ratatui::widgets::Clear, area);
+    }
+
     // Split area: list + info bar
     let chunks = Layout::default()
         .direction(Direction::Vertical)

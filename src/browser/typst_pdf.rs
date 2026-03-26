@@ -36,7 +36,7 @@ const TYPST_TEMPLATE: &str = r##"
   paper: "{page_size}",
   margin: (left: {margin}, right: {margin}, top: {margin}, bottom: {margin}),
   header: [
-    #set text(size: 9pt, fill: rgb("{header_border}"))
+    #set text(font: ("{font_family}", "Carlito", "Liberation Sans"), size: 9pt, fill: rgb("{header_border}"))
     {title}
     #v(2pt)
     #line(length: 100%, stroke: 0.5pt + rgb("{header_border}"))
@@ -44,7 +44,7 @@ const TYPST_TEMPLATE: &str = r##"
   footer: [
     #line(length: 100%, stroke: 0.5pt + rgb("{header_border}"))
     #v(2pt)
-    #set text(size: {footer_size}, fill: rgb("{footer_color}"))
+    #set text(font: ("{font_family}", "Carlito", "Liberation Sans"), size: {footer_size}, fill: rgb("{footer_color}"))
     #grid(
       columns: (1fr, 1fr, 1fr),
       align: (left, center, right),
@@ -249,6 +249,7 @@ struct TypstRenderer {
     list_depth: u32,
     ordered_list_stack: Vec<bool>,
     in_heading: bool,
+    heading_buf: String,
     table_header_bg: String,
     table_border: String,
     table_size: String,
@@ -269,6 +270,7 @@ impl TypstRenderer {
             list_depth: 0,
             ordered_list_stack: Vec::new(),
             in_heading: false,
+            heading_buf: String::new(),
             table_header_bg: doc.colors.table_header_bg.clone(),
             table_border: doc.colors.table_border.clone(),
             table_size: doc.sizes.table.clone(),
@@ -289,11 +291,17 @@ impl TypstRenderer {
                 // --- Headings ---
                 Event::Start(Tag::Heading { level, .. }) => {
                     r.in_heading = true;
+                    r.heading_buf.clear();
                     let prefix = "=".repeat(level as usize);
                     r.out.push_str(&format!("\n{} ", prefix));
                 }
                 Event::End(TagEnd::Heading(_)) => {
                     r.in_heading = false;
+                    // Generate a label from heading text for internal link targets
+                    let slug = slugify(&r.heading_buf);
+                    if !slug.is_empty() {
+                        r.out.push_str(&format!("\n#label(\"{}\")", slug));
+                    }
                     r.out.push('\n');
                 }
 
@@ -352,7 +360,14 @@ impl TypstRenderer {
 
                 // --- Links ---
                 Event::Start(Tag::Link { dest_url, .. }) => {
-                    r.push_to_active(&format!("#link(\"{}\")[", dest_url));
+                    let url = dest_url.to_string();
+                    if let Some(anchor) = url.strip_prefix('#') {
+                        // Internal anchor link → Typst label reference
+                        let slug = slugify(anchor);
+                        r.push_to_active(&format!("#link(label(\"{}\"))[", slug));
+                    } else {
+                        r.push_to_active(&format!("#link(\"{}\")[", url));
+                    }
                 }
                 Event::End(TagEnd::Link) => {
                     r.push_to_active("]");
@@ -466,6 +481,9 @@ impl TypstRenderer {
                     } else if r.in_table {
                         r.cell_buf.push_str(&typst_escape(&text));
                     } else {
+                        if r.in_heading {
+                            r.heading_buf.push_str(&text);
+                        }
                         r.push_to_active(&typst_escape(&text));
                     }
                 }
@@ -541,6 +559,28 @@ fn typst_escape(s: &str) -> String {
         }
     }
     result
+}
+
+/// Convert a heading or anchor text to a URL-style slug for Typst labels.
+fn slugify(text: &str) -> String {
+    text.to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c
+            } else if c == ' ' || c == '-' || c == '_' {
+                '-'
+            } else {
+                // Skip special chars
+                '\0'
+            }
+        })
+        .filter(|c| *c != '\0')
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 /// Build the complete Typst document from template + body.

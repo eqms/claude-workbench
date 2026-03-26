@@ -324,12 +324,23 @@ impl Widget for Footer {
         let version = env!("CARGO_PKG_VERSION");
 
         let right_spans = if self.copy_flash {
-            // Flash state: green background for 2s after copy/export
+            // Flash state for copy/export feedback
             use ratatui::style::Modifier;
-            let flash_text = if let Some(ref msg) = self.copy_flash_message {
-                format!(" \u{2713} {}  ", msg)
+            let is_progress = self
+                .copy_flash_message
+                .as_ref()
+                .is_some_and(|m| m.contains("..."));
+            let (flash_text, bg_color) = if let Some(ref msg) = self.copy_flash_message {
+                if is_progress {
+                    (format!(" \u{23F3} {}  ", msg), Color::Yellow) // hourglass for progress
+                } else {
+                    (format!(" \u{2713} {}  ", msg), Color::Green) // checkmark for success
+                }
             } else {
-                format!(" \u{2713} {} Zeilen  ", self.copy_flash_lines)
+                (
+                    format!(" \u{2713} {} Zeilen  ", self.copy_flash_lines),
+                    Color::Green,
+                )
             };
             vec![
                 Span::styled(
@@ -340,7 +351,7 @@ impl Widget for Footer {
                     flash_text,
                     Style::default()
                         .fg(Color::Black)
-                        .bg(Color::Green)
+                        .bg(bg_color)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(

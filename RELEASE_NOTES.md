@@ -1,5 +1,30 @@
 # Release Notes
 
+## Version 0.73.0 (26.03.2026)
+
+### Added
+- **Async PDF Export with Progress** — PDF generation now runs in a background thread.
+  Footer shows yellow "Generating PDF..." indicator during generation, green "PDF exported" on success.
+  UI remains responsive during export.
+- **PDF Internal Anchor Links** — Markdown `[text](#heading)` links now work as clickable internal
+  navigation in PDF. Headings automatically get Typst labels (slugified), anchor links resolve to
+  `label()` references.
+- **Wayland Clipboard Support** — arboard now compiled with `wayland-data-control` feature for
+  native Wayland clipboard access on Linux (no more X11-only limitation).
+- **OSC 52 Dual Terminator** — Clipboard fallback now sends both BEL (`\x07`) and ST (`\x1b\\`)
+  terminators for broader terminal compatibility (Terminus, etc.).
+
+### Fixed
+- **Linux Rendering: Pane Overlap** — Fixed severe rendering corruption on Linux where pane
+  content would overlap and mix when scrolling. Root causes: (1) Missing `Clear` widget before
+  rendering main panes — stale frame content bled through on Linux terminals. (2) Hidden panes
+  with zero-area `Rect(0,0,0,0)` were still rendered, writing border chars at position (0,0).
+  (3) `TerminalWidget` skipped `None` vt100 cells instead of clearing them, leaving ghost
+  content from previous frames.
+- **PDF Header/Footer Font** — Header and footer now explicitly use the configured font family
+  (Carlito/Calibri) instead of inheriting Typst's default font. The `font:` rule was missing in
+  the `#set text()` calls inside the `header:` and `footer:` page template blocks.
+
 ## Version 0.72.0 (26.03.2026)
 
 ### Fixed

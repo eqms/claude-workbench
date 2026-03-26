@@ -105,6 +105,14 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.73.0
+
+- **Async PDF Export** — PDF generation runs in background with yellow progress indicator. UI stays responsive.
+- **PDF Internal Links** — Markdown anchor links (`[text](#heading)`) now work as clickable navigation in PDF.
+- **PDF Font Fix** — Header/footer now use configured Carlito/Calibri font instead of Typst default.
+- **Linux Clipboard** — Wayland support via `wayland-data-control`, OSC 52 dual-terminator (BEL + ST) for broader terminal compatibility.
+- **Linux Rendering Fix** — Fixed severe pane overlap/ghosting when scrolling on Linux terminals. Added `Clear` before pane rendering, zero-area guards, and proper None-cell clearing.
+
 ### What's New in v0.72.0
 
 - **PDF Export Fix** — Fixed "file not found" error when exporting Markdown with local images. Remote image URLs are now rendered as links in PDF.
@@ -304,6 +312,14 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.73.0
+
+- **Async PDF-Export** — PDF-Generierung im Hintergrund mit gelbem Fortschrittsindikator. UI bleibt reaktiv.
+- **PDF Interne Links** — Markdown-Anker-Links (`[text](#heading)`) funktionieren als klickbare Navigation im PDF.
+- **PDF Schriftart-Fix** — Header/Footer verwenden jetzt konfigurierte Carlito/Calibri-Schrift statt Typst-Default.
+- **Linux Clipboard** — Wayland-Support via `wayland-data-control`, OSC 52 Dual-Terminator (BEL + ST) fuer breitere Terminal-Kompatibilitaet.
+- **Linux Rendering-Fix** — Schweres Pane-Overlap/Ghosting beim Scrollen unter Linux behoben. Clear vor Pane-Rendering, Zero-Area-Guards, und korrektes None-Cell-Clearing.
 
 ### Neu in v0.72.0
 

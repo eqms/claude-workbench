@@ -408,42 +408,85 @@ impl App {
                             format,
                         };
 
-                        match crate::browser::pdf_export::export_markdown(
-                            &source,
-                            &target_path,
-                            &options,
-                            &self.config.document,
-                        ) {
-                            Ok(path) => {
-                                // Flash success indicator with format-specific message
-                                let msg = match format {
-                                    crate::browser::pdf_export::ExportFormat::Pdf => {
-                                        "PDF exported".to_string()
-                                    }
-                                    crate::browser::pdf_export::ExportFormat::Markdown => {
-                                        "Markdown exported".to_string()
-                                    }
-                                };
-                                self.copy_flash_message = Some(msg);
-                                self.copy_flash_lines = 0;
-                                self.last_copy_time = Some(std::time::Instant::now());
-                                // Open the exported file with configured browser
-                                let _ = crate::browser::opener::open_file_with_browser(
-                                    &path,
-                                    &self.config.ui.browser,
+                        if format == crate::browser::pdf_export::ExportFormat::Pdf {
+                            // Async PDF export — run in background thread
+                            let (tx, rx) = std::sync::mpsc::channel();
+                            let doc_config = self.config.document.clone();
+                            let src = source.clone();
+                            let tgt = target_path.clone();
+                            std::thread::spawn(move || {
+                                let result = crate::browser::pdf_export::export_markdown(
+                                    &src,
+                                    &tgt,
+                                    &options,
+                                    &doc_config,
                                 );
-                            }
-                            Err(e) => {
-                                // Show error to user via confirm dialog
-                                self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
-                                    title: "Export Failed".to_string(),
-                                    message: format!("{}", e),
-                                    action: ui::dialog::DialogAction::DiscardEditorChanges,
-                                };
+                                let _ = tx.send(result.map_err(|e| format!("{}", e)));
+                            });
+                            self.export_receiver = Some(rx);
+                            self.export_browser = Some(self.config.ui.browser.clone());
+                            // Show progress flash
+                            self.copy_flash_message = Some("Generating PDF...".to_string());
+                            self.copy_flash_lines = 0;
+                            self.last_copy_time = Some(std::time::Instant::now());
+                        } else {
+                            // Markdown export is instant — run synchronously
+                            match crate::browser::pdf_export::export_markdown(
+                                &source,
+                                &target_path,
+                                &options,
+                                &self.config.document,
+                            ) {
+                                Ok(path) => {
+                                    self.copy_flash_message = Some("Markdown exported".to_string());
+                                    self.copy_flash_lines = 0;
+                                    self.last_copy_time = Some(std::time::Instant::now());
+                                    let _ = crate::browser::opener::open_file_with_browser(
+                                        &path,
+                                        &self.config.ui.browser,
+                                    );
+                                }
+                                Err(e) => {
+                                    self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                                        title: "Export Failed".to_string(),
+                                        message: format!("{}", e),
+                                        action: ui::dialog::DialogAction::DiscardEditorChanges,
+                                    };
+                                }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Poll for async PDF export completion
+    pub(crate) fn poll_export_result(&mut self) {
+        if let Some(ref rx) = self.export_receiver {
+            if let Ok(result) = rx.try_recv() {
+                let browser = self.export_browser.take().unwrap_or_default();
+                self.export_receiver = None;
+                match result {
+                    Ok(path) => {
+                        self.copy_flash_message = Some("PDF exported".to_string());
+                        self.copy_flash_lines = 0;
+                        self.last_copy_time = Some(std::time::Instant::now());
+                        let _ = crate::browser::opener::open_file_with_browser(&path, &browser);
+                    }
+                    Err(e) => {
+                        self.copy_flash_message = None;
+                        self.last_copy_time = None;
+                        self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                            title: "Export Failed".to_string(),
+                            message: e,
+                            action: ui::dialog::DialogAction::DiscardEditorChanges,
+                        };
+                    }
+                }
+            } else {
+                // Keep the flash alive while exporting
+                self.last_copy_time = Some(std::time::Instant::now());
             }
         }
     }

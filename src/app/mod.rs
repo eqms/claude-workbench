@@ -142,6 +142,9 @@ pub struct App {
     pub temp_preview_files: Vec<std::path::PathBuf>,
     // Export format chooser (Ctrl+X on Markdown files)
     pub export_chooser: crate::types::ExportChooserState,
+    // Async PDF export result channel
+    pub export_receiver: Option<std::sync::mpsc::Receiver<Result<std::path::PathBuf, String>>>,
+    pub export_browser: Option<String>,
 }
 
 impl App {
@@ -286,6 +289,8 @@ impl App {
             remote_control_send_time: remote_control_time,
             temp_preview_files: Vec::new(),
             export_chooser: crate::types::ExportChooserState::default(),
+            export_receiver: None,
+            export_browser: None,
         };
 
         // Open wizard on first run
@@ -365,6 +370,9 @@ impl App {
 
             // Poll for async git remote check results
             self.poll_git_check();
+
+            // Poll for async PDF export result
+            self.poll_export_result();
 
             // Poll for async update check and update results
             self.poll_update_check();
