@@ -7,6 +7,8 @@ pub mod markdown;
 pub mod opener;
 pub mod pdf_export;
 pub mod syntax;
+pub mod template;
+pub mod typst_pdf;
 
 pub use markdown::*;
 pub use opener::*;

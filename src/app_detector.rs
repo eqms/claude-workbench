@@ -257,59 +257,6 @@ pub fn detect_editors() -> Vec<DetectedApp> {
     }
 }
 
-/// Check if a given command can be used for headless PDF generation.
-/// Returns the chrome binary path if available.
-pub fn find_pdf_renderer() -> Option<String> {
-    #[cfg(target_os = "macos")]
-    {
-        // Check for Chrome-based browsers that support --headless --print-to-pdf
-        let chrome_bundles = [
-            (
-                "Google Chrome",
-                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            ),
-            (
-                "Chromium",
-                "/Applications/Chromium.app/Contents/MacOS/Chromium",
-            ),
-            (
-                "Brave Browser",
-                "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-            ),
-            (
-                "Microsoft Edge",
-                "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-            ),
-        ];
-        for (_, binary_path) in &chrome_bundles {
-            if std::path::Path::new(binary_path).exists() {
-                return Some(binary_path.to_string());
-            }
-        }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let binaries = [
-            "google-chrome",
-            "google-chrome-stable",
-            "chromium",
-            "chromium-browser",
-            "brave-browser",
-            "microsoft-edge",
-        ];
-        for name in &binaries {
-            if which_exists(name) {
-                return Some(name.to_string());
-            }
-        }
-    }
-    // Fallback: wkhtmltopdf
-    if which_exists("wkhtmltopdf") {
-        return Some("wkhtmltopdf".to_string());
-    }
-    None
-}
-
 // ── macOS helpers ──────────────────────────────────────────────────────
 
 #[cfg(target_os = "macos")]

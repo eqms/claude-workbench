@@ -403,7 +403,7 @@ impl App {
 
                         let options = crate::browser::pdf_export::ExportOptions {
                             title,
-                            author: "Claude Workbench".to_string(),
+                            author: self.config.document.resolved_author(),
                             date: chrono_date_now(),
                             format,
                         };
@@ -412,6 +412,7 @@ impl App {
                             &source,
                             &target_path,
                             &options,
+                            &self.config.document,
                         ) {
                             Ok(path) => {
                                 // Flash success indicator
@@ -443,7 +444,7 @@ impl App {
         use crate::browser;
         if browser::can_preview_in_browser(path) {
             let preview_path = if browser::is_markdown(path) {
-                match browser::markdown_to_html(path) {
+                match browser::markdown_to_html(path, &self.config.document) {
                     Ok(p) => {
                         self.temp_preview_files.push(p.clone());
                         p
@@ -451,7 +452,7 @@ impl App {
                     Err(_) => path.to_path_buf(),
                 }
             } else if browser::can_syntax_highlight(path) {
-                match browser::text_to_html(path) {
+                match browser::text_to_html(path, &self.config.document) {
                     Ok(p) => {
                         self.temp_preview_files.push(p.clone());
                         p

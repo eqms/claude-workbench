@@ -1,6 +1,6 @@
 [package]
 name = "claude-workbench"
-version = "0.70.0"
+version = "0.71.0"
 edition = "2021"
 
 [dependencies]
@@ -28,3 +28,11 @@ self_update = { version = "0.42", default-features = false, features = [
     "rustls"
 ] }
 tempfile = "3"
+
+# Typst PDF generation (pure Rust, no external binaries)
+typst = "0.14.2"
+typst-pdf = "0.14.2"
+typst-library = "0.14.2"
+typst-kit = { version = "0.14.2", default-features = false, features = ["fonts"] }
+comemo = "0.4"  # Memoization required by typst::World trait
+ecow = "0.2"    # EcoString/EcoVec used in typst API
