@@ -1,5 +1,6 @@
 //! Auto-detection of installed browsers and editors on macOS and Linux.
 
+#[cfg(not(target_os = "windows"))]
 use std::path::PathBuf;
 use std::process::Command;
 

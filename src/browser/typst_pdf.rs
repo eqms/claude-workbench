@@ -160,7 +160,10 @@ impl typst::World for WorkbenchWorld {
             let mut t: libc::time_t = 0;
             libc::time(&mut t);
             let mut tm: libc::tm = std::mem::zeroed();
+            #[cfg(unix)]
             libc::localtime_r(&t, &mut tm);
+            #[cfg(windows)]
+            libc::localtime_s(&mut tm, &t);
             tm
         };
         Datetime::from_ymd(
