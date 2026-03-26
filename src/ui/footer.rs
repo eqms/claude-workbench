@@ -57,6 +57,7 @@ pub struct Footer {
     pub autosave_flash: bool,
     pub copy_flash: bool,
     pub copy_flash_lines: usize,
+    pub copy_flash_message: Option<String>,
     pub preview_maximized: bool,
 }
 
@@ -117,6 +118,7 @@ impl Default for Footer {
             autosave_flash: false,
             copy_flash: false,
             copy_flash_lines: 0,
+            copy_flash_message: None,
             preview_maximized: false,
         }
     }
@@ -322,15 +324,20 @@ impl Widget for Footer {
         let version = env!("CARGO_PKG_VERSION");
 
         let right_spans = if self.copy_flash {
-            // Flash state: green background "✓ N Zeilen" for 2s after F9 copy
+            // Flash state: green background for 2s after copy/export
             use ratatui::style::Modifier;
+            let flash_text = if let Some(ref msg) = self.copy_flash_message {
+                format!(" \u{2713} {}  ", msg)
+            } else {
+                format!(" \u{2713} {} Zeilen  ", self.copy_flash_lines)
+            };
             vec![
                 Span::styled(
                     format!(" {} │ ", datetime_text),
                     Style::default().bg(Color::DarkGray).fg(Color::White),
                 ),
                 Span::styled(
-                    format!(" \u{2713} {} Zeilen  ", self.copy_flash_lines),
+                    flash_text,
                     Style::default()
                         .fg(Color::Black)
                         .bg(Color::Green)

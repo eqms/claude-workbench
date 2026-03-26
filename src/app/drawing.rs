@@ -141,6 +141,11 @@ impl App {
             .map(|t| t.elapsed().as_secs() < 2)
             .unwrap_or(false);
         let copy_flash_lines = self.copy_flash_lines;
+        let copy_flash_message = if copy_flash {
+            self.copy_flash_message.clone()
+        } else {
+            None
+        };
 
         if footer.height > 0 {
             let footer_widget = ui::footer::Footer {
@@ -152,6 +157,7 @@ impl App {
                 autosave_flash,
                 copy_flash,
                 copy_flash_lines,
+                copy_flash_message,
                 preview_maximized: self.preview_maximized,
             };
             frame.render_widget(footer_widget, footer);

@@ -1,5 +1,31 @@
 # Release Notes
 
+## Version 0.72.0 (26.03.2026)
+
+### Fixed
+- **PDF Export with Images** — Fixed "file not found (searched at \<not-available\>)" error when
+  exporting Markdown files containing local images. The Typst World implementation now resolves
+  files relative to the Markdown source directory.
+- **Remote Image Handling** — HTTP/HTTPS image URLs in Markdown are now rendered as clickable
+  links in PDF output instead of causing compilation errors (Typst cannot fetch remote resources).
+
+### Changed
+- **Export Flash Message** — Footer now shows "PDF exported" or "Markdown exported" after
+  successful export instead of generic "0 Zeilen" indicator.
+
+### Removed
+- **Templates Tab** — Removed non-functional Templates tab from Settings dialog (F8). The tab
+  had no persistence — selecting a template had no effect. Layout templates can still be applied
+  via drag & drop configuration.
+- **templates.rs** — Removed unused template system module (`src/setup/templates.rs`).
+
+## Version 0.71.1 (26.03.2026)
+
+### Fixed
+- **Typst Margin** — Fixed margin configuration for PDF export
+- **Default Company** — Changed default company name to "Musterfirma"
+- **F8 Document Settings** — Document settings now accessible via F8
+
 ## Version 0.71.0 (26.03.2026)
 
 ### Added

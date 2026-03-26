@@ -2,7 +2,6 @@
 
 use crate::app_detector::{self, DetectedApp};
 use crate::config::Config;
-use crate::setup::templates::{get_builtin_templates, Template};
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -19,7 +18,6 @@ pub enum SettingsCategory {
     Layout,
     Paths,
     Document,
-    Templates,
     About,
 }
 
@@ -30,7 +28,6 @@ impl SettingsCategory {
             SettingsCategory::Layout,
             SettingsCategory::Paths,
             SettingsCategory::Document,
-            SettingsCategory::Templates,
             SettingsCategory::About,
         ]
     }
@@ -41,7 +38,6 @@ impl SettingsCategory {
             SettingsCategory::Layout => "Layout",
             SettingsCategory::Paths => "Paths",
             SettingsCategory::Document => "Document",
-            SettingsCategory::Templates => "Templates",
             SettingsCategory::About => "About",
         }
     }
@@ -51,8 +47,7 @@ impl SettingsCategory {
             SettingsCategory::General => SettingsCategory::Layout,
             SettingsCategory::Layout => SettingsCategory::Paths,
             SettingsCategory::Paths => SettingsCategory::Document,
-            SettingsCategory::Document => SettingsCategory::Templates,
-            SettingsCategory::Templates => SettingsCategory::About,
+            SettingsCategory::Document => SettingsCategory::About,
             SettingsCategory::About => SettingsCategory::General,
         }
     }
@@ -63,8 +58,7 @@ impl SettingsCategory {
             SettingsCategory::Layout => SettingsCategory::General,
             SettingsCategory::Paths => SettingsCategory::Layout,
             SettingsCategory::Document => SettingsCategory::Paths,
-            SettingsCategory::Templates => SettingsCategory::Document,
-            SettingsCategory::About => SettingsCategory::Templates,
+            SettingsCategory::About => SettingsCategory::Document,
         }
     }
 }
@@ -183,8 +177,6 @@ pub struct SettingsState {
     pub doc_table_border: String,
     pub doc_page_size: String,
     pub doc_page_margin: String,
-    pub selected_template_idx: usize,
-    pub available_templates: Vec<Template>,
 
     // App detection (cached)
     pub dropdown: Option<AppDropdownState>,
@@ -198,7 +190,6 @@ pub struct SettingsState {
 
 impl Default for SettingsState {
     fn default() -> Self {
-        let templates = get_builtin_templates();
         Self {
             visible: false,
             category: SettingsCategory::General,
@@ -230,8 +221,6 @@ impl Default for SettingsState {
             doc_table_border: "#999999".to_string(),
             doc_page_size: "A4".to_string(),
             doc_page_margin: "2.5cm".to_string(),
-            selected_template_idx: 0,
-            available_templates: templates,
             dropdown: None,
             detected_browsers: Vec::new(),
             detected_editors: Vec::new(),
@@ -354,7 +343,6 @@ impl SettingsState {
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
             SettingsCategory::Paths => 5,   // claude, lazygit, browser, external_editor, export_dir
             SettingsCategory::Document => 10,
-            SettingsCategory::Templates => self.available_templates.len(),
             SettingsCategory::About => 0,
         }
     }
@@ -600,10 +588,6 @@ impl SettingsState {
                 }
                 _ => self.start_editing(),
             },
-            SettingsCategory::Templates => {
-                self.selected_template_idx = self.selected_idx;
-                self.has_changes = true;
-            }
             _ => self.start_editing(),
         }
     }
@@ -678,10 +662,6 @@ impl SettingsState {
     }
 
     /// Get selected template (if any)
-    pub fn selected_template(&self) -> Option<&Template> {
-        self.available_templates.get(self.selected_template_idx)
-    }
-
     /// Check if dropdown is currently active
     pub fn has_dropdown(&self) -> bool {
         self.dropdown.is_some()
@@ -756,7 +736,6 @@ fn render_category_content(frame: &mut Frame, area: Rect, state: &SettingsState)
         SettingsCategory::Layout => render_layout(frame, area, state),
         SettingsCategory::Paths => render_paths(frame, area, state),
         SettingsCategory::Document => render_document(frame, area, state),
-        SettingsCategory::Templates => render_templates(frame, area, state),
         SettingsCategory::About => render_about(frame, area),
     }
 }
@@ -987,33 +966,6 @@ fn render_document(frame: &mut Frame, area: Rect, state: &SettingsState) {
     frame.render_widget(list, area);
 }
 
-fn render_templates(frame: &mut Frame, area: Rect, state: &SettingsState) {
-    let items: Vec<ListItem> = state
-        .available_templates
-        .iter()
-        .enumerate()
-        .map(|(i, template)| {
-            let is_selected = i == state.selected_idx;
-            let is_active = i == state.selected_template_idx;
-
-            let marker = if is_active { "● " } else { "○ " };
-            let style = if is_selected {
-                Style::default().fg(Color::Black).bg(Color::Cyan)
-            } else if is_active {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default()
-            };
-
-            let text = format!("{}{} - {}", marker, template.name, template.description);
-            ListItem::new(Line::from(text)).style(style)
-        })
-        .collect();
-
-    let list = List::new(items).block(Block::default().borders(Borders::NONE));
-    frame.render_widget(list, area);
-}
-
 fn render_about(frame: &mut Frame, area: Rect) {
     let text = vec![
         Line::from(""),
@@ -1054,8 +1006,6 @@ fn render_footer(frame: &mut Frame, area: Rect, state: &SettingsState) {
         "j/k: Navigate │ Enter: Select │ Esc: Cancel"
     } else if state.editing.is_some() {
         "Enter: Save │ Esc: Cancel │ Ctrl+V: Paste"
-    } else if state.category == SettingsCategory::Templates {
-        "Tab: Category │ j/k: Navigate │ Enter: Select │ s: Save & Close │ Esc: Close"
     } else {
         "Tab: Category │ j/k: Navigate │ Enter: Edit │ Space: Toggle │ s: Save & Close │ Esc: Close"
     };

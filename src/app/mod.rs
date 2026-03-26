@@ -135,6 +135,7 @@ pub struct App {
     // Flash state for F9 "✓ N Zeilen" copy indicator (2s duration)
     pub last_copy_time: Option<std::time::Instant>,
     pub copy_flash_lines: usize,
+    pub copy_flash_message: Option<String>,
     // Pending /remote-control slash command (sent after 4s startup delay)
     pub remote_control_send_time: Option<std::time::Instant>,
     // Temp files created for browser previews (cleaned up on exit)
@@ -281,6 +282,7 @@ impl App {
             last_autosave_time: None,
             last_copy_time: None,
             copy_flash_lines: 0,
+            copy_flash_message: None,
             remote_control_send_time: remote_control_time,
             temp_preview_files: Vec::new(),
             export_chooser: crate::types::ExportChooserState::default(),

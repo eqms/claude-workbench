@@ -105,6 +105,12 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.72.0
+
+- **PDF Export Fix** — Fixed "file not found" error when exporting Markdown with local images. Remote image URLs are now rendered as links in PDF.
+- **Export Flash Message** — Footer shows "PDF exported" / "Markdown exported" after successful export.
+- **Templates Tab Removed** — Removed non-functional Templates tab from Settings (no persistence, no effect).
+
 ### What's New in v0.71.0
 
 - **Native Typst PDF Engine** — PDF export now uses pure Rust Typst rendering. No external tools (Chrome, wkhtmltopdf) required. Bundled Carlito font (Calibri-compatible) for consistent cross-platform rendering.
@@ -298,6 +304,12 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.72.0
+
+- **PDF-Export Fix** — Fehler „file not found" bei Markdown-Dateien mit lokalen Bildern behoben. Remote-Bild-URLs werden als Links im PDF dargestellt.
+- **Export Flash-Nachricht** — Footer zeigt nach erfolgreichem Export „PDF exported" / „Markdown exported".
+- **Templates-Tab entfernt** — Nicht-funktionaler Templates-Tab aus Settings entfernt (keine Persistierung, keine Wirkung).
 
 ### Neu in v0.70.0
 

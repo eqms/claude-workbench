@@ -101,6 +101,7 @@ const TYPST_TEMPLATE: &str = r##"
 /// Minimal Typst World for self-contained document rendering.
 struct WorkbenchWorld {
     source: Source,
+    source_dir: PathBuf,
     library: LazyHash<typst::Library>,
     book: LazyHash<FontBook>,
     fonts: Vec<FontSlot>,
@@ -146,8 +147,15 @@ impl typst::World for WorkbenchWorld {
         }
     }
 
-    fn file(&self, _id: FileId) -> FileResult<Bytes> {
-        Err(FileError::NotFound(PathBuf::from("<not-available>")))
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        let vpath = id.vpath();
+        let path = vpath.as_rooted_path();
+        let rel = path.strip_prefix("/").unwrap_or(path);
+        let full_path = self.source_dir.join(rel);
+        match std::fs::read(&full_path) {
+            Ok(data) => Ok(Bytes::new(data)),
+            Err(_) => Err(FileError::NotFound(full_path)),
+        }
     }
 
     fn font(&self, index: usize) -> Option<Font> {
@@ -352,7 +360,16 @@ impl TypstRenderer {
 
                 // --- Images ---
                 Event::Start(Tag::Image { dest_url, .. }) => {
-                    r.out.push_str(&format!("#image(\"{}\")", dest_url));
+                    let url = dest_url.to_string();
+                    if url.starts_with("http://") || url.starts_with("https://") {
+                        // Remote images cannot be loaded by Typst — render as link
+                        r.out.push_str(&format!(
+                            "#text(fill: rgb(\"#666666\"), size: 9pt)[Image: #link(\"{}\")[{}]]",
+                            url, url
+                        ));
+                    } else {
+                        r.out.push_str(&format!("#image(\"{}\")", url));
+                    }
                 }
                 Event::End(TagEnd::Image) => {}
 
@@ -583,8 +600,13 @@ pub fn export_markdown_to_pdf(
     // 5. Create Typst source and world
     let source = Source::detached(&typ_source);
     let library = LazyHash::new(typst::Library::default());
+    let source_dir = md_source
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
     let world = WorkbenchWorld {
         source,
+        source_dir,
         library,
         book,
         fonts,

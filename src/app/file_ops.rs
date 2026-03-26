@@ -415,8 +415,17 @@ impl App {
                             &self.config.document,
                         ) {
                             Ok(path) => {
-                                // Flash success indicator
-                                self.copy_flash_lines = 0; // reuse flash mechanism
+                                // Flash success indicator with format-specific message
+                                let msg = match format {
+                                    crate::browser::pdf_export::ExportFormat::Pdf => {
+                                        "PDF exported".to_string()
+                                    }
+                                    crate::browser::pdf_export::ExportFormat::Markdown => {
+                                        "Markdown exported".to_string()
+                                    }
+                                };
+                                self.copy_flash_message = Some(msg);
+                                self.copy_flash_lines = 0;
                                 self.last_copy_time = Some(std::time::Instant::now());
                                 // Open the exported file with configured browser
                                 let _ = crate::browser::opener::open_file_with_browser(
