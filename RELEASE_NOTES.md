@@ -1,5 +1,29 @@
 # Release Notes
 
+## Version 0.71.0 (26.03.2026)
+
+### Added
+- **Native Typst PDF Engine** — PDF export now uses pure Rust Typst rendering. No external
+  tools (Chrome, wkhtmltopdf) required. Bundled Carlito font (Calibri-compatible, SIL OFL)
+  ensures consistent rendering on all platforms.
+- **Page Numbers** — Every PDF page shows "Seite X von Y" in the footer.
+- **Professional PDF Layout** — Three-column footer (Company | Date | Page), header with
+  document title and separator line on every page. A4 format, 2.5cm margins.
+- **Central DocumentConfig** — New `document:` section in `config.yaml` for unified branding
+  across all HTML preview and PDF export templates:
+  - `company:` — name, footer_text, author, website (supports `{company_name}` placeholder)
+  - `fonts:` — body and code font families (default: Calibri)
+  - `colors:` — accent, table_header_bg (#D5E8F0), table_border, link, footer, header_border
+  - `sizes:` — title (16pt), h1 (14pt), h2 (12pt), h3 (11pt), body (10pt), table (9pt), footer (8pt)
+  - `pdf:` — page_size (A4), margin (2.5cm)
+- **CSS Template Module** (`template.rs`) — Shared CSS fragment generator ensures consistent
+  styling across Markdown preview and syntax highlight templates.
+
+### Removed
+- **Chrome/wkhtmltopdf PDF rendering** — Replaced by native Typst engine. No external
+  binary dependencies for PDF export anymore.
+- **`find_pdf_renderer()`** — No longer needed since PDF is generated natively.
+
 ## Version 0.70.0 (25.03.2026)
 
 ### Added
