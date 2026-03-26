@@ -34,7 +34,7 @@ static CARLITO_BOLD_ITALIC: &[u8] = include_bytes!("../../assets/fonts/Carlito-B
 const TYPST_TEMPLATE: &str = r##"
 #set page(
   paper: "{page_size}",
-  margin: (all: {margin}),
+  margin: (left: {margin}, right: {margin}, top: {margin}, bottom: {margin}),
   header: [
     #set text(size: 9pt, fill: rgb("{header_border}"))
     {title}
