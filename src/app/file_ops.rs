@@ -395,16 +395,26 @@ impl App {
                             let _ = std::fs::create_dir_all(parent);
                         }
 
-                        let title = source
+                        let file_stem = source
                             .file_stem()
                             .and_then(|s| s.to_str())
-                            .unwrap_or("Export")
-                            .to_string();
+                            .unwrap_or("Export");
+                        let project_name = self
+                            .file_browser
+                            .root_dir
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("");
+                        let title = if project_name.is_empty() {
+                            file_stem.to_string()
+                        } else {
+                            format!("{} - {}", project_name, file_stem)
+                        };
 
                         let options = crate::browser::pdf_export::ExportOptions {
                             title,
                             author: self.config.document.resolved_author(),
-                            date: chrono_date_now(),
+                            date: crate::browser::pdf_export::date_now_dmy(),
                             format,
                         };
 
@@ -703,33 +713,4 @@ impl App {
             _ => {}
         }
     }
-}
-
-/// Get current date as DD.MM.YYYY string
-fn chrono_date_now() -> String {
-    use std::time::SystemTime;
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let time_t = now as libc::time_t;
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    #[cfg(not(target_os = "windows"))]
-    {
-        unsafe {
-            libc::localtime_r(&time_t, &mut tm);
-        }
-    }
-    #[cfg(target_os = "windows")]
-    {
-        unsafe {
-            libc::localtime_s(&mut tm, &time_t);
-        }
-    }
-    format!(
-        "{:02}.{:02}.{}",
-        tm.tm_mday,
-        tm.tm_mon + 1,
-        tm.tm_year + 1900
-    )
 }

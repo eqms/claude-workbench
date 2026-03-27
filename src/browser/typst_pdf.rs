@@ -83,7 +83,7 @@ const TYPST_TEMPLATE: &str = r##"
 ]
 
 #show raw.where(block: true): it => [
-  #set text(size: {table_size})
+  #set text(font: ("Consolas", "Courier New", "DejaVu Sans Mono", "Liberation Mono"), size: {table_size})
   #block(
     fill: rgb("#f4f4f4"),
     inset: 10pt,
@@ -422,13 +422,13 @@ impl TypstRenderer {
                     r.table_cells.clear();
                     r.table_header_done = false;
                     r.out.push_str(&format!(
-                        "\n#set text(size: {})\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: 8pt,\n",
+                        "\n#block[\n#set text(font: (\"Consolas\", \"Courier New\", \"DejaVu Sans Mono\", \"Liberation Mono\"), size: {})\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: 8pt,\n",
                         r.table_size, r.table_columns, r.table_header_bg, r.table_border,
                     ));
                 }
                 Event::End(TagEnd::Table) => {
                     r.in_table = false;
-                    r.out.push_str(")\n\n");
+                    r.out.push_str(")\n]\n\n");
                 }
                 Event::Start(Tag::TableHead) => {
                     r.table_cells.clear();

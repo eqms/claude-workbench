@@ -1,5 +1,16 @@
 # Release Notes
 
+## Version 0.74.0 (27.03.2026)
+
+### Changed
+- **PDF Export Filename** — Generated filename now includes project name and German date stamp:
+  `{project}-{filename}-{dd.mm.yyyy}.pdf` (e.g. `claude-workbench-README-27.03.2026.pdf`).
+- **PDF Document Title** — PDF header now shows project name as prefix: `{project} - {filename}`
+  (e.g. `claude-workbench - README`).
+- **PDF Monospace Fonts** — Table cells and code blocks now use explicit monospace font stack
+  (`Consolas`, `Courier New`, `DejaVu Sans Mono`, `Liberation Mono`) for consistent character
+  widths. Tables are wrapped in a `#block[...]` scope to prevent font bleeding into surrounding text.
+
 ## Version 0.73.0 (26.03.2026)
 
 ### Added

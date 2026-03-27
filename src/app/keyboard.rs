@@ -159,8 +159,17 @@ impl App {
                     // Open path dialog for target location
                     let export_dir =
                         crate::browser::pdf_export::resolve_export_dir(&self.config.ui.export_dir);
-                    let filename =
-                        crate::browser::pdf_export::default_export_filename(&source, format);
+                    let project_name = self
+                        .file_browser
+                        .root_dir
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("");
+                    let filename = crate::browser::pdf_export::default_export_filename(
+                        &source,
+                        format,
+                        project_name,
+                    );
                     let target = export_dir.join(&filename);
                     let target_str = target.to_string_lossy().to_string();
                     let cursor = target_str.len();

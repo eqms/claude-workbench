@@ -64,8 +64,38 @@ pub fn resolve_export_dir(configured: &str) -> PathBuf {
     }
 }
 
-/// Generate a default export filename based on source file and format
-pub fn default_export_filename(source: &Path, format: ExportFormat) -> String {
+/// Generate current date in German format (dd.mm.yyyy)
+pub(crate) fn date_now_dmy() -> String {
+    use std::time::SystemTime;
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let time_t = now as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    #[cfg(not(target_os = "windows"))]
+    {
+        unsafe {
+            libc::localtime_r(&time_t, &mut tm);
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        unsafe {
+            libc::localtime_s(&mut tm, &time_t);
+        }
+    }
+    format!(
+        "{:02}.{:02}.{}",
+        tm.tm_mday,
+        tm.tm_mon + 1,
+        tm.tm_year + 1900
+    )
+}
+
+/// Generate a default export filename based on source file, format and project name.
+/// Format: `{project}-{stem}-{dd.mm.yyyy}.{ext}`
+pub fn default_export_filename(source: &Path, format: ExportFormat, project_name: &str) -> String {
     let stem = source
         .file_stem()
         .and_then(|s| s.to_str())
@@ -74,7 +104,12 @@ pub fn default_export_filename(source: &Path, format: ExportFormat) -> String {
         ExportFormat::Markdown => "md",
         ExportFormat::Pdf => "pdf",
     };
-    format!("{}.{}", stem, ext)
+    let date = date_now_dmy();
+    if project_name.is_empty() {
+        format!("{}-{}.{}", stem, date, ext)
+    } else {
+        format!("{}-{}-{}.{}", project_name, stem, date, ext)
+    }
 }
 
 #[cfg(test)]
@@ -96,10 +131,17 @@ mod tests {
 
     #[test]
     fn test_default_export_filename() {
-        let name = default_export_filename(Path::new("/path/to/my-plan.md"), ExportFormat::Pdf);
-        assert_eq!(name, "my-plan.pdf");
+        let name = default_export_filename(
+            Path::new("/path/to/my-plan.md"),
+            ExportFormat::Pdf,
+            "myproject",
+        );
+        assert!(name.starts_with("myproject-my-plan-"));
+        assert!(name.ends_with(".pdf"));
 
-        let name = default_export_filename(Path::new("/path/to/notes.md"), ExportFormat::Markdown);
-        assert_eq!(name, "notes.md");
+        let name =
+            default_export_filename(Path::new("/path/to/notes.md"), ExportFormat::Markdown, "");
+        assert!(name.starts_with("notes-"));
+        assert!(name.ends_with(".md"));
     }
 }
