@@ -349,6 +349,9 @@ pub struct DocSizeConfig {
     /// Table text font size
     #[serde(default = "default_size_table")]
     pub table: String,
+    /// Code block font size
+    #[serde(default = "default_size_code")]
+    pub code: String,
     /// Footer text font size
     #[serde(default = "default_size_footer")]
     pub footer: String,
@@ -372,6 +375,9 @@ fn default_size_body() -> String {
 fn default_size_table() -> String {
     "9pt".to_string()
 }
+fn default_size_code() -> String {
+    "9pt".to_string()
+}
 fn default_size_footer() -> String {
     "8pt".to_string()
 }
@@ -385,6 +391,7 @@ impl Default for DocSizeConfig {
             h3: default_size_h3(),
             body: default_size_body(),
             table: default_size_table(),
+            code: default_size_code(),
             footer: default_size_footer(),
         }
     }

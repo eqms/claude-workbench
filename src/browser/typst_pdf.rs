@@ -83,7 +83,7 @@ const TYPST_TEMPLATE: &str = r##"
 ]
 
 #show raw.where(block: true): it => [
-  #set text(font: ({code_font_list}), size: {table_size})
+  #set text(font: ({code_font_list}), size: {code_size})
   #block(
     fill: rgb("#f4f4f4"),
     inset: 10pt,
@@ -641,6 +641,7 @@ fn build_typst_document(body: &str, options: &ExportOptions, doc: &DocumentConfi
         .replace("{h2_size}", &doc.sizes.h2)
         .replace("{h3_size}", &doc.sizes.h3)
         .replace("{table_size}", &doc.sizes.table)
+        .replace("{code_size}", &doc.sizes.code)
         .replace("{body}", body)
 }
 

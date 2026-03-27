@@ -90,7 +90,9 @@ pub enum SettingsField {
     CompanyAuthor,
     CompanyWebsite,
     DocBodyFont,
+    DocBodyFontSize,
     DocCodeFont,
+    DocCodeFontSize,
     DocTableHeaderBg,
     DocTableBorder,
     DocPageSize,
@@ -172,7 +174,9 @@ pub struct SettingsState {
     pub company_author: String,
     pub company_website: String,
     pub doc_body_font: String,
+    pub doc_body_font_size: String,
     pub doc_code_font: String,
+    pub doc_code_font_size: String,
     pub doc_table_header_bg: String,
     pub doc_table_border: String,
     pub doc_page_size: String,
@@ -216,7 +220,9 @@ impl Default for SettingsState {
             company_website: String::new(),
             doc_body_font: "Calibri, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
                 .to_string(),
+            doc_body_font_size: "10pt".to_string(),
             doc_code_font: "'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace".to_string(),
+            doc_code_font_size: "9pt".to_string(),
             doc_table_header_bg: "#D5E8F0".to_string(),
             doc_table_border: "#999999".to_string(),
             doc_page_size: "A4".to_string(),
@@ -267,7 +273,9 @@ impl SettingsState {
         self.company_author = config.document.company.author.clone();
         self.company_website = config.document.company.website.clone();
         self.doc_body_font = config.document.fonts.body.clone();
+        self.doc_body_font_size = config.document.sizes.body.clone();
         self.doc_code_font = config.document.fonts.code.clone();
+        self.doc_code_font_size = config.document.sizes.code.clone();
         self.doc_table_header_bg = config.document.colors.table_header_bg.clone();
         self.doc_table_border = config.document.colors.table_border.clone();
         self.doc_page_size = config.document.pdf.page_size.clone();
@@ -297,7 +305,9 @@ impl SettingsState {
         config.document.company.author = self.company_author.clone();
         config.document.company.website = self.company_website.clone();
         config.document.fonts.body = self.doc_body_font.clone();
+        config.document.sizes.body = self.doc_body_font_size.clone();
         config.document.fonts.code = self.doc_code_font.clone();
+        config.document.sizes.code = self.doc_code_font_size.clone();
         config.document.colors.table_header_bg = self.doc_table_header_bg.clone();
         config.document.colors.table_border = self.doc_table_border.clone();
         config.document.pdf.page_size = self.doc_page_size.clone();
@@ -342,7 +352,7 @@ impl SettingsState {
             SettingsCategory::General => 6, // shell, scrollback, hidden, autosave, auto-refresh, check updates
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
             SettingsCategory::Paths => 5,   // claude, lazygit, browser, external_editor, export_dir
-            SettingsCategory::Document => 10,
+            SettingsCategory::Document => 12,
             SettingsCategory::About => 0,
         }
     }
@@ -397,11 +407,13 @@ impl SettingsState {
                 2 => Some(SettingsField::CompanyAuthor),
                 3 => Some(SettingsField::CompanyWebsite),
                 4 => Some(SettingsField::DocBodyFont),
-                5 => Some(SettingsField::DocCodeFont),
-                6 => Some(SettingsField::DocTableHeaderBg),
-                7 => Some(SettingsField::DocTableBorder),
-                8 => Some(SettingsField::DocPageSize),
-                9 => Some(SettingsField::DocPageMargin),
+                5 => Some(SettingsField::DocBodyFontSize),
+                6 => Some(SettingsField::DocCodeFont),
+                7 => Some(SettingsField::DocCodeFontSize),
+                8 => Some(SettingsField::DocTableHeaderBg),
+                9 => Some(SettingsField::DocTableBorder),
+                10 => Some(SettingsField::DocPageSize),
+                11 => Some(SettingsField::DocPageMargin),
                 _ => None,
             },
             _ => None,
@@ -439,7 +451,9 @@ impl SettingsState {
                 SettingsField::CompanyAuthor => self.company_author.clone(),
                 SettingsField::CompanyWebsite => self.company_website.clone(),
                 SettingsField::DocBodyFont => self.doc_body_font.clone(),
+                SettingsField::DocBodyFontSize => self.doc_body_font_size.clone(),
                 SettingsField::DocCodeFont => self.doc_code_font.clone(),
+                SettingsField::DocCodeFontSize => self.doc_code_font_size.clone(),
                 SettingsField::DocTableHeaderBg => self.doc_table_header_bg.clone(),
                 SettingsField::DocTableBorder => self.doc_table_border.clone(),
                 SettingsField::DocPageSize => self.doc_page_size.clone(),
@@ -644,7 +658,9 @@ impl SettingsState {
                 SettingsField::CompanyAuthor => self.company_author = value,
                 SettingsField::CompanyWebsite => self.company_website = value,
                 SettingsField::DocBodyFont => self.doc_body_font = value,
+                SettingsField::DocBodyFontSize => self.doc_body_font_size = value,
                 SettingsField::DocCodeFont => self.doc_code_font = value,
+                SettingsField::DocCodeFontSize => self.doc_code_font_size = value,
                 SettingsField::DocTableHeaderBg => self.doc_table_header_bg = value,
                 SettingsField::DocTableBorder => self.doc_table_border = value,
                 SettingsField::DocPageSize => self.doc_page_size = value,
@@ -926,37 +942,51 @@ fn render_document(frame: &mut Frame, area: Rect, state: &SettingsState) {
             &state.input_buffer,
         ),
         format_setting(
+            "Body Font Size",
+            &state.doc_body_font_size,
+            state.selected_idx == 5,
+            state.editing.as_ref() == Some(&SettingsField::DocBodyFontSize),
+            &state.input_buffer,
+        ),
+        format_setting(
             "Code Font",
             &state.doc_code_font,
-            state.selected_idx == 5,
+            state.selected_idx == 6,
             state.editing.as_ref() == Some(&SettingsField::DocCodeFont),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Code Font Size",
+            &state.doc_code_font_size,
+            state.selected_idx == 7,
+            state.editing.as_ref() == Some(&SettingsField::DocCodeFontSize),
             &state.input_buffer,
         ),
         format_setting(
             "Table Header BG",
             &state.doc_table_header_bg,
-            state.selected_idx == 6,
+            state.selected_idx == 8,
             state.editing.as_ref() == Some(&SettingsField::DocTableHeaderBg),
             &state.input_buffer,
         ),
         format_setting(
             "Table Border",
             &state.doc_table_border,
-            state.selected_idx == 7,
+            state.selected_idx == 9,
             state.editing.as_ref() == Some(&SettingsField::DocTableBorder),
             &state.input_buffer,
         ),
         format_setting(
             "Page Size",
             &state.doc_page_size,
-            state.selected_idx == 8,
+            state.selected_idx == 10,
             state.editing.as_ref() == Some(&SettingsField::DocPageSize),
             &state.input_buffer,
         ),
         format_setting(
             "Page Margin",
             &state.doc_page_margin,
-            state.selected_idx == 9,
+            state.selected_idx == 11,
             state.editing.as_ref() == Some(&SettingsField::DocPageMargin),
             &state.input_buffer,
         ),

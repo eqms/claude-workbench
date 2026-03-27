@@ -105,6 +105,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.76.0
+
+- **Configurable Font Sizes** — Body Font Size and Code Font Size are now editable in Document Settings (F8 → Document). Code blocks use their own size independently from tables.
+
 ### What's New in v0.75.0
 
 - **PDF Code Font from Config** — The `Code Font` setting (F8 → Document) is now applied to code blocks and tables in PDF export. Previously hardcoded to Consolas/Courier New.
@@ -316,6 +320,10 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.76.0
+
+- **Konfigurierbare Schriftgroessen** — Body Font Size und Code Font Size sind jetzt in den Document Settings (F8 → Document) editierbar. Code-Bloecke verwenden eine eigene Groesse unabhaengig von Tabellen.
 
 ### Neu in v0.75.0
 

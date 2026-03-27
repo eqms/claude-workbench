@@ -1,5 +1,13 @@
 # Release Notes
 
+## Version 0.76.0 (27.03.2026)
+
+### Added
+- **Configurable Font Sizes** — Body Font Size and Code Font Size are now editable in
+  Document Settings (F8 → Document tab). Body text defaults to `10pt`, code blocks to `9pt`.
+- **Separate Code Block Size** — PDF code blocks now use their own `sizes.code` config field
+  instead of sharing `sizes.table`. Tables retain their own size independently.
+
 ## Version 0.75.0 (27.03.2026)
 
 ### Fixed
