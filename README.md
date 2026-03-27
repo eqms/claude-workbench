@@ -105,6 +105,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.75.0
+
+- **PDF Code Font from Config** — The `Code Font` setting (F8 → Document) is now applied to code blocks and tables in PDF export. Previously hardcoded to Consolas/Courier New.
+
 ### What's New in v0.73.0
 
 - **Async PDF Export** — PDF generation runs in background with yellow progress indicator. UI stays responsive.
@@ -312,6 +316,10 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.75.0
+
+- **PDF Code-Font aus Config** — Die `Code Font`-Einstellung (F8 → Document) wird jetzt auf Code-Blöcke und Tabellen im PDF-Export angewendet. Zuvor fest auf Consolas/Courier New verdrahtet.
 
 ### Neu in v0.73.0
 

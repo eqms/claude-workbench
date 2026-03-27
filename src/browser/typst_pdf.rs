@@ -83,7 +83,7 @@ const TYPST_TEMPLATE: &str = r##"
 ]
 
 #show raw.where(block: true): it => [
-  #set text(font: ("Consolas", "Courier New", "DejaVu Sans Mono", "Liberation Mono"), size: {table_size})
+  #set text(font: ({code_font_list}), size: {table_size})
   #block(
     fill: rgb("#f4f4f4"),
     inset: 10pt,
@@ -253,6 +253,7 @@ struct TypstRenderer {
     table_header_bg: String,
     table_border: String,
     table_size: String,
+    code_font_list: String,
 }
 
 impl TypstRenderer {
@@ -274,6 +275,7 @@ impl TypstRenderer {
             table_header_bg: doc.colors.table_header_bg.clone(),
             table_border: doc.colors.table_border.clone(),
             table_size: doc.sizes.table.clone(),
+            code_font_list: build_code_font_list(&doc.fonts.code),
         }
     }
 
@@ -422,8 +424,8 @@ impl TypstRenderer {
                     r.table_cells.clear();
                     r.table_header_done = false;
                     r.out.push_str(&format!(
-                        "\n#block[\n#set text(font: (\"Consolas\", \"Courier New\", \"DejaVu Sans Mono\", \"Liberation Mono\"), size: {})\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: 8pt,\n",
-                        r.table_size, r.table_columns, r.table_header_bg, r.table_border,
+                        "\n#block[\n#set text(font: ({}), size: {})\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: 8pt,\n",
+                        r.code_font_list, r.table_size, r.table_columns, r.table_header_bg, r.table_border,
                     ));
                 }
                 Event::End(TagEnd::Table) => {
@@ -583,6 +585,30 @@ fn slugify(text: &str) -> String {
         .join("-")
 }
 
+/// Build a Typst-compatible font list from a CSS font-family string.
+///
+/// Parses entries like `'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace`
+/// into `"SF Mono", "Monaco", "Cascadia Code", "Consolas"` (Typst format).
+/// Filters out generic CSS values like `monospace` and appends reliable fallbacks.
+fn build_code_font_list(css_fonts: &str) -> String {
+    let mut fonts: Vec<String> = css_fonts
+        .split(',')
+        .map(|s| s.trim().trim_matches('\'').trim_matches('"').to_string())
+        .filter(|s| !s.is_empty() && s != "monospace" && s != "serif" && s != "sans-serif")
+        .map(|s| format!("\"{}\"", s))
+        .collect();
+
+    // Append reliable fallbacks if not already present
+    for fallback in &["DejaVu Sans Mono", "Liberation Mono"] {
+        let quoted = format!("\"{}\"", fallback);
+        if !fonts.iter().any(|f| f == &quoted) {
+            fonts.push(quoted);
+        }
+    }
+
+    fonts.join(", ")
+}
+
 /// Build the complete Typst document from template + body.
 fn build_typst_document(body: &str, options: &ExportOptions, doc: &DocumentConfig) -> String {
     // Extract font family name (first entry before comma for Typst)
@@ -596,6 +622,8 @@ fn build_typst_document(body: &str, options: &ExportOptions, doc: &DocumentConfi
         .trim_matches('\'')
         .trim_matches('"');
 
+    let code_font_list = build_code_font_list(&doc.fonts.code);
+
     TYPST_TEMPLATE
         .replace("{page_size}", &doc.pdf.page_size.to_lowercase())
         .replace("{margin}", &doc.pdf.margin)
@@ -606,6 +634,7 @@ fn build_typst_document(body: &str, options: &ExportOptions, doc: &DocumentConfi
         .replace("{date}", &options.date)
         .replace("{title}", &typst_escape(&options.title))
         .replace("{font_family}", font_family)
+        .replace("{code_font_list}", &code_font_list)
         .replace("{body_size}", &doc.sizes.body)
         .replace("{title_size}", &doc.sizes.title)
         .replace("{h1_size}", &doc.sizes.h1)

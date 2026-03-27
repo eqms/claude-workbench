@@ -1,5 +1,15 @@
 # Release Notes
 
+## Version 0.75.0 (27.03.2026)
+
+### Fixed
+- **PDF Code Font from Config** — The configured `Code Font` from Document Settings
+  (F8 → Document tab) is now actually applied to code blocks and table cells in PDF exports.
+  Previously, fonts were hardcoded to `Consolas/Courier New` regardless of configuration.
+  The CSS font-family string (e.g. `'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace`)
+  is parsed into a Typst-compatible font list with automatic fallbacks (`DejaVu Sans Mono`,
+  `Liberation Mono`). Generic CSS values like `monospace` are filtered out.
+
 ## Version 0.74.0 (27.03.2026)
 
 ### Changed
