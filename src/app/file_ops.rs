@@ -504,9 +504,10 @@ impl App {
     /// Open a file in the configured browser (with Markdown→HTML conversion)
     pub(crate) fn open_in_browser(&mut self, path: &std::path::Path) {
         use crate::browser;
+        let project_name = &self.config.document.company.name;
         if browser::can_preview_in_browser(path) {
             let preview_path = if browser::is_markdown(path) {
-                match browser::markdown_to_html(path, &self.config.document) {
+                match browser::markdown_to_html(path, &self.config.document, project_name) {
                     Ok(p) => {
                         self.temp_preview_files.push(p.clone());
                         p
@@ -514,7 +515,7 @@ impl App {
                     Err(_) => path.to_path_buf(),
                 }
             } else if browser::can_syntax_highlight(path) {
-                match browser::text_to_html(path, &self.config.document) {
+                match browser::text_to_html(path, &self.config.document, project_name) {
                     Ok(p) => {
                         self.temp_preview_files.push(p.clone());
                         p

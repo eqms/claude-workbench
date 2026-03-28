@@ -93,6 +93,13 @@ pub enum SettingsField {
     DocBodyFontSize,
     DocCodeFont,
     DocCodeFontSize,
+    DocTableFontSize,
+    DocHeaderFontSize,
+    DocLineHeight,
+    DocCodeBg,
+    DocHeadingSeparator,
+    DocTableCellPadding,
+    DocBlockquoteBorder,
     DocTableHeaderBg,
     DocTableBorder,
     DocPageSize,
@@ -177,6 +184,13 @@ pub struct SettingsState {
     pub doc_body_font_size: String,
     pub doc_code_font: String,
     pub doc_code_font_size: String,
+    pub doc_table_font_size: String,
+    pub doc_header_font_size: String,
+    pub doc_line_height: String,
+    pub doc_code_bg: String,
+    pub doc_heading_separator: String,
+    pub doc_table_cell_padding: String,
+    pub doc_blockquote_border: String,
     pub doc_table_header_bg: String,
     pub doc_table_border: String,
     pub doc_page_size: String,
@@ -223,6 +237,13 @@ impl Default for SettingsState {
             doc_body_font_size: "10pt".to_string(),
             doc_code_font: "'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace".to_string(),
             doc_code_font_size: "9pt".to_string(),
+            doc_table_font_size: "9pt".to_string(),
+            doc_header_font_size: "9pt".to_string(),
+            doc_line_height: "1.6".to_string(),
+            doc_code_bg: "#f4f4f4".to_string(),
+            doc_heading_separator: "#cccccc".to_string(),
+            doc_table_cell_padding: "6px 12px".to_string(),
+            doc_blockquote_border: "#dddddd".to_string(),
             doc_table_header_bg: "#D5E8F0".to_string(),
             doc_table_border: "#999999".to_string(),
             doc_page_size: "A4".to_string(),
@@ -276,6 +297,13 @@ impl SettingsState {
         self.doc_body_font_size = config.document.sizes.body.clone();
         self.doc_code_font = config.document.fonts.code.clone();
         self.doc_code_font_size = config.document.sizes.code.clone();
+        self.doc_table_font_size = config.document.sizes.table.clone();
+        self.doc_header_font_size = config.document.sizes.header.clone();
+        self.doc_line_height = config.document.sizes.line_height.clone();
+        self.doc_code_bg = config.document.colors.code_bg.clone();
+        self.doc_heading_separator = config.document.colors.heading_separator.clone();
+        self.doc_table_cell_padding = config.document.sizes.table_cell_padding.clone();
+        self.doc_blockquote_border = config.document.colors.blockquote_border.clone();
         self.doc_table_header_bg = config.document.colors.table_header_bg.clone();
         self.doc_table_border = config.document.colors.table_border.clone();
         self.doc_page_size = config.document.pdf.page_size.clone();
@@ -308,6 +336,13 @@ impl SettingsState {
         config.document.sizes.body = self.doc_body_font_size.clone();
         config.document.fonts.code = self.doc_code_font.clone();
         config.document.sizes.code = self.doc_code_font_size.clone();
+        config.document.sizes.table = self.doc_table_font_size.clone();
+        config.document.sizes.header = self.doc_header_font_size.clone();
+        config.document.sizes.line_height = self.doc_line_height.clone();
+        config.document.colors.code_bg = self.doc_code_bg.clone();
+        config.document.colors.heading_separator = self.doc_heading_separator.clone();
+        config.document.sizes.table_cell_padding = self.doc_table_cell_padding.clone();
+        config.document.colors.blockquote_border = self.doc_blockquote_border.clone();
         config.document.colors.table_header_bg = self.doc_table_header_bg.clone();
         config.document.colors.table_border = self.doc_table_border.clone();
         config.document.pdf.page_size = self.doc_page_size.clone();
@@ -352,7 +387,7 @@ impl SettingsState {
             SettingsCategory::General => 6, // shell, scrollback, hidden, autosave, auto-refresh, check updates
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
             SettingsCategory::Paths => 5,   // claude, lazygit, browser, external_editor, export_dir
-            SettingsCategory::Document => 12,
+            SettingsCategory::Document => 19,
             SettingsCategory::About => 0,
         }
     }
@@ -410,10 +445,17 @@ impl SettingsState {
                 5 => Some(SettingsField::DocBodyFontSize),
                 6 => Some(SettingsField::DocCodeFont),
                 7 => Some(SettingsField::DocCodeFontSize),
-                8 => Some(SettingsField::DocTableHeaderBg),
-                9 => Some(SettingsField::DocTableBorder),
-                10 => Some(SettingsField::DocPageSize),
-                11 => Some(SettingsField::DocPageMargin),
+                8 => Some(SettingsField::DocTableFontSize),
+                9 => Some(SettingsField::DocHeaderFontSize),
+                10 => Some(SettingsField::DocLineHeight),
+                11 => Some(SettingsField::DocCodeBg),
+                12 => Some(SettingsField::DocHeadingSeparator),
+                13 => Some(SettingsField::DocTableCellPadding),
+                14 => Some(SettingsField::DocBlockquoteBorder),
+                15 => Some(SettingsField::DocTableHeaderBg),
+                16 => Some(SettingsField::DocTableBorder),
+                17 => Some(SettingsField::DocPageSize),
+                18 => Some(SettingsField::DocPageMargin),
                 _ => None,
             },
             _ => None,
@@ -454,6 +496,13 @@ impl SettingsState {
                 SettingsField::DocBodyFontSize => self.doc_body_font_size.clone(),
                 SettingsField::DocCodeFont => self.doc_code_font.clone(),
                 SettingsField::DocCodeFontSize => self.doc_code_font_size.clone(),
+                SettingsField::DocTableFontSize => self.doc_table_font_size.clone(),
+                SettingsField::DocHeaderFontSize => self.doc_header_font_size.clone(),
+                SettingsField::DocLineHeight => self.doc_line_height.clone(),
+                SettingsField::DocCodeBg => self.doc_code_bg.clone(),
+                SettingsField::DocHeadingSeparator => self.doc_heading_separator.clone(),
+                SettingsField::DocTableCellPadding => self.doc_table_cell_padding.clone(),
+                SettingsField::DocBlockquoteBorder => self.doc_blockquote_border.clone(),
                 SettingsField::DocTableHeaderBg => self.doc_table_header_bg.clone(),
                 SettingsField::DocTableBorder => self.doc_table_border.clone(),
                 SettingsField::DocPageSize => self.doc_page_size.clone(),
@@ -661,6 +710,13 @@ impl SettingsState {
                 SettingsField::DocBodyFontSize => self.doc_body_font_size = value,
                 SettingsField::DocCodeFont => self.doc_code_font = value,
                 SettingsField::DocCodeFontSize => self.doc_code_font_size = value,
+                SettingsField::DocTableFontSize => self.doc_table_font_size = value,
+                SettingsField::DocHeaderFontSize => self.doc_header_font_size = value,
+                SettingsField::DocLineHeight => self.doc_line_height = value,
+                SettingsField::DocCodeBg => self.doc_code_bg = value,
+                SettingsField::DocHeadingSeparator => self.doc_heading_separator = value,
+                SettingsField::DocTableCellPadding => self.doc_table_cell_padding = value,
+                SettingsField::DocBlockquoteBorder => self.doc_blockquote_border = value,
                 SettingsField::DocTableHeaderBg => self.doc_table_header_bg = value,
                 SettingsField::DocTableBorder => self.doc_table_border = value,
                 SettingsField::DocPageSize => self.doc_page_size = value,
@@ -963,30 +1019,79 @@ fn render_document(frame: &mut Frame, area: Rect, state: &SettingsState) {
             &state.input_buffer,
         ),
         format_setting(
+            "Table Font Size",
+            &state.doc_table_font_size,
+            state.selected_idx == 8,
+            state.editing.as_ref() == Some(&SettingsField::DocTableFontSize),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Header Font Size",
+            &state.doc_header_font_size,
+            state.selected_idx == 9,
+            state.editing.as_ref() == Some(&SettingsField::DocHeaderFontSize),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Line Height",
+            &state.doc_line_height,
+            state.selected_idx == 10,
+            state.editing.as_ref() == Some(&SettingsField::DocLineHeight),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Code Block BG",
+            &state.doc_code_bg,
+            state.selected_idx == 11,
+            state.editing.as_ref() == Some(&SettingsField::DocCodeBg),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Heading Separator",
+            &state.doc_heading_separator,
+            state.selected_idx == 12,
+            state.editing.as_ref() == Some(&SettingsField::DocHeadingSeparator),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Table Cell Padding",
+            &state.doc_table_cell_padding,
+            state.selected_idx == 13,
+            state.editing.as_ref() == Some(&SettingsField::DocTableCellPadding),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Blockquote Border",
+            &state.doc_blockquote_border,
+            state.selected_idx == 14,
+            state.editing.as_ref() == Some(&SettingsField::DocBlockquoteBorder),
+            &state.input_buffer,
+        ),
+        format_setting(
             "Table Header BG",
             &state.doc_table_header_bg,
-            state.selected_idx == 8,
+            state.selected_idx == 15,
             state.editing.as_ref() == Some(&SettingsField::DocTableHeaderBg),
             &state.input_buffer,
         ),
         format_setting(
             "Table Border",
             &state.doc_table_border,
-            state.selected_idx == 9,
+            state.selected_idx == 16,
             state.editing.as_ref() == Some(&SettingsField::DocTableBorder),
             &state.input_buffer,
         ),
         format_setting(
             "Page Size",
             &state.doc_page_size,
-            state.selected_idx == 10,
+            state.selected_idx == 17,
             state.editing.as_ref() == Some(&SettingsField::DocPageSize),
             &state.input_buffer,
         ),
         format_setting(
             "Page Margin",
             &state.doc_page_margin,
-            state.selected_idx == 11,
+            state.selected_idx == 18,
             state.editing.as_ref() == Some(&SettingsField::DocPageMargin),
             &state.input_buffer,
         ),

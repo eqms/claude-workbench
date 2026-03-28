@@ -53,8 +53,13 @@ fn build_html_template(doc: &DocumentConfig) -> String {
     )
 }
 
-/// Convert markdown file to HTML and return temp file path
-pub fn markdown_to_html(md_path: &Path, doc: &DocumentConfig) -> Result<PathBuf> {
+/// Convert markdown file to HTML and return temp file path.
+/// Uses consistent naming convention: `{project}-{stem}-{date}.html`
+pub fn markdown_to_html(
+    md_path: &Path,
+    doc: &DocumentConfig,
+    project_name: &str,
+) -> Result<PathBuf> {
     use pulldown_cmark::{html, Options, Parser};
 
     let md_content = std::fs::read_to_string(md_path)?;
@@ -84,14 +89,11 @@ pub fn markdown_to_html(md_path: &Path, doc: &DocumentConfig) -> Result<PathBuf>
         .replace("{title}", title)
         .replace("{content}", &html_content);
 
-    // Create temp file and write content via file handle (prevents TOCTOU/symlink attacks).
-    let named_temp = tempfile::Builder::new()
-        .prefix("cwb-preview-")
-        .suffix(".html")
-        .tempfile()?;
+    // Write to consistently named file in temp directory
+    let temp_path = crate::browser::pdf_export::default_preview_filename(md_path, project_name);
 
     use std::io::Write;
-    let (mut file, temp_path) = named_temp.keep()?;
+    let mut file = std::fs::File::create(&temp_path)?;
     file.write_all(html.as_bytes())?;
     file.flush()?;
     Ok(temp_path)

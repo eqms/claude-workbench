@@ -22,8 +22,8 @@ impl<'a> TemplateContext<'a> {
             r#"body {{
             font-family: {body_font};
             font-size: {body_size};
-            line-height: 1.6;
-            color: #333;
+            line-height: {line_height};
+            color: {body_text};
             max-width: 800px;
             margin: 0 auto;
             padding: 2rem;
@@ -31,6 +31,8 @@ impl<'a> TemplateContext<'a> {
         }}"#,
             body_font = self.doc.fonts.body,
             body_size = self.doc.sizes.body,
+            line_height = self.doc.sizes.line_height,
+            body_text = self.doc.colors.body_text,
         )
     }
 
@@ -40,7 +42,7 @@ impl<'a> TemplateContext<'a> {
             r#"h1 {{
             font-size: {title};
             font-weight: bold;
-            border-bottom: 2px solid #eee;
+            border-bottom: 2px solid {heading_separator};
             padding-bottom: 0.3em;
             margin-top: 1.5em;
             margin-bottom: 0.5em;
@@ -48,7 +50,7 @@ impl<'a> TemplateContext<'a> {
         h2 {{
             font-size: {h1};
             font-weight: bold;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid {heading_separator};
             padding-bottom: 0.3em;
             margin-top: 1.3em;
             margin-bottom: 0.5em;
@@ -69,6 +71,7 @@ impl<'a> TemplateContext<'a> {
             h1 = self.doc.sizes.h1,
             h2 = self.doc.sizes.h2,
             h3 = self.doc.sizes.h3,
+            heading_separator = self.doc.colors.heading_separator,
         )
     }
 
@@ -83,20 +86,23 @@ impl<'a> TemplateContext<'a> {
         }}
         th, td {{
             border: 1px solid {table_border};
-            padding: 6px 12px;
+            padding: {table_cell_padding};
             text-align: left;
         }}
         th {{
             background-color: {table_header_bg};
             font-weight: bold;
-            color: #1a1a1a;
+            color: {table_header_text};
         }}
         tr:nth-child(even) td {{
-            background-color: #fafafa;
+            background-color: {table_row_alt_bg};
         }}"#,
             table_size = self.doc.sizes.table,
             table_border = self.doc.colors.table_border,
             table_header_bg = self.doc.colors.table_header_bg,
+            table_cell_padding = self.doc.sizes.table_cell_padding,
+            table_header_text = self.doc.colors.table_header_text,
+            table_row_alt_bg = self.doc.colors.table_row_alt_bg,
         )
     }
 
@@ -105,38 +111,44 @@ impl<'a> TemplateContext<'a> {
         format!(
             r#"code {{
             font-family: {code_font};
-            background-color: #f4f4f4;
+            background-color: {code_bg};
             padding: 2px 6px;
             border-radius: 3px;
-            font-size: 0.9em;
+            font-size: {code_size};
         }}
         pre {{
-            background-color: #f4f4f4;
+            background-color: {code_bg};
             padding: 1em;
             border-radius: 5px;
             overflow-x: auto;
-            line-height: 1.4;
+            line-height: {code_line_height};
         }}
         pre code {{
             background: none;
             padding: 0;
-            font-size: {table_size};
+            font-size: {code_size};
         }}"#,
             code_font = self.doc.fonts.code,
-            table_size = self.doc.sizes.table,
+            code_bg = self.doc.colors.code_bg,
+            code_size = self.doc.sizes.code,
+            code_line_height = self.doc.sizes.code_line_height,
         )
     }
 
     /// Blockquote CSS: left border, padding
     pub fn blockquote_css(&self) -> String {
-        r#"blockquote {
-            border-left: 4px solid #ddd;
+        format!(
+            r#"blockquote {{
+            border-left: 4px solid {blockquote_border};
             margin: 1em 0;
             padding: 0.5em 1em;
-            color: #666;
-            background-color: #f9f9f9;
-        }"#
-        .to_string()
+            color: {blockquote_text};
+            background-color: {blockquote_bg};
+        }}"#,
+            blockquote_border = self.doc.colors.blockquote_border,
+            blockquote_text = self.doc.colors.blockquote_text,
+            blockquote_bg = self.doc.colors.blockquote_bg,
+        )
     }
 
     /// Link CSS: color from accent config

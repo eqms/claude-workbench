@@ -105,6 +105,13 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.77.0
+
+- **Unified Export System** — All export paths (PDF, Markdown preview, Syntax preview) now share the same configurable values. 14 hardcoded values replaced by config fields.
+- **7 New Document Settings** — Table Font Size, Header Font Size, Line Height, Code Block BG, Heading Separator, Table Cell Padding, Blockquote Border now editable in F8.
+- **Consistent Preview Filenames** — Browser previews use `{project}-{file}-{date}.html` naming instead of random temp names.
+- **Bug Fix** — `pre code` CSS incorrectly used table font size instead of code font size.
+
 ### What's New in v0.76.0
 
 - **Configurable Font Sizes** — Body Font Size and Code Font Size are now editable in Document Settings (F8 → Document). Code blocks use their own size independently from tables.
@@ -320,6 +327,13 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.77.0
+
+- **Einheitliches Export-System** — Alle Export-Pfade (PDF, Markdown-Vorschau, Syntax-Vorschau) nutzen jetzt die gleichen konfigurierbaren Werte. 14 hardcoded Werte durch Config-Felder ersetzt.
+- **7 neue Document Settings** — Tabellen-Schriftgroesse, Header-Schriftgroesse, Zeilenhoehe, Code-Block-Hintergrund, Ueberschrift-Trennlinie, Tabellen-Zellenabstand, Blockquote-Rahmen jetzt in F8 editierbar.
+- **Konsistente Vorschau-Dateinamen** — Browser-Vorschauen verwenden `{Projekt}-{Datei}-{Datum}.html` statt zufaelliger Temp-Namen.
+- **Bug-Fix** — `pre code` CSS nutzte faelschlicherweise Tabellen- statt Code-Schriftgroesse.
 
 ### Neu in v0.76.0
 

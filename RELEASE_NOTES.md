@@ -1,5 +1,28 @@
 # Release Notes
 
+## Version 0.77.0 (28.03.2026)
+
+### Added
+- **Unified Export/Preview System** — All export paths (PDF, HTML Markdown preview, Syntax
+  preview) now share the same configurable values. 14 new config fields replace hardcoded values
+  across `template.rs`, `typst_pdf.rs`, and `syntax.rs`.
+- **7 New Document Settings (F8)** — Table Font Size, Header Font Size, Line Height,
+  Code Block BG color, Heading Separator color, Table Cell Padding, and Blockquote Border
+  are now editable in the Document Settings dialog.
+- **Consistent Preview Filenames** — Browser previews (`o` key) now use the same naming
+  convention as PDF export: `{project}-{filename}-{dd.mm.yyyy}.html` instead of random
+  `cwb-preview-XXXXXXXX.html` / `cwb-syntax-XXXXXXXX.html` temp names.
+
+### Changed
+- **TemplateContext Unification** — `syntax.rs` (code file preview) now uses `TemplateContext`
+  for footer styling and config-driven font sizes/line heights, consistent with `markdown.rs`.
+- **Heading Separator Consistency** — H1 separator line now uses the same color (`#cccccc`)
+  in both HTML preview and PDF export. Previously inconsistent (`#eee` vs `#cccccc`).
+
+### Fixed
+- **Code Block Font Size Bug** — `pre code` CSS in HTML preview incorrectly used `sizes.table`
+  instead of `sizes.code`. Now correctly uses the configured code font size.
+
 ## Version 0.76.0 (27.03.2026)
 
 ### Added

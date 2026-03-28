@@ -36,7 +36,7 @@ const TYPST_TEMPLATE: &str = r##"
   paper: "{page_size}",
   margin: (left: {margin}, right: {margin}, top: {margin}, bottom: {margin}),
   header: [
-    #set text(font: ("{font_family}", "Carlito", "Liberation Sans"), size: 9pt, fill: rgb("{header_border}"))
+    #set text(font: ("{font_family}", "Carlito", "Liberation Sans"), size: {header_size}, fill: rgb("{header_border}"))
     {title}
     #v(2pt)
     #line(length: 100%, stroke: 0.5pt + rgb("{header_border}"))
@@ -64,7 +64,7 @@ const TYPST_TEMPLATE: &str = r##"
   #v(0.8em)
   #it
   #v(0.2em)
-  #line(length: 100%, stroke: 0.5pt + rgb("#cccccc"))
+  #line(length: 100%, stroke: 0.5pt + rgb("{heading_separator}"))
   #v(0.3em)
 ]
 
@@ -85,8 +85,8 @@ const TYPST_TEMPLATE: &str = r##"
 #show raw.where(block: true): it => [
   #set text(font: ({code_font_list}), size: {code_size})
   #block(
-    fill: rgb("#f4f4f4"),
-    inset: 10pt,
+    fill: rgb("{code_bg}"),
+    inset: {code_block_inset},
     radius: 4pt,
     width: 100%,
     it,
@@ -253,6 +253,7 @@ struct TypstRenderer {
     table_header_bg: String,
     table_border: String,
     table_size: String,
+    table_cell_inset: String,
     code_font_list: String,
 }
 
@@ -275,6 +276,7 @@ impl TypstRenderer {
             table_header_bg: doc.colors.table_header_bg.clone(),
             table_border: doc.colors.table_border.clone(),
             table_size: doc.sizes.table.clone(),
+            table_cell_inset: doc.sizes.table_cell_inset.clone(),
             code_font_list: build_code_font_list(&doc.fonts.code),
         }
     }
@@ -424,8 +426,8 @@ impl TypstRenderer {
                     r.table_cells.clear();
                     r.table_header_done = false;
                     r.out.push_str(&format!(
-                        "\n#block[\n#set text(font: ({}), size: {})\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: 8pt,\n",
-                        r.code_font_list, r.table_size, r.table_columns, r.table_header_bg, r.table_border,
+                        "\n#block[\n#set text(font: ({}), size: {})\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: {},\n",
+                        r.code_font_list, r.table_size, r.table_columns, r.table_header_bg, r.table_border, r.table_cell_inset,
                     ));
                 }
                 Event::End(TagEnd::Table) => {
@@ -628,6 +630,7 @@ fn build_typst_document(body: &str, options: &ExportOptions, doc: &DocumentConfi
         .replace("{page_size}", &doc.pdf.page_size.to_lowercase())
         .replace("{margin}", &doc.pdf.margin)
         .replace("{header_border}", &doc.colors.header_border)
+        .replace("{header_size}", &doc.sizes.header)
         .replace("{footer_color}", &doc.colors.footer)
         .replace("{footer_size}", &doc.sizes.footer)
         .replace("{company_name}", &typst_escape(&doc.resolved_footer_text()))
@@ -642,6 +645,9 @@ fn build_typst_document(body: &str, options: &ExportOptions, doc: &DocumentConfi
         .replace("{h3_size}", &doc.sizes.h3)
         .replace("{table_size}", &doc.sizes.table)
         .replace("{code_size}", &doc.sizes.code)
+        .replace("{heading_separator}", &doc.colors.heading_separator)
+        .replace("{code_bg}", &doc.colors.code_bg)
+        .replace("{code_block_inset}", &doc.sizes.code_block_inset)
         .replace("{body}", body)
 }
 

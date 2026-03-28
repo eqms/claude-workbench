@@ -93,6 +93,22 @@ pub(crate) fn date_now_dmy() -> String {
     )
 }
 
+/// Generate a preview filename in temp directory for browser preview.
+/// Format: `{project}-{stem}-{dd.mm.yyyy}.html` in system temp dir.
+pub fn default_preview_filename(source: &Path, project_name: &str) -> PathBuf {
+    let stem = source
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("preview");
+    let date = date_now_dmy();
+    let name = if project_name.is_empty() {
+        format!("{}-{}.html", stem, date)
+    } else {
+        format!("{}-{}-{}.html", project_name, stem, date)
+    };
+    std::env::temp_dir().join(name)
+}
+
 /// Generate a default export filename based on source file, format and project name.
 /// Format: `{project}-{stem}-{dd.mm.yyyy}.{ext}`
 pub fn default_export_filename(source: &Path, format: ExportFormat, project_name: &str) -> String {

@@ -294,6 +294,30 @@ pub struct DocColorConfig {
     /// Header/footer separator line color
     #[serde(default = "default_header_border")]
     pub header_border: String,
+    /// Code/pre block background color
+    #[serde(default = "default_code_bg")]
+    pub code_bg: String,
+    /// H1/H2 heading separator line color
+    #[serde(default = "default_heading_separator")]
+    pub heading_separator: String,
+    /// Body text color
+    #[serde(default = "default_body_text_color")]
+    pub body_text: String,
+    /// Table header text color
+    #[serde(default = "default_table_header_text")]
+    pub table_header_text: String,
+    /// Table alternating row background (zebra stripe)
+    #[serde(default = "default_table_row_alt_bg")]
+    pub table_row_alt_bg: String,
+    /// Blockquote left border color
+    #[serde(default = "default_blockquote_border")]
+    pub blockquote_border: String,
+    /// Blockquote text color
+    #[serde(default = "default_blockquote_text")]
+    pub blockquote_text: String,
+    /// Blockquote background color
+    #[serde(default = "default_blockquote_bg")]
+    pub blockquote_bg: String,
 }
 
 fn default_accent_color() -> String {
@@ -314,6 +338,30 @@ fn default_footer_color() -> String {
 fn default_header_border() -> String {
     "#999999".to_string()
 }
+fn default_code_bg() -> String {
+    "#f4f4f4".to_string()
+}
+fn default_heading_separator() -> String {
+    "#cccccc".to_string()
+}
+fn default_body_text_color() -> String {
+    "#333333".to_string()
+}
+fn default_table_header_text() -> String {
+    "#1a1a1a".to_string()
+}
+fn default_table_row_alt_bg() -> String {
+    "#fafafa".to_string()
+}
+fn default_blockquote_border() -> String {
+    "#dddddd".to_string()
+}
+fn default_blockquote_text() -> String {
+    "#666666".to_string()
+}
+fn default_blockquote_bg() -> String {
+    "#f9f9f9".to_string()
+}
 
 impl Default for DocColorConfig {
     fn default() -> Self {
@@ -324,6 +372,14 @@ impl Default for DocColorConfig {
             link: default_link_color(),
             footer: default_footer_color(),
             header_border: default_header_border(),
+            code_bg: default_code_bg(),
+            heading_separator: default_heading_separator(),
+            body_text: default_body_text_color(),
+            table_header_text: default_table_header_text(),
+            table_row_alt_bg: default_table_row_alt_bg(),
+            blockquote_border: default_blockquote_border(),
+            blockquote_text: default_blockquote_text(),
+            blockquote_bg: default_blockquote_bg(),
         }
     }
 }
@@ -355,6 +411,24 @@ pub struct DocSizeConfig {
     /// Footer text font size
     #[serde(default = "default_size_footer")]
     pub footer: String,
+    /// PDF header text font size
+    #[serde(default = "default_size_header")]
+    pub header: String,
+    /// Body line height (e.g. "1.6")
+    #[serde(default = "default_size_line_height")]
+    pub line_height: String,
+    /// Code block line height (e.g. "1.4")
+    #[serde(default = "default_size_code_line_height")]
+    pub code_line_height: String,
+    /// Code block inset/padding for PDF (e.g. "10pt")
+    #[serde(default = "default_size_code_block_inset")]
+    pub code_block_inset: String,
+    /// Table cell padding for HTML (e.g. "6px 12px")
+    #[serde(default = "default_size_table_cell_padding")]
+    pub table_cell_padding: String,
+    /// Table cell inset for PDF (e.g. "8pt")
+    #[serde(default = "default_size_table_cell_inset")]
+    pub table_cell_inset: String,
 }
 
 fn default_size_title() -> String {
@@ -381,6 +455,24 @@ fn default_size_code() -> String {
 fn default_size_footer() -> String {
     "8pt".to_string()
 }
+fn default_size_header() -> String {
+    "9pt".to_string()
+}
+fn default_size_line_height() -> String {
+    "1.6".to_string()
+}
+fn default_size_code_line_height() -> String {
+    "1.4".to_string()
+}
+fn default_size_code_block_inset() -> String {
+    "10pt".to_string()
+}
+fn default_size_table_cell_padding() -> String {
+    "6px 12px".to_string()
+}
+fn default_size_table_cell_inset() -> String {
+    "8pt".to_string()
+}
 
 impl Default for DocSizeConfig {
     fn default() -> Self {
@@ -393,6 +485,12 @@ impl Default for DocSizeConfig {
             table: default_size_table(),
             code: default_size_code(),
             footer: default_size_footer(),
+            header: default_size_header(),
+            line_height: default_size_line_height(),
+            code_line_height: default_size_code_line_height(),
+            code_block_inset: default_size_code_block_inset(),
+            table_cell_padding: default_size_table_cell_padding(),
+            table_cell_inset: default_size_table_cell_inset(),
         }
     }
 }

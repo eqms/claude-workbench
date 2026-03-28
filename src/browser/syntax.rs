@@ -7,14 +7,17 @@ use anyhow::Result;
 use std::path::{Path, PathBuf};
 use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
 
+use crate::browser::template::TemplateContext;
 use crate::config::DocumentConfig;
 
 /// Build syntax highlight HTML template dynamically from config.
-/// This is a dark-mode-only template (code viewer).
+/// This is a dark-mode-only template (code viewer) that uses TemplateContext
+/// for consistent footer styling while keeping dark theme colors for the code viewer.
 fn build_syntax_template(doc: &DocumentConfig) -> String {
-    let footer_text = doc.resolved_footer_text();
-    let footer_color = &doc.colors.footer;
+    let ctx = TemplateContext::new(doc);
     let code_font = &doc.fonts.code;
+    let code_size = &doc.sizes.code;
+    let code_line_height = &doc.sizes.code_line_height;
 
     format!(
         r#"<!DOCTYPE html>
@@ -57,15 +60,15 @@ fn build_syntax_template(doc: &DocumentConfig) -> String {
         pre {{
             margin: 0;
             padding: 16px 20px;
-            line-height: 1.5;
-            font-size: 13px;
+            line-height: {code_line_height};
+            font-size: {code_size};
             overflow-x: auto;
         }}
         .footer {{
             background: #2d2d2d;
             padding: 8px 20px;
             border-top: 1px solid #404040;
-            font-size: 0.75em;
+            font-size: {footer_size};
             color: {footer_color};
             text-align: center;
         }}
@@ -85,8 +88,11 @@ fn build_syntax_template(doc: &DocumentConfig) -> String {
 </body>
 </html>"#,
         code_font = code_font,
-        footer_color = footer_color,
-        footer_text = footer_text,
+        code_size = code_size,
+        code_line_height = code_line_height,
+        footer_size = doc.sizes.footer,
+        footer_color = doc.colors.footer,
+        footer_text = ctx.footer_text(),
     )
 }
 
@@ -96,8 +102,9 @@ pub fn can_syntax_highlight(path: &Path) -> bool {
     crate::syntax_registry::is_known_text_file(path, &ss)
 }
 
-/// Convert text file to HTML with syntax highlighting
-pub fn text_to_html(path: &Path, doc: &DocumentConfig) -> Result<PathBuf> {
+/// Convert text file to HTML with syntax highlighting.
+/// Uses consistent naming convention: `{project}-{stem}-{date}.html`
+pub fn text_to_html(path: &Path, doc: &DocumentConfig, project_name: &str) -> Result<PathBuf> {
     let content = std::fs::read_to_string(path)?;
     let ss = SyntaxSet::load_defaults_newlines();
     let ts = ThemeSet::load_defaults();
@@ -130,12 +137,8 @@ pub fn text_to_html(path: &Path, doc: &DocumentConfig) -> Result<PathBuf> {
         .replace("{lines}", &lines.to_string())
         .replace("{highlighted_code}", &highlighted);
 
-    // Create temp file with cryptographically random name (prevents symlink attacks)
-    let named_temp = tempfile::Builder::new()
-        .prefix("cwb-syntax-")
-        .suffix(".html")
-        .tempfile()?;
-    let (_, temp_path) = named_temp.keep()?;
+    // Write to consistently named file in temp directory
+    let temp_path = crate::browser::pdf_export::default_preview_filename(path, project_name);
 
     std::fs::write(&temp_path, html)?;
     Ok(temp_path)
