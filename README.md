@@ -105,6 +105,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.78.0
+
+- **HTML Anchor Links Fixed** — Internal anchor links (`[text](#heading)`) now work in browser preview and HTML export. Headings get auto-generated `id` attributes via shared `slugify()` function.
+
 ### What's New in v0.77.0
 
 - **Unified Export System** — All export paths (PDF, Markdown preview, Syntax preview) now share the same configurable values. 14 hardcoded values replaced by config fields.
@@ -327,6 +331,10 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.78.0
+
+- **HTML Anker-Links repariert** — Interne Anker-Links (`[text](#heading)`) funktionieren jetzt in der Browser-Vorschau und im HTML-Export. Ueberschriften erhalten automatisch `id`-Attribute ueber eine gemeinsame `slugify()`-Funktion.
 
 ### Neu in v0.77.0
 

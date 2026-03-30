@@ -60,7 +60,7 @@ pub fn markdown_to_html(
     doc: &DocumentConfig,
     project_name: &str,
 ) -> Result<PathBuf> {
-    use pulldown_cmark::{html, Options, Parser};
+    use pulldown_cmark::{html, Event, Options, Parser};
 
     let md_content = std::fs::read_to_string(md_path)?;
     let title = md_path
@@ -77,9 +77,11 @@ pub fn markdown_to_html(
     // Enable all markdown extensions
     let options = Options::all();
     let parser = Parser::new_ext(&md_content, options);
+    let events: Vec<Event> = parser.collect();
+    let events = inject_heading_ids(events);
 
     let mut html_content = String::new();
-    html::push_html(&mut html_content, parser);
+    html::push_html(&mut html_content, events.into_iter());
 
     // Convert relative image paths to absolute file:// URLs
     let html_content = fix_image_paths(&html_content, &md_dir);
@@ -142,4 +144,117 @@ fn fix_image_paths(html: &str, base_dir: &Path) -> String {
             }
         })
         .to_string()
+}
+
+/// Inject `id` attributes into heading events so that internal anchor links work.
+///
+/// pulldown-cmark does not auto-generate `id` on headings — it only sets `id`
+/// when the Markdown source uses explicit `{ #id }` attribute syntax.
+/// This function walks the event stream, collects heading text, slugifies it,
+/// and injects the `id` into the `Tag::Heading` start event.
+fn inject_heading_ids(mut events: Vec<pulldown_cmark::Event>) -> Vec<pulldown_cmark::Event> {
+    use pulldown_cmark::{CowStr, Event, Tag, TagEnd};
+
+    let mut i = 0;
+    while i < events.len() {
+        if let Event::Start(Tag::Heading { .. }) = &events[i] {
+            // Collect heading text from subsequent events up to the End tag
+            let mut text_buf = String::new();
+            let mut j = i + 1;
+            while j < events.len() {
+                match &events[j] {
+                    Event::Text(t) | Event::Code(t) => text_buf.push_str(t),
+                    Event::End(TagEnd::Heading(_)) => break,
+                    _ => {}
+                }
+                j += 1;
+            }
+
+            let slug = crate::browser::slugify(&text_buf);
+            if !slug.is_empty() {
+                // Re-match to extract fields, then replace the event
+                if let Event::Start(Tag::Heading {
+                    level,
+                    classes,
+                    attrs,
+                    ..
+                }) = &events[i]
+                {
+                    let level = *level;
+                    let classes = classes.clone();
+                    let attrs = attrs.clone();
+                    events[i] = Event::Start(Tag::Heading {
+                        level,
+                        id: Some(CowStr::from(slug)),
+                        classes,
+                        attrs,
+                    });
+                }
+            }
+        }
+        i += 1;
+    }
+    events
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn md_to_html_fragment(md: &str) -> String {
+        use pulldown_cmark::{html, Event, Options, Parser};
+
+        let options = Options::all();
+        let parser = Parser::new_ext(md, options);
+        let events: Vec<Event> = parser.collect();
+        let events = inject_heading_ids(events);
+        let mut out = String::new();
+        html::push_html(&mut out, events.into_iter());
+        out
+    }
+
+    #[test]
+    fn test_heading_id_injected() {
+        let html = md_to_html_fragment("## Overview");
+        assert!(html.contains("id=\"overview\""), "got: {}", html);
+    }
+
+    #[test]
+    fn test_heading_id_slug_spaces() {
+        let html = md_to_html_fragment("## Hello World");
+        assert!(html.contains("id=\"hello-world\""), "got: {}", html);
+    }
+
+    #[test]
+    fn test_heading_id_drops_special_chars() {
+        let html = md_to_html_fragment("## C++ & Rust");
+        assert!(html.contains("id=\"c-rust\""), "got: {}", html);
+    }
+
+    #[test]
+    fn test_anchor_link_has_target() {
+        let md = "## Overview\n\n[go to overview](#overview)";
+        let html = md_to_html_fragment(md);
+        assert!(html.contains("id=\"overview\""), "missing id: {}", html);
+        assert!(
+            html.contains("href=\"#overview\""),
+            "missing href: {}",
+            html
+        );
+    }
+
+    #[test]
+    fn test_multiple_heading_levels() {
+        let md = "# Title\n## Section\n### Subsection";
+        let html = md_to_html_fragment(md);
+        assert!(html.contains("id=\"title\""), "got: {}", html);
+        assert!(html.contains("id=\"section\""), "got: {}", html);
+        assert!(html.contains("id=\"subsection\""), "got: {}", html);
+    }
+
+    #[test]
+    fn test_heading_with_inline_code() {
+        let html = md_to_html_fragment("## Use `fmt::Display`");
+        assert!(html.contains("id=\"use-fmtdisplay\""), "got: {}", html);
+    }
 }

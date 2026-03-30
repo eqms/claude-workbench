@@ -22,6 +22,7 @@ use typst::utils::LazyHash;
 use typst::LibraryExt;
 
 use crate::browser::pdf_export::ExportOptions;
+use crate::browser::slugify;
 use crate::config::DocumentConfig;
 
 // --- Bundled Carlito font files (SIL Open Font License) ---
@@ -563,28 +564,6 @@ fn typst_escape(s: &str) -> String {
         }
     }
     result
-}
-
-/// Convert a heading or anchor text to a URL-style slug for Typst labels.
-fn slugify(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() {
-                c
-            } else if c == ' ' || c == '-' || c == '_' {
-                '-'
-            } else {
-                // Skip special chars
-                '\0'
-            }
-        })
-        .filter(|c| *c != '\0')
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
 }
 
 /// Build a Typst-compatible font list from a CSS font-family string.
