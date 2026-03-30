@@ -508,9 +508,10 @@ impl App {
         if browser::can_preview_in_browser(path) {
             let preview_path = if browser::is_markdown(path) {
                 match browser::markdown_to_html(path, &self.config.document, project_name) {
-                    Ok(p) => {
-                        self.temp_preview_files.push(p.clone());
-                        p
+                    Ok(paths) => {
+                        let primary = paths[0].clone();
+                        self.temp_preview_files.extend(paths);
+                        primary
                     }
                     Err(_) => path.to_path_buf(),
                 }

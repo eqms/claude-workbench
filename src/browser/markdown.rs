@@ -1,6 +1,7 @@
 //! Markdown to HTML conversion for browser preview
 
 use anyhow::Result;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::browser::template::TemplateContext;
@@ -53,13 +54,13 @@ fn build_html_template(doc: &DocumentConfig) -> String {
     )
 }
 
-/// Convert markdown file to HTML and return temp file path.
-/// Uses consistent naming convention: `{project}-{stem}-{date}.html`
-pub fn markdown_to_html(
+/// Convert a single markdown file to an HTML string without writing to disk.
+/// Returns (html_string, temp_output_path).
+fn convert_single_md(
     md_path: &Path,
     doc: &DocumentConfig,
     project_name: &str,
-) -> Result<PathBuf> {
+) -> Result<(String, PathBuf)> {
     use pulldown_cmark::{html, Event, Options, Parser};
 
     let md_content = std::fs::read_to_string(md_path)?;
@@ -91,14 +92,158 @@ pub fn markdown_to_html(
         .replace("{title}", title)
         .replace("{content}", &html_content);
 
-    // Write to consistently named file in temp directory
+    // Compute temp path (but don't write yet)
     let temp_path = crate::browser::pdf_export::default_preview_filename(md_path, project_name);
 
+    Ok((html, temp_path))
+}
+
+/// Collect relative `.md` link hrefs from rendered HTML.
+/// Returns raw href values like `"USAGE.md"`, `"./INSTALL.md#section"`.
+fn collect_md_links(html: &str) -> Vec<String> {
+    use regex::Regex;
+    use std::sync::LazyLock;
+
+    static LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"<a\s[^>]*?href="([^"]*\.md(?:#[^"]*)?)"[^>]*>"#).expect("valid regex")
+    });
+
+    let mut links = Vec::new();
+    for cap in LINK_RE.captures_iter(html) {
+        let href = &cap[1];
+        // Skip absolute URLs and absolute paths
+        if href.starts_with("http://")
+            || href.starts_with("https://")
+            || href.starts_with("file://")
+            || href.starts_with('/')
+        {
+            continue;
+        }
+        links.push(href.to_string());
+    }
+    links
+}
+
+/// Rewrite relative `.md` links in HTML to point to converted temp HTML files.
+/// `link_map` maps normalized md filenames (e.g. `"USAGE.md"`) to their temp HTML paths.
+fn fix_md_links(html: &str, link_map: &HashMap<String, PathBuf>) -> String {
+    use regex::Regex;
+    use std::sync::LazyLock;
+
+    static LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(<a\s[^>]*?href=")([^"]*\.md)(#[^"]*)?("[^>]*>)"#).expect("valid regex")
+    });
+
+    LINK_RE
+        .replace_all(html, |caps: &regex::Captures| {
+            let prefix = &caps[1];
+            let md_href = &caps[2];
+            let fragment = caps.get(3).map_or("", |m| m.as_str());
+            let suffix = &caps[4];
+
+            // Skip absolute URLs
+            if md_href.starts_with("http://")
+                || md_href.starts_with("https://")
+                || md_href.starts_with("file://")
+                || md_href.starts_with('/')
+            {
+                return caps[0].to_string();
+            }
+
+            // Normalize: strip leading "./"
+            let normalized = md_href.trim_start_matches("./");
+            if let Some(html_path) = link_map.get(normalized) {
+                let file_url = format!("file://{}", html_path.display());
+                format!("{}{}{}{}", prefix, file_url, fragment, suffix)
+            } else {
+                caps[0].to_string()
+            }
+        })
+        .to_string()
+}
+
+/// Convert markdown file to HTML, including all directly referenced .md files.
+/// Returns a Vec of temp file paths (primary file first, then dependencies).
+/// All inter-document .md links are rewritten to point to the generated HTML files.
+pub fn markdown_to_html(
+    md_path: &Path,
+    doc: &DocumentConfig,
+    project_name: &str,
+) -> Result<Vec<PathBuf>> {
+    // Phase 1: Convert primary file
+    let (primary_html, primary_path) = convert_single_md(md_path, doc, project_name)?;
+
+    // Get source directory for resolving relative paths
+    let md_dir = md_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let canonical_md_dir = md_dir
+        .canonicalize()
+        .unwrap_or_else(|_| md_dir.to_path_buf());
+
+    // Collect all referenced .md links from primary HTML
+    let md_links = collect_md_links(&primary_html);
+
+    // Build link map: normalized md filename -> temp HTML path
+    // Also collect (html_string, temp_path) for each dependency
+    let mut link_map: HashMap<String, PathBuf> = HashMap::new();
+    let mut dep_files: Vec<(String, PathBuf)> = Vec::new();
+
+    for href in &md_links {
+        // Strip fragment for file resolution
+        let bare_href = href.split('#').next().unwrap_or(href);
+        let normalized = bare_href.trim_start_matches("./");
+
+        // Skip if already processed
+        if link_map.contains_key(normalized) {
+            continue;
+        }
+
+        // Resolve relative path with security guard
+        let abs_candidate = md_dir.join(normalized);
+        let resolved = match abs_candidate.canonicalize() {
+            Ok(r) => r,
+            Err(_) => continue, // File doesn't exist, leave link unchanged
+        };
+
+        // Path traversal guard: must be under the source directory
+        if !resolved.starts_with(&canonical_md_dir) {
+            continue;
+        }
+
+        // Convert the referenced .md file
+        match convert_single_md(&resolved, doc, project_name) {
+            Ok((dep_html, dep_path)) => {
+                link_map.insert(normalized.to_string(), dep_path.clone());
+                dep_files.push((dep_html, dep_path));
+            }
+            Err(_) => continue, // Conversion failed, leave link unchanged
+        }
+    }
+
+    // Phase 2: Rewrite .md links in ALL HTML files and write to disk
     use std::io::Write;
-    let mut file = std::fs::File::create(&temp_path)?;
-    file.write_all(html.as_bytes())?;
+
+    // Write primary file
+    let primary_html = fix_md_links(&primary_html, &link_map);
+    let mut file = std::fs::File::create(&primary_path)?;
+    file.write_all(primary_html.as_bytes())?;
     file.flush()?;
-    Ok(temp_path)
+
+    // Collect all paths for cleanup tracking
+    let mut all_paths = vec![primary_path];
+
+    // Write dependency files
+    for (dep_html, dep_path) in dep_files {
+        let dep_html = fix_md_links(&dep_html, &link_map);
+        let mut file = std::fs::File::create(&dep_path)?;
+        file.write_all(dep_html.as_bytes())?;
+        file.flush()?;
+        all_paths.push(dep_path);
+    }
+
+    Ok(all_paths)
 }
 
 /// Fix relative image paths in HTML by converting them to absolute file:// URLs
@@ -256,5 +401,95 @@ mod tests {
     fn test_heading_with_inline_code() {
         let html = md_to_html_fragment("## Use `fmt::Display`");
         assert!(html.contains("id=\"use-fmtdisplay\""), "got: {}", html);
+    }
+
+    // --- Tests for collect_md_links ---
+
+    #[test]
+    fn test_collect_md_links_simple() {
+        let html = r#"<a href="USAGE.md">Usage</a>"#;
+        let links = collect_md_links(html);
+        assert_eq!(links, vec!["USAGE.md"]);
+    }
+
+    #[test]
+    fn test_collect_md_links_with_fragment() {
+        let html = r#"<a href="INSTALL.md#section">Install</a>"#;
+        let links = collect_md_links(html);
+        assert_eq!(links, vec!["INSTALL.md#section"]);
+    }
+
+    #[test]
+    fn test_collect_md_links_ignores_absolute() {
+        let html = r#"<a href="https://example.com/foo.md">ext</a>
+                       <a href="/absolute.md">abs</a>
+                       <a href="file:///tmp/local.md">file</a>"#;
+        let links = collect_md_links(html);
+        assert!(links.is_empty(), "got: {:?}", links);
+    }
+
+    #[test]
+    fn test_collect_md_links_dotslash() {
+        let html = r#"<a href="./USAGE.md">Usage</a>"#;
+        let links = collect_md_links(html);
+        assert_eq!(links, vec!["./USAGE.md"]);
+    }
+
+    // --- Tests for fix_md_links ---
+
+    #[test]
+    fn test_fix_md_links_rewrites() {
+        let html = r#"<a href="USAGE.md">Usage</a>"#;
+        let mut map = HashMap::new();
+        map.insert(
+            "USAGE.md".to_string(),
+            PathBuf::from("/tmp/project-usage-01.01.2026.html"),
+        );
+        let result = fix_md_links(html, &map);
+        assert!(
+            result.contains("file:///tmp/project-usage-01.01.2026.html"),
+            "got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fix_md_links_preserves_fragment() {
+        let html = r#"<a href="USAGE.md#shortcuts">Shortcuts</a>"#;
+        let mut map = HashMap::new();
+        map.insert(
+            "USAGE.md".to_string(),
+            PathBuf::from("/tmp/project-usage-01.01.2026.html"),
+        );
+        let result = fix_md_links(html, &map);
+        assert!(
+            result.contains("file:///tmp/project-usage-01.01.2026.html#shortcuts"),
+            "got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_fix_md_links_leaves_unknown() {
+        let html = r#"<a href="UNKNOWN.md">Unknown</a>"#;
+        let map = HashMap::new();
+        let result = fix_md_links(html, &map);
+        assert_eq!(result, html);
+    }
+
+    #[test]
+    fn test_fix_md_links_normalizes_dotslash() {
+        let html = r#"<a href="./USAGE.md">Usage</a>"#;
+        let mut map = HashMap::new();
+        map.insert(
+            "USAGE.md".to_string(),
+            PathBuf::from("/tmp/project-usage-01.01.2026.html"),
+        );
+        let result = fix_md_links(html, &map);
+        assert!(
+            result.contains("file:///tmp/project-usage-01.01.2026.html"),
+            "got: {}",
+            result
+        );
     }
 }

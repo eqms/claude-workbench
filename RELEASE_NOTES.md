@@ -1,5 +1,25 @@
 # Release Notes
 
+## Version 0.79.0 (30.03.2026)
+
+### Added
+- **HTML Export Cross-File Link Resolution** — When a Markdown file references other `.md`
+  files (e.g., `[Usage](USAGE.md)`), the HTML export now automatically converts all
+  referenced Markdown files to HTML and rewrites the links to point to the generated
+  HTML files. This ensures link integrity when previewing documentation in the browser.
+- 6 new unit tests for `collect_md_links()` and `fix_md_links()`: simple links, fragment
+  preservation, absolute URL filtering, dot-slash normalization, unknown link passthrough.
+
+### Changed
+- **`markdown_to_html()` signature** — Now returns `Vec<PathBuf>` instead of `PathBuf`,
+  containing the primary HTML file and all linked dependency files for proper cleanup tracking.
+- **Internal refactoring** — Extracted `convert_single_md()` helper for single-file conversion
+  without disk I/O, enabling the two-phase convert-then-rewrite approach.
+
+### Security
+- Path traversal guard on linked `.md` files — resolved paths must remain under the source
+  file's directory (same guard as used for image paths).
+
 ## Version 0.78.0 (30.03.2026)
 
 ### Fixed

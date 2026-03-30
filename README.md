@@ -105,6 +105,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.79.0
+
+- **Cross-File Link Resolution** — HTML export now auto-converts referenced `.md` files and rewrites links. When README.md links to USAGE.md or INSTALL.md, all files are converted to HTML with working links.
+
 ### What's New in v0.78.0
 
 - **HTML Anchor Links Fixed** — Internal anchor links (`[text](#heading)`) now work in browser preview and HTML export. Headings get auto-generated `id` attributes via shared `slugify()` function.
@@ -331,6 +335,10 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.79.0
+
+- **Cross-File Link-Aufloesung** — Der HTML-Export konvertiert jetzt automatisch referenzierte `.md`-Dateien mit und schreibt die Links um. Wenn README.md auf USAGE.md oder INSTALL.md verlinkt, werden alle Dateien zu HTML konvertiert und die Links funktionieren.
 
 ### Neu in v0.78.0
 
