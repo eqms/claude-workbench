@@ -48,20 +48,24 @@ pub struct FilteredOutput {
 static PROMPT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
         // user@host:path$ or user@host:path#
-        Regex::new(r"^[a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+:[^\$#]*[\$#]\s*$").unwrap(),
+        Regex::new(r"^[a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+:[^\$#]*[\$#]\s*$")
+            .expect("static regex pattern must compile"),
         // Simple prompts: $, >, %, >>> (Python)
-        Regex::new(r"^[\$>%]\s*$").unwrap(),
-        Regex::new(r"^>>>\s*$").unwrap(),
+        Regex::new(r"^[\$>%]\s*$").expect("static regex pattern must compile"),
+        Regex::new(r"^>>>\s*$").expect("static regex pattern must compile"),
         // Zsh themes: ➜, ❯, →
-        Regex::new(r"^[➜❯→]\s+").unwrap(),
+        Regex::new(r"^[➜❯→]\s+").expect("static regex pattern must compile"),
         // Fish prompt with abbreviated path
-        Regex::new(r"^[a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+\s+[~\w/]+\s*[\$#>]\s*$").unwrap(),
+        Regex::new(r"^[a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+\s+[~\w/]+\s*[\$#>]\s*$")
+            .expect("static regex pattern must compile"),
         // PS1 with colors (stripped)
-        Regex::new(r"^\[[^\]]*\][a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+").unwrap(),
+        Regex::new(r"^\[[^\]]*\][a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+")
+            .expect("static regex pattern must compile"),
         // Time-prefixed prompts
-        Regex::new(r"^\[\d{2}:\d{2}(:\d{2})?\]\s*[\$#>]").unwrap(),
+        Regex::new(r"^\[\d{2}:\d{2}(:\d{2})?\]\s*[\$#>]")
+            .expect("static regex pattern must compile"),
         // Just a directory path ending with prompt
-        Regex::new(r"^[~\w/\-\.]+\s*[\$#>%]\s*$").unwrap(),
+        Regex::new(r"^[~\w/\-\.]+\s*[\$#>%]\s*$").expect("static regex pattern must compile"),
     ]
 });
 
@@ -69,25 +73,28 @@ static PROMPT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 static ERROR_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
         // Python traceback
-        Regex::new(r"Traceback \(most recent call last\)").unwrap(),
-        Regex::new(r#"^\s+File "[^"]+", line \d+"#).unwrap(),
-        Regex::new(r"^\s+raise ").unwrap(),
-        Regex::new(r"^[A-Z][a-zA-Z]*Error:").unwrap(),
-        Regex::new(r"^[A-Z][a-zA-Z]*Exception:").unwrap(),
+        Regex::new(r"Traceback \(most recent call last\)")
+            .expect("static regex pattern must compile"),
+        Regex::new(r#"^\s+File "[^"]+", line \d+"#).expect("static regex pattern must compile"),
+        Regex::new(r"^\s+raise ").expect("static regex pattern must compile"),
+        Regex::new(r"^[A-Z][a-zA-Z]*Error:").expect("static regex pattern must compile"),
+        Regex::new(r"^[A-Z][a-zA-Z]*Exception:").expect("static regex pattern must compile"),
         // Odoo errors
-        Regex::new(r"odoo\.exceptions\.").unwrap(),
-        Regex::new(r"psycopg2\.").unwrap(),
-        Regex::new(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+.*ERROR").unwrap(),
+        Regex::new(r"odoo\.exceptions\.").expect("static regex pattern must compile"),
+        Regex::new(r"psycopg2\.").expect("static regex pattern must compile"),
+        Regex::new(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+.*ERROR")
+            .expect("static regex pattern must compile"),
         // Rust errors
-        Regex::new(r"^error\[E\d+\]:").unwrap(),
-        Regex::new(r"^\s+-->\s+").unwrap(),
+        Regex::new(r"^error\[E\d+\]:").expect("static regex pattern must compile"),
+        Regex::new(r"^\s+-->\s+").expect("static regex pattern must compile"),
         // JavaScript/Node errors
-        Regex::new(r"^\s+at\s+").unwrap(),
-        Regex::new(r"^(TypeError|ReferenceError|SyntaxError):").unwrap(),
+        Regex::new(r"^\s+at\s+").expect("static regex pattern must compile"),
+        Regex::new(r"^(TypeError|ReferenceError|SyntaxError):")
+            .expect("static regex pattern must compile"),
         // Generic errors
-        Regex::new(r"(?i)^error:").unwrap(),
-        Regex::new(r"(?i)^fatal:").unwrap(),
-        Regex::new(r"(?i)^panic:").unwrap(),
+        Regex::new(r"(?i)^error:").expect("static regex pattern must compile"),
+        Regex::new(r"(?i)^fatal:").expect("static regex pattern must compile"),
+        Regex::new(r"(?i)^panic:").expect("static regex pattern must compile"),
     ]
 });
 
@@ -95,59 +102,60 @@ static ERROR_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 static DIR_LISTING_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
         // Permission strings: drwxr-xr-x, -rw-r--r--
-        Regex::new(r"^[d\-][rwx\-]{9}").unwrap(),
+        Regex::new(r"^[d\-][rwx\-]{9}").expect("static regex pattern must compile"),
         // Total line: total 123
-        Regex::new(r"^total\s+\d+").unwrap(),
+        Regex::new(r"^total\s+\d+").expect("static regex pattern must compile"),
     ]
 });
 
 // Syntax detection patterns
 static PYTHON_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
-        Regex::new(r"^def\s+\w+\s*\(").unwrap(),
-        Regex::new(r"^class\s+\w+").unwrap(),
-        Regex::new(r"^import\s+\w+").unwrap(),
-        Regex::new(r"^from\s+\w+\s+import").unwrap(),
-        Regex::new(r"self\.\w+").unwrap(),
-        Regex::new(r"__init__").unwrap(),
+        Regex::new(r"^def\s+\w+\s*\(").expect("static regex pattern must compile"),
+        Regex::new(r"^class\s+\w+").expect("static regex pattern must compile"),
+        Regex::new(r"^import\s+\w+").expect("static regex pattern must compile"),
+        Regex::new(r"^from\s+\w+\s+import").expect("static regex pattern must compile"),
+        Regex::new(r"self\.\w+").expect("static regex pattern must compile"),
+        Regex::new(r"__init__").expect("static regex pattern must compile"),
     ]
 });
 
 static RUST_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
-        Regex::new(r"^fn\s+\w+").unwrap(),
-        Regex::new(r"^pub\s+(fn|struct|enum|mod)").unwrap(),
-        Regex::new(r"^impl\s+").unwrap(),
-        Regex::new(r"^let\s+(mut\s+)?\w+").unwrap(),
-        Regex::new(r"^use\s+\w+::").unwrap(),
+        Regex::new(r"^fn\s+\w+").expect("static regex pattern must compile"),
+        Regex::new(r"^pub\s+(fn|struct|enum|mod)").expect("static regex pattern must compile"),
+        Regex::new(r"^impl\s+").expect("static regex pattern must compile"),
+        Regex::new(r"^let\s+(mut\s+)?\w+").expect("static regex pattern must compile"),
+        Regex::new(r"^use\s+\w+::").expect("static regex pattern must compile"),
     ]
 });
 
 static JAVASCRIPT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
-        Regex::new(r"^const\s+\w+\s*=").unwrap(),
-        Regex::new(r"^let\s+\w+\s*=").unwrap(),
-        Regex::new(r"^function\s+\w+").unwrap(),
-        Regex::new(r"^(export\s+)?(default\s+)?class\s+").unwrap(),
-        Regex::new(r"=>\s*\{?").unwrap(),
-        Regex::new(r"^import\s+.*\s+from\s+").unwrap(),
+        Regex::new(r"^const\s+\w+\s*=").expect("static regex pattern must compile"),
+        Regex::new(r"^let\s+\w+\s*=").expect("static regex pattern must compile"),
+        Regex::new(r"^function\s+\w+").expect("static regex pattern must compile"),
+        Regex::new(r"^(export\s+)?(default\s+)?class\s+")
+            .expect("static regex pattern must compile"),
+        Regex::new(r"=>\s*\{?").expect("static regex pattern must compile"),
+        Regex::new(r"^import\s+.*\s+from\s+").expect("static regex pattern must compile"),
     ]
 });
 
 static BASH_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
-        Regex::new(r"^#!/bin/(ba)?sh").unwrap(),
-        Regex::new(r"^export\s+\w+=").unwrap(),
-        Regex::new(r"^if\s+\[").unwrap(),
-        Regex::new(r"^\$\{?\w+").unwrap(),
+        Regex::new(r"^#!/bin/(ba)?sh").expect("static regex pattern must compile"),
+        Regex::new(r"^export\s+\w+=").expect("static regex pattern must compile"),
+        Regex::new(r"^if\s+\[").expect("static regex pattern must compile"),
+        Regex::new(r"^\$\{?\w+").expect("static regex pattern must compile"),
     ]
 });
 
 static XML_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
-        Regex::new(r"^<\?xml").unwrap(),
-        Regex::new(r"^<!DOCTYPE").unwrap(),
-        Regex::new(r"^<[a-zA-Z_][\w\-]*(\s|>|/)").unwrap(),
+        Regex::new(r"^<\?xml").expect("static regex pattern must compile"),
+        Regex::new(r"^<!DOCTYPE").expect("static regex pattern must compile"),
+        Regex::new(r"^<[a-zA-Z_][\w\-]*(\s|>|/)").expect("static regex pattern must compile"),
     ]
 });
 

@@ -8,6 +8,7 @@ pub mod opener;
 pub mod pdf_export;
 pub mod syntax;
 pub mod template;
+#[cfg(feature = "pdf-export")]
 pub mod typst_pdf;
 
 pub use markdown::*;

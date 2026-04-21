@@ -105,6 +105,14 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.80.0
+
+- **Internal Refactor Release** — `handle_key_event` (1,375 lines) split into 15 focused methods per overlay/pane; `src/update/mod.rs` (986 lines) split into six submodules (`log`, `state`, `version`, `release_notes`, `check`, `install`). Behavior preserved 1:1.
+- **Optional `pdf-export` Feature** — Typst PDF toolchain is now behind a default-enabled Cargo feature. `cargo build --no-default-features` produces a smaller binary without PDF support.
+- **Multi-OS CI** — Test job now runs on Linux, macOS, and Windows (previously Linux only).
+- **Explicit Style Contract** — `rustfmt.toml` and `clippy.toml` codify formatting and lint thresholds.
+- **Integration Tests** — New `tests/cli.rs` exercises `--help`, `--version`, and unknown-flag handling (81 total tests, up from 78).
+
 ### What's New in v0.79.0
 
 - **Cross-File Link Resolution** — HTML export now auto-converts referenced `.md` files and rewrites links. When README.md links to USAGE.md or INSTALL.md, all files are converted to HTML with working links.
@@ -335,6 +343,14 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.80.0
+
+- **Internes Refactor-Release** — `handle_key_event` (1.375 Zeilen) in 15 fokussierte Methoden pro Overlay/Pane aufgeteilt; `src/update/mod.rs` (986 Zeilen) in sechs Submodule (`log`, `state`, `version`, `release_notes`, `check`, `install`) zerlegt. Verhalten bleibt 1:1.
+- **Optionales `pdf-export` Feature** — Die Typst-PDF-Toolchain steht jetzt hinter einem default-aktivierten Cargo-Feature. `cargo build --no-default-features` erzeugt ein kleineres Binary ohne PDF-Support.
+- **Multi-OS CI** — Der Test-Job laeuft jetzt auf Linux, macOS und Windows (vorher nur Linux).
+- **Expliziter Style-Contract** — `rustfmt.toml` und `clippy.toml` dokumentieren Formatierungs- und Lint-Schwellenwerte.
+- **Integrationstests** — Neue `tests/cli.rs` prueft `--help`, `--version` und unbekannte Flags (81 Tests gesamt, vorher 78).
 
 ### Neu in v0.79.0
 

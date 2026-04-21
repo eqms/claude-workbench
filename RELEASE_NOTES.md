@@ -1,5 +1,56 @@
 # Release Notes
 
+## Version 0.80.0 (21.04.2026)
+
+### Added
+- **`pdf-export` Cargo Feature (default-enabled)** — The typst-based PDF pipeline
+  (`typst`, `typst-pdf`, `typst-library`, `typst-kit`, `comemo`, `ecow`) is now gated
+  behind the `pdf-export` feature. `cargo build --no-default-features` produces a
+  smaller binary without the PDF toolchain, while `cargo build` keeps the default
+  behavior. Callers of `export_markdown()` receive a descriptive error when PDF
+  export is requested in a build without the feature.
+- **CLI integration tests (`tests/cli.rs`)** — First integration-test suite verifies
+  `--help` shows usage including `--check-update`, `--version` prints the Cargo
+  package version, and unknown flags are rejected. Runs alongside the 78 unit tests
+  via `cargo test`.
+- **`rustfmt.toml` and `clippy.toml`** — Style/lint contract is now explicit:
+  edition 2021, Unix newlines, reordered imports/modules, cognitive-complexity
+  threshold 30, too-many-arguments threshold 8.
+- **Multi-OS test coverage in CI** — `ci.yml` test job now matrixes over
+  `ubuntu-latest`, `macos-latest`, `windows-latest` (previously only Linux),
+  matching the release-build target platforms.
+
+### Changed
+- **`src/app/keyboard.rs` split into 15 focused methods** — `handle_key_event`
+  shrunk from 1,375 lines (the single function body) to a ~180-line orchestrator
+  that dispatches to dedicated handlers per overlay and pane: `handle_fuzzy_finder_key`,
+  `handle_update_dialog_key`, `handle_export_chooser_key`, `handle_active_dialog_key`,
+  `handle_menu_key`, `handle_about_key`, `handle_help_key`,
+  `handle_permission_mode_dialog_key`, `handle_claude_startup_key`,
+  `handle_global_shortcut`, `handle_pane_resize_key`,
+  `handle_file_browser_pane_key`, `handle_preview_pane_key`,
+  `handle_preview_edit_key`, `handle_preview_readonly_key`,
+  `handle_terminal_pane_key`. Behavior is preserved 1:1.
+- **`src/update/mod.rs` split into submodules** — The 986-line update module is
+  now composed of six focused files: `log.rs` (file-based update log),
+  `state.rs` (`UpdateState`, `UpdateCheckResult`, `UpdateResult`),
+  `version.rs` (`version_newer`, `CURRENT_VERSION`),
+  `release_notes.rs` (fetch + platform filtering),
+  `check.rs` (sync/async update checks, `get_target`),
+  `install.rs` (`perform_update_*`, `restart_application`). All public items are
+  re-exported from `update/` for source-compatibility.
+- **Regex `unwrap()` audit** — The 49 `Regex::new(…).unwrap()` sites in
+  `src/filter.rs` are now `.expect("static regex pattern must compile")`, so any
+  future pattern-compilation failure emits a descriptive panic instead of a bare
+  `called Option::unwrap() on None`.
+- **Single-file modules flattened** — `src/input/mod.rs` → `src/input.rs` and
+  `src/session/mod.rs` → `src/session.rs`. Module paths and imports are unchanged.
+
+### Internal
+- This is a pure refactor/infrastructure release — no user-facing behavior
+  changes beyond the optional `--no-default-features` build. Existing
+  shortcuts, dialogs, and workflows are untouched.
+
 ## Version 0.79.0 (30.03.2026)
 
 ### Added

@@ -33,7 +33,17 @@ pub fn export_markdown(
     match options.format {
         ExportFormat::Markdown => export_as_markdown(source, target),
         ExportFormat::Pdf => {
-            crate::browser::typst_pdf::export_markdown_to_pdf(source, target, options, doc)
+            #[cfg(feature = "pdf-export")]
+            {
+                crate::browser::typst_pdf::export_markdown_to_pdf(source, target, options, doc)
+            }
+            #[cfg(not(feature = "pdf-export"))]
+            {
+                let _ = (source, target, doc);
+                Err(anyhow::anyhow!(
+                    "PDF export is not available: rebuild with `--features pdf-export`"
+                ))
+            }
         }
     }
 }
