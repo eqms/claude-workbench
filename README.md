@@ -105,6 +105,14 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.81.0
+
+- **Claude Code 2.1.117 Startup Dialog** — The permission mode dialog is replaced by a unified multi-section startup dialog covering Permission Mode, Model, Effort, Session Name, Worktree, and Remote Control. Navigation: `Tab`/`Shift+Tab` between sections, `↑↓` in lists, `←→` for radios. All values persist to `config.yaml` and are pre-selected on next launch.
+- **Auto Mode** — New `auto` permission mode (`--permission-mode auto`) as the 6th variant, sorted after `acceptEdits` matching the Shift+Tab cycle order of Claude Code. Lets Claude check each tool call for risky actions and prompt injection — ideal for long-running tasks.
+- **Model, Effort, Session Name, Worktree Flags** — `--model sonnet|opus`, `--effort low|medium|high|xhigh|max`, `--name <session>`, `--worktree <name>` now configurable from the startup dialog.
+- **Remote Control via CLI flag** — The 4-second `/remote-control` slash-command hack is replaced by the official `--remote-control` flag. Starts reliably without timing-dependent race conditions.
+- **18 new unit tests** — Test count now 99 (96 unit + 3 integration), up from 81.
+
 ### What's New in v0.80.0
 
 - **Internal Refactor Release** — `handle_key_event` (1,375 lines) split into 15 focused methods per overlay/pane; `src/update/mod.rs` (986 lines) split into six submodules (`log`, `state`, `version`, `release_notes`, `check`, `install`). Behavior preserved 1:1.
@@ -343,6 +351,14 @@ cd claude-workbench && cargo build --release
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.81.0
+
+- **Claude Code 2.1.117 Startup-Dialog** — Der Permission-Mode-Dialog wird durch einen vereinheitlichten Multi-Sektion-Startup-Dialog ersetzt: Permission Mode, Model, Effort, Session-Name, Worktree und Remote Control. Navigation: `Tab`/`Shift+Tab` zwischen Sektionen, `↑↓` in Listen, `←→` für Radio-Buttons. Alle Werte werden in `config.yaml` persistiert und beim nächsten Start vorselektiert.
+- **Auto Mode** — Neuer `auto` Permission Mode (`--permission-mode auto`) als 6. Variante, nach `acceptEdits` einsortiert entsprechend der Shift+Tab-Reihenfolge von Claude Code. Claude prüft jeden Tool-Call auf riskante Aktionen und Prompt-Injection — ideal für Long-Running Tasks.
+- **Model, Effort, Session-Name, Worktree Flags** — `--model sonnet|opus`, `--effort low|medium|high|xhigh|max`, `--name <session>`, `--worktree <name>` jetzt im Startup-Dialog konfigurierbar.
+- **Remote Control als CLI-Flag** — Der 4-Sekunden `/remote-control` Slash-Command-Hack ist durch das offizielle `--remote-control` Flag ersetzt. Startet zuverlaessig ohne Timing-abhaengige Race Condition.
+- **18 neue Unit-Tests** — Test-Anzahl jetzt 99 (96 unit + 3 integration), vorher 81.
 
 ### Neu in v0.80.0
 

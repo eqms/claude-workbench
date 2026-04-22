@@ -136,8 +136,6 @@ pub struct App {
     pub last_copy_time: Option<std::time::Instant>,
     pub copy_flash_lines: usize,
     pub copy_flash_message: Option<String>,
-    // Pending /remote-control slash command (sent after 4s startup delay)
-    pub remote_control_send_time: Option<std::time::Instant>,
     // Temp files created for browser previews (cleaned up on exit)
     pub temp_preview_files: Vec<std::path::PathBuf>,
     // Export format chooser (Ctrl+X on Markdown files)
@@ -160,7 +158,6 @@ impl App {
         let mut claude_pty_pending = false;
         let mut permission_mode_dialog = ui::permission_mode::PermissionModeState::default();
         let mut claude_permission_mode = ClaudePermissionMode::Default;
-        let mut remote_control_time: Option<std::time::Instant> = None;
         // Determine if we should show permission mode dialog
         // Don't show if wizard needs to run first (first-time setup)
         let should_show_permission_dialog =
@@ -171,8 +168,12 @@ impl App {
         if should_show_permission_dialog {
             // Delay Claude PTY creation until permission mode is selected
             claude_pty_pending = true;
-            permission_mode_dialog.open_with_default(
+            permission_mode_dialog.open_with_defaults(
                 config.claude.default_permission_mode,
+                config.claude.default_model,
+                config.claude.default_effort,
+                &config.claude.default_session_name,
+                &config.claude.default_worktree,
                 config.claude.remote_control,
             );
             claude_command_str = String::new();
@@ -183,16 +184,21 @@ impl App {
                 .default_permission_mode
                 .unwrap_or(ClaudePermissionMode::Default);
 
-            // Build Claude command with permission mode
-            let claude_cmd = Self::build_claude_command(&config, claude_permission_mode);
+            // Build Claude command with persisted startup options
+            let opts = crate::app::pty::StartupOptions {
+                permission_mode: claude_permission_mode,
+                model: config.claude.default_model,
+                effort: config.claude.default_effort,
+                session_name: config.claude.default_session_name.clone(),
+                worktree: config.claude.default_worktree.clone(),
+                remote_control: config.claude.remote_control,
+            };
+            let claude_cmd = Self::build_claude_command(&config, &opts);
             claude_command_str = claude_cmd.join(" ");
 
             match PseudoTerminal::new(&claude_cmd, rows, cols, &cwd) {
                 Ok(pty) => {
                     terminals.insert(PaneId::Claude, pty);
-                    if config.claude.remote_control {
-                        remote_control_time = Some(std::time::Instant::now());
-                    }
                 }
                 Err(e) => {
                     claude_error = Some(format!(
@@ -286,7 +292,6 @@ impl App {
             last_copy_time: None,
             copy_flash_lines: 0,
             copy_flash_message: None,
-            remote_control_send_time: remote_control_time,
             temp_preview_files: Vec::new(),
             export_chooser: crate::types::ExportChooserState::default(),
             export_receiver: None,
@@ -377,8 +382,6 @@ impl App {
             // Poll for async update check and update results
             self.poll_update_check();
             self.poll_update_result();
-            // Send pending /remote-control command after delay
-            self.poll_remote_control_send();
 
             terminal.draw(|frame| self.draw(frame))?;
 

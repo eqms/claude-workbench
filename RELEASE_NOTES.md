@@ -1,5 +1,57 @@
 # Release Notes
 
+## Version 0.81.0 (22.04.2026)
+
+### Added
+- **Auto Mode for Claude Code 2.1.117** — New `auto` permission mode
+  (`--permission-mode auto`) as the 6th variant in `ClaudePermissionMode`,
+  sorted right after `acceptEdits` matching the Shift+Tab cycle order of
+  Claude Code itself. Auto Mode lets Claude check each tool call for risky
+  actions and prompt injection before executing, ideal for long-running
+  tasks.
+- **Unified Claude Startup Dialog** — The permission mode dialog is replaced
+  by a multi-section startup dialog covering Permission Mode, Model, Effort,
+  Session Name, Worktree and Remote Control. Navigation: `Tab`/`Shift+Tab`
+  between sections, `↑↓` in lists, `←→` for radios, Home/End/Left/Right for
+  text input. All values persist to `~/.config/claude-workbench/config.yaml`
+  and get pre-selected on the next launch.
+- **`--model` flag** — New `ClaudeModel` enum with `Unset` (CLI default),
+  `Sonnet`, `Opus`. Emitted as `--model sonnet` / `--model opus` when set.
+- **`--effort` flag** — New `ClaudeEffort` enum with 6 levels
+  (Unset/Low/Medium/High/XHigh/Max) emitted as `--effort <level>`.
+- **`--name` and `--worktree` flags** — Free-text input fields with full
+  UTF-8-safe cursor navigation (char-index based, same pattern as the MC Edit
+  search dialog from v0.20.0).
+- **`StartupOptions` struct** — Bundles permission mode, model, effort,
+  session name, worktree and remote control into one value passed to
+  `App::build_claude_command()` and `App::init_claude_pty()`.
+- **4 new `ClaudeConfig` fields** — `default_model`, `default_effort`,
+  `default_session_name`, `default_worktree` with `#[serde(default)]` for
+  forward-compatible YAML migration.
+- **18 new unit tests** — `src/types.rs` adds 8 tests covering `Auto`
+  variant position/flag/name, `ClaudeModel` and `ClaudeEffort` CLI flags
+  and unique-name invariants. `src/app/pty.rs` adds 10 tests covering
+  `build_claude_command` across all flag combinations (shell fallback, auto
+  mode, model, effort, session name, worktree, remote control, YOLO mode,
+  empty values, all-flags combined). Test count now 99 (96 unit + 3
+  integration) up from 81.
+
+### Changed
+- **Remote Control uses CLI flag instead of slash-command hack** — The
+  4-second `/remote-control` slash-command timer is replaced by the official
+  `--remote-control` CLI flag introduced in Claude Code 2.1.x. Eliminates
+  the timing-dependent race condition and starts reliably. Removes
+  `remote_control_send_time` field from `App` and the `poll_remote_control_send`
+  method from `src/app/update.rs`.
+- **`build_claude_command` signature** — Now takes `&StartupOptions` instead
+  of a single `ClaudePermissionMode`. Flags are emitted in order:
+  `--permission-mode` / `--dangerously-skip-permissions` → `--model` →
+  `--effort` → `--name` → `--worktree` → `--remote-control`.
+- **`PermissionModeState` rewritten** — Replaces the single-list dialog with
+  a `DialogSection` enum (6 variants) and per-section indices plus text
+  fields. Legacy `open()` / `open_with_default()` replaced by
+  `open_with_defaults()` taking all 6 default values.
+
 ## Version 0.80.0 (21.04.2026)
 
 ### Added

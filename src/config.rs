@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-use crate::types::ClaudePermissionMode;
+use crate::types::{ClaudeEffort, ClaudeModel, ClaudePermissionMode};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -92,6 +92,18 @@ pub struct ClaudeConfig {
     /// Enable remote control mode (claude remote-control) for session sharing
     #[serde(default)]
     pub remote_control: bool,
+    /// Default Claude model (--model flag)
+    #[serde(default)]
+    pub default_model: ClaudeModel,
+    /// Default reasoning effort level (--effort flag)
+    #[serde(default)]
+    pub default_effort: ClaudeEffort,
+    /// Default session name (--name flag, empty = not passed)
+    #[serde(default)]
+    pub default_session_name: String,
+    /// Default worktree name (--worktree flag, empty = not passed)
+    #[serde(default)]
+    pub default_worktree: String,
 }
 
 impl Default for ClaudeConfig {
@@ -101,6 +113,10 @@ impl Default for ClaudeConfig {
             default_permission_mode: None,
             show_permission_dialog: true, // Dialog is shown by default
             remote_control: false,
+            default_model: ClaudeModel::Unset,
+            default_effort: ClaudeEffort::Unset,
+            default_session_name: String::new(),
+            default_worktree: String::new(),
         }
     }
 }

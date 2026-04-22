@@ -231,10 +231,17 @@ impl App {
                 // Permission mode dialog - click outside uses default mode
                 // Skip if update dialog is visible - update takes priority
                 if self.permission_mode_dialog.visible && !self.update_state.show_dialog {
-                    let mode = ClaudePermissionMode::Default;
                     self.permission_mode_dialog.close();
                     if self.claude_pty_pending {
-                        self.init_claude_pty(mode);
+                        let opts = crate::app::pty::StartupOptions {
+                            permission_mode: ClaudePermissionMode::Default,
+                            model: self.config.claude.default_model,
+                            effort: self.config.claude.default_effort,
+                            session_name: self.config.claude.default_session_name.clone(),
+                            worktree: self.config.claude.default_worktree.clone(),
+                            remote_control: self.config.claude.remote_control,
+                        };
+                        self.init_claude_pty(opts);
                     }
                     self.active_pane = PaneId::Claude;
                     return;

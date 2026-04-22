@@ -163,18 +163,26 @@ Press **Shift+F9** to open an input dialog where you can enter a custom line cou
 
 When all upper panes (File Browser, Preview, LazyGit, Terminal) are hidden, Claude Code automatically uses the full screen. Toggle panes with F1, F2, F5, F6 to enter/exit fullscreen mode.
 
-### Permission Mode Dialog
+### Claude Startup Dialog
 
-At startup, a dialog lets you choose the Claude Code permission mode. Below the 5 modes, a **Remote Control** toggle is available.
+At startup, a unified multi-section dialog lets you pre-configure Claude Code. Six sections: **Permission Mode** (6 modes incl. new `auto`), **Model** (sonnet/opus), **Effort** (low…max), **Session Name**, **Worktree**, and **Remote Control**.
 
 | Key | Action |
 |-----|--------|
-| ↑/↓ | Navigate between modes and toggle |
-| Enter | Confirm selection |
-| Space | Toggle Remote Control checkbox |
-| Esc | Use default mode |
+| Tab / Shift+Tab | Switch between sections |
+| ↑/↓ or k/j | Navigate items in Permission list |
+| ←/→ or ↑/↓ | Select radio option in Model/Effort |
+| Left/Right/Home/End | Cursor in text fields (Session/Worktree) |
+| Backspace/Delete | Edit text fields |
+| Space | Toggle Remote Control (when focused) |
+| Enter | Confirm selection and persist to config |
+| Esc | Use saved defaults |
 
-When Remote Control is enabled, the workbench automatically sends a Space key 2 seconds after Claude starts, triggering the QR code display for remote access. The session can then be accessed from other devices (browser, phone). The setting is saved in `config.yaml` under `claude.remote_control`.
+All values persist to `~/.config/claude-workbench/config.yaml` under `claude.*` (`default_permission_mode`, `default_model`, `default_effort`, `default_session_name`, `default_worktree`, `remote_control`) and are pre-selected on next launch.
+
+**Permission Modes (6):** `default`, `acceptEdits`, `auto`, `plan`, `bypassPermissions`, `dangerouslySkip`. The new `auto` mode lets Claude check each tool call for risky actions and prompt injection before executing — ideal for long-running tasks.
+
+**Remote Control** now uses the official `--remote-control` CLI flag (replaces the former 4-second slash-command hack). Setting persists under `claude.remote_control`.
 
 ### File Browser Features
 
@@ -412,18 +420,26 @@ Mit **Shift+F9** öffnet sich ein Eingabedialog, in dem eine eigene Zeilenanzahl
 
 Wenn alle oberen Bereiche (Dateibrowser, Vorschau, LazyGit, Terminal) ausgeblendet sind, nutzt Claude Code automatisch den gesamten Bildschirm. Bereiche mit F1, F2, F5, F6 ein-/ausblenden um den Vollbildmodus zu aktivieren/deaktivieren.
 
-### Berechtigungsmodus-Dialog
+### Claude Startup-Dialog
 
-Beim Start erscheint ein Dialog zur Auswahl des Claude Code Berechtigungsmodus. Unterhalb der 5 Modi befindet sich ein **Remote Control** Toggle.
+Beim Start erscheint ein vereinheitlichter Multi-Sektion-Dialog zur Vorkonfiguration von Claude Code. Sechs Sektionen: **Permission Mode** (6 Modi inkl. neuem `auto`), **Model** (sonnet/opus), **Effort** (low…max), **Session-Name**, **Worktree** und **Remote Control**.
 
 | Taste | Aktion |
 |-------|--------|
-| ↑/↓ | Zwischen Modi und Toggle navigieren |
-| Enter | Auswahl bestätigen |
-| Leertaste | Remote Control Checkbox umschalten |
-| Esc | Standard-Modus verwenden |
+| Tab / Shift+Tab | Zwischen Sektionen wechseln |
+| ↑/↓ oder k/j | Items in Permission-Liste navigieren |
+| ←/→ oder ↑/↓ | Radio-Option in Model/Effort waehlen |
+| Links/Rechts/Home/End | Cursor in Textfeldern (Session/Worktree) |
+| Backspace/Entf | Textfelder editieren |
+| Leertaste | Remote Control umschalten (wenn fokussiert) |
+| Enter | Auswahl bestaetigen und in Config speichern |
+| Esc | Gespeicherte Defaults verwenden |
 
-Wenn Remote Control aktiviert ist, sendet die Workbench automatisch 2 Sekunden nach dem Claude-Start die Leertaste, um den QR-Code für den Remote-Zugriff anzuzeigen. Die Session kann dann von anderen Geräten (Browser, Handy) genutzt werden. Die Einstellung wird in `config.yaml` unter `claude.remote_control` gespeichert.
+Alle Werte werden in `~/.config/claude-workbench/config.yaml` unter `claude.*` persistiert (`default_permission_mode`, `default_model`, `default_effort`, `default_session_name`, `default_worktree`, `remote_control`) und beim naechsten Start vorselektiert.
+
+**Permission Modes (6):** `default`, `acceptEdits`, `auto`, `plan`, `bypassPermissions`, `dangerouslySkip`. Der neue `auto`-Modus laesst Claude jeden Tool-Call auf riskante Aktionen und Prompt-Injection pruefen — ideal fuer Long-Running Tasks.
+
+**Remote Control** nutzt jetzt das offizielle `--remote-control` CLI-Flag (ersetzt den frueheren 4-Sekunden-Slash-Command-Hack). Einstellung wird unter `claude.remote_control` gespeichert.
 
 ### Dateibrowser-Funktionen
 

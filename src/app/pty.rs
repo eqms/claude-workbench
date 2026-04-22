@@ -5,12 +5,23 @@ use shell_escape::escape;
 
 use crate::config::Config;
 use crate::terminal::PseudoTerminal;
-use crate::types::{ClaudePermissionMode, PaneId};
+use crate::types::{ClaudeEffort, ClaudeModel, ClaudePermissionMode, PaneId};
 
 use super::App;
 
+/// Bundled Claude Code startup options, assembled from dialog state + config.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct StartupOptions {
+    pub permission_mode: ClaudePermissionMode,
+    pub model: ClaudeModel,
+    pub effort: ClaudeEffort,
+    pub session_name: String,
+    pub worktree: String,
+    pub remote_control: bool,
+}
+
 impl App {
-    pub(super) fn build_claude_command(config: &Config, mode: ClaudePermissionMode) -> Vec<String> {
+    pub(super) fn build_claude_command(config: &Config, opts: &StartupOptions) -> Vec<String> {
         let mut cmd = if config.pty.claude_command.is_empty() {
             // Default: use the same shell as Terminal pane
             let mut shell_cmd = vec![config.terminal.shell_path.clone()];
@@ -22,32 +33,64 @@ impl App {
 
         // Only add flags if using claude command (not shell)
         if !config.pty.claude_command.is_empty() {
-            if mode.is_yolo() {
-                // YOLO mode: --dangerously-skip-permissions flag
+            // Permission mode
+            if opts.permission_mode.is_yolo() {
                 if !cmd
                     .iter()
                     .any(|a| a.contains("--dangerously-skip-permissions"))
                 {
                     cmd.push("--dangerously-skip-permissions".to_string());
                 }
-            } else if let Some(flag_value) = mode.cli_flag() {
-                // Normal modes: --permission-mode flag
+            } else if let Some(flag_value) = opts.permission_mode.cli_flag() {
                 if !cmd.iter().any(|a| a.contains("--permission-mode")) {
                     cmd.push("--permission-mode".to_string());
                     cmd.push(flag_value.to_string());
                 }
+            }
+
+            // Model
+            if let Some(model) = opts.model.cli_flag() {
+                if !cmd.iter().any(|a| a == "--model") {
+                    cmd.push("--model".to_string());
+                    cmd.push(model.to_string());
+                }
+            }
+
+            // Effort
+            if let Some(effort) = opts.effort.cli_flag() {
+                if !cmd.iter().any(|a| a == "--effort") {
+                    cmd.push("--effort".to_string());
+                    cmd.push(effort.to_string());
+                }
+            }
+
+            // Session name (--name)
+            if !opts.session_name.is_empty() && !cmd.iter().any(|a| a == "--name") {
+                cmd.push("--name".to_string());
+                cmd.push(opts.session_name.clone());
+            }
+
+            // Worktree (--worktree)
+            if !opts.worktree.is_empty() && !cmd.iter().any(|a| a == "--worktree") {
+                cmd.push("--worktree".to_string());
+                cmd.push(opts.worktree.clone());
+            }
+
+            // Remote control flag (replaces former slash-command hack)
+            if opts.remote_control && !cmd.iter().any(|a| a == "--remote-control" || a == "--rc") {
+                cmd.push("--remote-control".to_string());
             }
         }
 
         cmd
     }
 
-    /// Initialize Claude PTY with the selected permission mode
-    pub(super) fn init_claude_pty(&mut self, mode: ClaudePermissionMode) {
-        self.claude_permission_mode = mode;
+    /// Initialize Claude PTY with the given startup options
+    pub(super) fn init_claude_pty(&mut self, opts: StartupOptions) {
+        self.claude_permission_mode = opts.permission_mode;
         self.claude_pty_pending = false;
 
-        let claude_cmd = Self::build_claude_command(&self.config, mode);
+        let claude_cmd = Self::build_claude_command(&self.config, &opts);
         self.claude_command_used = claude_cmd.join(" ");
 
         let cwd = self.file_browser.current_dir.clone();
@@ -58,10 +101,6 @@ impl App {
             Ok(pty) => {
                 self.terminals.insert(PaneId::Claude, pty);
                 self.claude_error = None;
-                // Schedule /remote-control if enabled
-                if self.config.claude.remote_control {
-                    self.remote_control_send_time = Some(std::time::Instant::now());
-                }
             }
             Err(e) => {
                 self.claude_error = Some(format!(
@@ -83,17 +122,28 @@ impl App {
 
         if should_show_permission_dialog {
             self.claude_pty_pending = true;
-            self.permission_mode_dialog.open_with_default(
+            self.permission_mode_dialog.open_with_defaults(
                 self.config.claude.default_permission_mode,
+                self.config.claude.default_model,
+                self.config.claude.default_effort,
+                &self.config.claude.default_session_name,
+                &self.config.claude.default_worktree,
                 self.config.claude.remote_control,
             );
         } else {
-            let mode = self
-                .config
-                .claude
-                .default_permission_mode
-                .unwrap_or(ClaudePermissionMode::Default);
-            self.init_claude_pty(mode);
+            let opts = StartupOptions {
+                permission_mode: self
+                    .config
+                    .claude
+                    .default_permission_mode
+                    .unwrap_or(ClaudePermissionMode::Default),
+                model: self.config.claude.default_model,
+                effort: self.config.claude.default_effort,
+                session_name: self.config.claude.default_session_name.clone(),
+                worktree: self.config.claude.default_worktree.clone(),
+                remote_control: self.config.claude.remote_control,
+            };
+            self.init_claude_pty(opts);
             self.active_pane = PaneId::Claude;
         }
     }
@@ -262,5 +312,147 @@ impl App {
             // Write to PTY (no newline - just insert the path)
             let _ = pty.write_input(escaped.as_bytes());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    fn config_with_claude_command() -> Config {
+        let mut cfg = Config::default();
+        cfg.pty.claude_command = vec!["claude".to_string()];
+        cfg
+    }
+
+    fn base_opts() -> StartupOptions {
+        StartupOptions {
+            permission_mode: ClaudePermissionMode::Default,
+            model: ClaudeModel::Unset,
+            effort: ClaudeEffort::Unset,
+            session_name: String::new(),
+            worktree: String::new(),
+            remote_control: false,
+        }
+    }
+
+    #[test]
+    fn test_build_command_shell_fallback_adds_no_flags() {
+        // When claude_command is empty, no flags should be appended (shell path)
+        let cfg = Config::default();
+        let mut opts = base_opts();
+        opts.permission_mode = ClaudePermissionMode::Auto;
+        opts.model = ClaudeModel::Sonnet;
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(!cmd.iter().any(|a| a == "--permission-mode"));
+        assert!(!cmd.iter().any(|a| a == "--model"));
+    }
+
+    #[test]
+    fn test_build_command_auto_mode() {
+        let cfg = config_with_claude_command();
+        let mut opts = base_opts();
+        opts.permission_mode = ClaudePermissionMode::Auto;
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(cmd.contains(&"--permission-mode".to_string()));
+        assert!(cmd.contains(&"auto".to_string()));
+    }
+
+    #[test]
+    fn test_build_command_with_model() {
+        let cfg = config_with_claude_command();
+        let mut opts = base_opts();
+        opts.model = ClaudeModel::Sonnet;
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(cmd.contains(&"--model".to_string()));
+        assert!(cmd.contains(&"sonnet".to_string()));
+    }
+
+    #[test]
+    fn test_build_command_with_effort() {
+        let cfg = config_with_claude_command();
+        let mut opts = base_opts();
+        opts.effort = ClaudeEffort::High;
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(cmd.contains(&"--effort".to_string()));
+        assert!(cmd.contains(&"high".to_string()));
+    }
+
+    #[test]
+    fn test_build_command_with_session_name() {
+        let cfg = config_with_claude_command();
+        let mut opts = base_opts();
+        opts.session_name = "test-session".to_string();
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(cmd.contains(&"--name".to_string()));
+        assert!(cmd.contains(&"test-session".to_string()));
+    }
+
+    #[test]
+    fn test_build_command_with_worktree() {
+        let cfg = config_with_claude_command();
+        let mut opts = base_opts();
+        opts.worktree = "feature-x".to_string();
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(cmd.contains(&"--worktree".to_string()));
+        assert!(cmd.contains(&"feature-x".to_string()));
+    }
+
+    #[test]
+    fn test_build_command_remote_control() {
+        let cfg = config_with_claude_command();
+        let mut opts = base_opts();
+        opts.remote_control = true;
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(cmd.contains(&"--remote-control".to_string()));
+    }
+
+    #[test]
+    fn test_build_command_yolo_mode_uses_dangerously_skip() {
+        let cfg = config_with_claude_command();
+        let mut opts = base_opts();
+        opts.permission_mode = ClaudePermissionMode::DangerouslySkipPermissions;
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(cmd.contains(&"--dangerously-skip-permissions".to_string()));
+        assert!(!cmd.iter().any(|a| a == "--permission-mode"));
+    }
+
+    #[test]
+    fn test_build_command_empty_values_do_not_emit_flags() {
+        let cfg = config_with_claude_command();
+        let opts = base_opts(); // all empty/Unset/false
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert!(!cmd.iter().any(|a| a == "--model"));
+        assert!(!cmd.iter().any(|a| a == "--effort"));
+        assert!(!cmd.iter().any(|a| a == "--name"));
+        assert!(!cmd.iter().any(|a| a == "--worktree"));
+        assert!(!cmd.iter().any(|a| a == "--remote-control"));
+    }
+
+    #[test]
+    fn test_build_command_all_flags_combined() {
+        let cfg = config_with_claude_command();
+        let opts = StartupOptions {
+            permission_mode: ClaudePermissionMode::Auto,
+            model: ClaudeModel::Opus,
+            effort: ClaudeEffort::Max,
+            session_name: "session1".to_string(),
+            worktree: "feat".to_string(),
+            remote_control: true,
+        };
+        let cmd = App::build_claude_command(&cfg, &opts);
+        assert_eq!(cmd[0], "claude");
+        assert!(cmd.contains(&"--permission-mode".to_string()));
+        assert!(cmd.contains(&"auto".to_string()));
+        assert!(cmd.contains(&"--model".to_string()));
+        assert!(cmd.contains(&"opus".to_string()));
+        assert!(cmd.contains(&"--effort".to_string()));
+        assert!(cmd.contains(&"max".to_string()));
+        assert!(cmd.contains(&"--name".to_string()));
+        assert!(cmd.contains(&"session1".to_string()));
+        assert!(cmd.contains(&"--worktree".to_string()));
+        assert!(cmd.contains(&"feat".to_string()));
+        assert!(cmd.contains(&"--remote-control".to_string()));
     }
 }

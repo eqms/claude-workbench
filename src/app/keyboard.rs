@@ -561,37 +561,103 @@ impl App {
     }
 
     fn handle_permission_mode_dialog_key(&mut self, key: KeyEvent) {
+        use crate::ui::permission_mode::DialogSection;
+
         match key.code {
             KeyCode::Esc => {
-                let mode = self
-                    .config
-                    .claude
-                    .default_permission_mode
-                    .unwrap_or(crate::types::ClaudePermissionMode::Default);
+                // Close without saving — start with persisted defaults.
                 self.permission_mode_dialog.close();
                 if self.claude_pty_pending {
-                    self.init_claude_pty(mode);
+                    let opts = crate::app::pty::StartupOptions {
+                        permission_mode: self
+                            .config
+                            .claude
+                            .default_permission_mode
+                            .unwrap_or(crate::types::ClaudePermissionMode::Default),
+                        model: self.config.claude.default_model,
+                        effort: self.config.claude.default_effort,
+                        session_name: self.config.claude.default_session_name.clone(),
+                        worktree: self.config.claude.default_worktree.clone(),
+                        remote_control: self.config.claude.remote_control,
+                    };
+                    self.init_claude_pty(opts);
                 }
                 self.active_pane = PaneId::Claude;
             }
             KeyCode::Enter => {
-                let mode = self.permission_mode_dialog.selected_mode();
+                // Collect all values from dialog state
+                let mode = self.permission_mode_dialog.selected_permission_mode();
+                let model = self.permission_mode_dialog.selected_model();
+                let effort = self.permission_mode_dialog.selected_effort();
+                let session_name = self.permission_mode_dialog.session_name.clone();
+                let worktree = self.permission_mode_dialog.worktree.clone();
                 let remote = self.permission_mode_dialog.remote_control;
+
                 self.permission_mode_dialog.confirm();
+
+                // Persist everything
                 self.config.claude.default_permission_mode = Some(mode);
+                self.config.claude.default_model = model;
+                self.config.claude.default_effort = effort;
+                self.config.claude.default_session_name = session_name.clone();
+                self.config.claude.default_worktree = worktree.clone();
                 self.config.claude.remote_control = remote;
                 let _ = crate::config::save_config(&self.config);
+
                 if self.claude_pty_pending {
-                    self.init_claude_pty(mode);
+                    let opts = crate::app::pty::StartupOptions {
+                        permission_mode: mode,
+                        model,
+                        effort,
+                        session_name,
+                        worktree,
+                        remote_control: remote,
+                    };
+                    self.init_claude_pty(opts);
                 }
                 self.active_pane = PaneId::Claude;
             }
-            KeyCode::Char(' ') => {
-                self.permission_mode_dialog.toggle_remote_control();
+            KeyCode::Tab => self.permission_mode_dialog.next_section(),
+            KeyCode::BackTab => self.permission_mode_dialog.prev_section(),
+            _ => {
+                // Delegate remaining keys based on current section
+                match self.permission_mode_dialog.section {
+                    DialogSection::Permission => match key.code {
+                        KeyCode::Up | KeyCode::Char('k') => self.permission_mode_dialog.prev_item(),
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            self.permission_mode_dialog.next_item()
+                        }
+                        _ => {}
+                    },
+                    DialogSection::Model | DialogSection::Effort => match key.code {
+                        KeyCode::Left | KeyCode::Up | KeyCode::Char('h') | KeyCode::Char('k') => {
+                            self.permission_mode_dialog.prev_item()
+                        }
+                        KeyCode::Right
+                        | KeyCode::Down
+                        | KeyCode::Char('l')
+                        | KeyCode::Char('j') => self.permission_mode_dialog.next_item(),
+                        _ => {}
+                    },
+                    DialogSection::Session | DialogSection::Worktree => match key.code {
+                        KeyCode::Left => self.permission_mode_dialog.cursor_left(),
+                        KeyCode::Right => self.permission_mode_dialog.cursor_right(),
+                        KeyCode::Home => self.permission_mode_dialog.cursor_home(),
+                        KeyCode::End => self.permission_mode_dialog.cursor_end(),
+                        KeyCode::Backspace => self.permission_mode_dialog.delete_char_before(),
+                        KeyCode::Delete => self.permission_mode_dialog.delete_char_at(),
+                        KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            self.permission_mode_dialog.insert_char(c);
+                        }
+                        _ => {}
+                    },
+                    DialogSection::RemoteControl => {
+                        if let KeyCode::Char(' ') = key.code {
+                            self.permission_mode_dialog.toggle_remote_control();
+                        }
+                    }
+                }
             }
-            KeyCode::Up | KeyCode::Char('k') => self.permission_mode_dialog.prev(),
-            KeyCode::Down | KeyCode::Char('j') => self.permission_mode_dialog.next(),
-            _ => {}
         }
     }
 

@@ -1,4 +1,3 @@
-use crate::types::PaneId;
 use crate::ui::update_dialog::UpdateDialogButton;
 use crate::update::{self, UpdateCheckResult, UpdateResult, UpdateState};
 
@@ -93,18 +92,6 @@ impl App {
                     self.update_state.show_dialog = true;
                     self.update_receiver = None;
                 }
-            }
-        }
-    }
-
-    /// Send /remote-control slash command to Claude PTY after startup delay
-    pub(super) fn poll_remote_control_send(&mut self) {
-        if let Some(start_time) = self.remote_control_send_time {
-            if start_time.elapsed().as_secs() >= 4 {
-                if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
-                    let _ = pty.write_input(b"/remote-control\r");
-                }
-                self.remote_control_send_time = None;
             }
         }
     }

@@ -6,6 +6,7 @@ pub enum ClaudePermissionMode {
     #[default]
     Default,
     AcceptEdits,
+    Auto,
     Plan,
     BypassPermissions,
     DangerouslySkipPermissions, // YOLO-Mode
@@ -18,6 +19,7 @@ impl ClaudePermissionMode {
             Self::DangerouslySkipPermissions => None,
             Self::Default => Some("default"),
             Self::AcceptEdits => Some("acceptEdits"),
+            Self::Auto => Some("auto"),
             Self::Plan => Some("plan"),
             Self::BypassPermissions => Some("bypassPermissions"),
         }
@@ -33,6 +35,7 @@ impl ClaudePermissionMode {
         match self {
             Self::Default => "default",
             Self::AcceptEdits => "acceptEdits",
+            Self::Auto => "auto",
             Self::Plan => "plan",
             Self::BypassPermissions => "bypassPermissions",
             Self::DangerouslySkipPermissions => "dangerouslySkip",
@@ -44,6 +47,7 @@ impl ClaudePermissionMode {
         match self {
             Self::Default => "Standard - fragt bei jeder Tool-Nutzung",
             Self::AcceptEdits => "Akzeptiert Datei-Edits automatisch",
+            Self::Auto => "KI-gestützte Prüfung - ideal für Long-Running Tasks",
             Self::Plan => "Nur-Lesen-Modus, keine Änderungen",
             Self::BypassPermissions => "Voller Zugriff ohne Nachfragen",
             Self::DangerouslySkipPermissions => "⚠️ YOLO - Alle Sicherheitsabfragen aus!",
@@ -55,9 +59,115 @@ impl ClaudePermissionMode {
         &[
             Self::Default,
             Self::AcceptEdits,
+            Self::Auto,
             Self::Plan,
             Self::BypassPermissions,
             Self::DangerouslySkipPermissions,
+        ]
+    }
+}
+
+/// Claude Code model selection for --model flag
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ClaudeModel {
+    #[default]
+    Unset,
+    Sonnet,
+    Opus,
+}
+
+impl ClaudeModel {
+    /// Get the CLI flag value for --model (None means: don't pass the flag)
+    pub fn cli_flag(&self) -> Option<&'static str> {
+        match self {
+            Self::Unset => None,
+            Self::Sonnet => Some("sonnet"),
+            Self::Opus => Some("opus"),
+        }
+    }
+
+    /// Get display name
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Unset => "CLI-Default",
+            Self::Sonnet => "sonnet",
+            Self::Opus => "opus",
+        }
+    }
+
+    /// German description
+    pub fn description_de(&self) -> &'static str {
+        match self {
+            Self::Unset => "ohne --model Flag (Claude-Default)",
+            Self::Sonnet => "Claude Sonnet",
+            Self::Opus => "Claude Opus",
+        }
+    }
+
+    /// Get all available models
+    pub fn all() -> &'static [Self] {
+        &[Self::Unset, Self::Sonnet, Self::Opus]
+    }
+}
+
+/// Claude Code reasoning effort level for --effort flag
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ClaudeEffort {
+    #[default]
+    Unset,
+    Low,
+    Medium,
+    High,
+    XHigh,
+    Max,
+}
+
+impl ClaudeEffort {
+    /// Get the CLI flag value for --effort (None means: don't pass the flag)
+    pub fn cli_flag(&self) -> Option<&'static str> {
+        match self {
+            Self::Unset => None,
+            Self::Low => Some("low"),
+            Self::Medium => Some("medium"),
+            Self::High => Some("high"),
+            Self::XHigh => Some("xhigh"),
+            Self::Max => Some("max"),
+        }
+    }
+
+    /// Get display name
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Unset => "CLI-Default",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::XHigh => "xhigh",
+            Self::Max => "max",
+        }
+    }
+
+    /// German description
+    pub fn description_de(&self) -> &'static str {
+        match self {
+            Self::Unset => "ohne --effort Flag",
+            Self::Low => "niedriger Denkaufwand",
+            Self::Medium => "mittlerer Denkaufwand",
+            Self::High => "hoher Denkaufwand",
+            Self::XHigh => "sehr hoher Denkaufwand",
+            Self::Max => "maximaler Denkaufwand",
+        }
+    }
+
+    /// Get all available effort levels
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::Unset,
+            Self::Low,
+            Self::Medium,
+            Self::High,
+            Self::XHigh,
+            Self::Max,
         ]
     }
 }
@@ -927,5 +1037,71 @@ impl Default for ExportChooserState {
             source_path: std::path::PathBuf::new(),
             selected: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_auto_mode_cli_flag() {
+        assert_eq!(ClaudePermissionMode::Auto.cli_flag(), Some("auto"));
+    }
+
+    #[test]
+    fn test_auto_mode_name_and_description() {
+        assert_eq!(ClaudePermissionMode::Auto.name(), "auto");
+        assert!(ClaudePermissionMode::Auto.description_de().contains("KI"));
+        assert!(!ClaudePermissionMode::Auto.is_yolo());
+    }
+
+    #[test]
+    fn test_auto_mode_position_in_all() {
+        let all = ClaudePermissionMode::all();
+        // Auto must be at index 2, right after Default (0) and AcceptEdits (1)
+        assert_eq!(all[0], ClaudePermissionMode::Default);
+        assert_eq!(all[1], ClaudePermissionMode::AcceptEdits);
+        assert_eq!(all[2], ClaudePermissionMode::Auto);
+        assert_eq!(all.len(), 6);
+    }
+
+    #[test]
+    fn test_all_permission_modes_have_unique_names() {
+        let all = ClaudePermissionMode::all();
+        let names: Vec<&str> = all.iter().map(|m| m.name()).collect();
+        let unique: std::collections::HashSet<&&str> = names.iter().collect();
+        assert_eq!(names.len(), unique.len(), "duplicate permission mode names");
+    }
+
+    #[test]
+    fn test_model_cli_flag() {
+        assert_eq!(ClaudeModel::Unset.cli_flag(), None);
+        assert_eq!(ClaudeModel::Sonnet.cli_flag(), Some("sonnet"));
+        assert_eq!(ClaudeModel::Opus.cli_flag(), Some("opus"));
+    }
+
+    #[test]
+    fn test_model_all_contains_all_variants() {
+        let all = ClaudeModel::all();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0], ClaudeModel::Unset);
+    }
+
+    #[test]
+    fn test_effort_cli_flag() {
+        assert_eq!(ClaudeEffort::Unset.cli_flag(), None);
+        assert_eq!(ClaudeEffort::Low.cli_flag(), Some("low"));
+        assert_eq!(ClaudeEffort::Medium.cli_flag(), Some("medium"));
+        assert_eq!(ClaudeEffort::High.cli_flag(), Some("high"));
+        assert_eq!(ClaudeEffort::XHigh.cli_flag(), Some("xhigh"));
+        assert_eq!(ClaudeEffort::Max.cli_flag(), Some("max"));
+    }
+
+    #[test]
+    fn test_effort_all_contains_all_variants() {
+        let all = ClaudeEffort::all();
+        assert_eq!(all.len(), 6);
+        assert_eq!(all[0], ClaudeEffort::Unset);
     }
 }
