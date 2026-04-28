@@ -183,6 +183,68 @@ impl App {
         }
     }
 
+    /// Ensure a PTY exists for the given pane. Used for lazy-init of LazyGit/Terminal.
+    ///
+    /// - No-op if a PTY for `pane_id` is already in `terminals`.
+    /// - For `PaneId::Terminal` and `PaneId::LazyGit`: spawns a new PTY in the
+    ///   current file-browser directory; on failure stores the error message in
+    ///   `terminal_error` / `lazygit_error` (rendered in `terminal_pane.rs`).
+    /// - For other pane IDs: no-op (Claude has its own dedicated init paths via
+    ///   `init_claude_pty` / `init_claude_after_wizard`).
+    pub(super) fn ensure_pty_for_pane(&mut self, pane_id: PaneId) {
+        if self.terminals.contains_key(&pane_id) {
+            return;
+        }
+
+        let cwd = self.file_browser.current_dir.clone();
+        let rows = 24;
+        let cols = 80;
+
+        let cmd = match pane_id {
+            PaneId::Terminal => {
+                let mut c = vec![self.config.terminal.shell_path.clone()];
+                c.extend(self.config.terminal.shell_args.clone());
+                c
+            }
+            PaneId::LazyGit => {
+                if self.config.pty.lazygit_command.is_empty() {
+                    vec!["lazygit".to_string()]
+                } else {
+                    self.config.pty.lazygit_command.clone()
+                }
+            }
+            _ => return,
+        };
+
+        match PseudoTerminal::new(&cmd, rows, cols, &cwd) {
+            Ok(pty) => {
+                self.terminals.insert(pane_id, pty);
+                match pane_id {
+                    PaneId::Terminal => self.terminal_error = None,
+                    PaneId::LazyGit => self.lazygit_error = None,
+                    _ => {}
+                }
+            }
+            Err(e) => {
+                let msg = format!(
+                    "Failed to start {}\n\nCommand: {}\n\nError: {}",
+                    if pane_id == PaneId::Terminal {
+                        "shell"
+                    } else {
+                        "LazyGit"
+                    },
+                    cmd.join(" "),
+                    e
+                );
+                match pane_id {
+                    PaneId::Terminal => self.terminal_error = Some(msg),
+                    PaneId::LazyGit => self.lazygit_error = Some(msg),
+                    _ => {}
+                }
+            }
+        }
+    }
+
     /// Restart LazyGit PTY in current directory
     pub(super) fn restart_lazygit_in_current_dir(&mut self) {
         let cwd = self.file_browser.current_dir.clone();
@@ -225,6 +287,19 @@ impl App {
             .collect();
 
         for pane_id in panes_to_restart {
+            // Skip restart for hidden lazy-init panes — leave the dead PTY removed
+            // so the slot stays empty until the user toggles the pane visible again.
+            let is_visible = match pane_id {
+                PaneId::LazyGit => self.show_lazygit,
+                PaneId::Terminal => self.show_terminal,
+                PaneId::Claude => true,
+                _ => false,
+            };
+            if !is_visible {
+                self.terminals.remove(&pane_id);
+                continue;
+            }
+
             // Remove the old PTY
             self.terminals.remove(&pane_id);
 
@@ -263,6 +338,19 @@ impl App {
 
     /// Restart a single PTY (manual restart when auto_restart is disabled)
     pub(super) fn restart_single_pty(&mut self, pane_id: PaneId) {
+        // Don't restart hidden lazy-init panes — they will be re-spawned by
+        // ensure_pty_for_pane() the next time the user toggles them visible.
+        let is_visible = match pane_id {
+            PaneId::LazyGit => self.show_lazygit,
+            PaneId::Terminal => self.show_terminal,
+            PaneId::Claude => true,
+            _ => false,
+        };
+        if !is_visible {
+            self.terminals.remove(&pane_id);
+            return;
+        }
+
         let cwd = self.file_browser.current_dir.clone();
         let rows = 24;
         let cols = 80;

@@ -1,5 +1,37 @@
 # Release Notes
 
+## Version 0.83.0 (28.04.2026)
+
+### Performance
+- **Lazy-Init für LazyGit + Terminal Panes** — Beim App-Start werden nur noch
+  PTYs für Panes gespawnt, deren Visibility-Flag (`config.ui.show_lazygit` /
+  `config.ui.show_terminal`) auf `true` steht. Bisher wurden alle drei PTYs
+  immer beim Start sequenziell gespawnt — auch wenn die Panes laut Config
+  unsichtbar waren.
+  - **Auswirkung:** Da der Default beider Flags `false` ist, werden statt
+    drei nur ein PTY (Claude) beim Start aufgebaut. Der ConPTY-Handshake unter
+    Windows ist signifikant langsamer als Unix-PTY, daher ist der Effekt dort
+    am größten.
+
+### Added
+- **`App::ensure_pty_for_pane(PaneId)`** in `src/app/pty.rs` — Idempotente
+  Spawn-Methode für `Terminal` und `LazyGit` Panes. No-op wenn das PTY bereits
+  existiert. Spawn-Fehler werden in `terminal_error`/`lazygit_error` erfasst
+  (rendert weiterhin als roter Border + Fehlertext, siehe v0.82.0).
+
+### Changed
+- **F6 Terminal-Toggle** — Ruft `ensure_pty_for_pane(Terminal)` direkt nach
+  dem Visibility-Flip auf, bevor der `cd`-Sync läuft. Beim ersten Toggle
+  entsteht das PTY; bei späteren Toggles bleibt der Shell-State (History,
+  laufende Prozesse) erhalten.
+- **F5 LazyGit-Toggle** — Verhalten unverändert: nutzt weiterhin
+  `restart_lazygit_in_current_dir()`, das jeden Toggle frisch im aktuellen
+  Verzeichnis startet (gewollt, damit LazyGit immer das richtige Repo zeigt).
+- **`check_and_restart_exited_ptys` und `restart_single_pty`** prüfen jetzt,
+  ob das Pane sichtbar ist, bevor sie ein abgestürztes PTY restarten —
+  unsichtbare Panes (z. B. Terminal nach `lazygit` Crash bei `auto_restart:
+  true`) bleiben tot bis zum nächsten F-Key-Toggle.
+
 ## Version 0.82.0 (28.04.2026)
 
 ### Fixed

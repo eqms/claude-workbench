@@ -211,43 +211,47 @@ impl App {
             }
         }
 
-        // 2. LazyGit (from Config)
-        let lazygit_cmd = if config.pty.lazygit_command.is_empty() {
-            vec!["lazygit".to_string()]
-        } else {
-            config.pty.lazygit_command.clone()
-        };
+        // 2. LazyGit (lazy-init: spawn only if pane is configured to be visible)
         let mut lazygit_error: Option<String> = None;
-        match PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
-            Ok(pty) => {
-                terminals.insert(PaneId::LazyGit, pty);
-            }
-            Err(e) => {
-                lazygit_error = Some(format!(
-                    "Failed to start LazyGit\n\nCommand: {}\n\nError: {}",
-                    lazygit_cmd.join(" "),
-                    e
-                ));
+        if config.ui.show_lazygit {
+            let lazygit_cmd = if config.pty.lazygit_command.is_empty() {
+                vec!["lazygit".to_string()]
+            } else {
+                config.pty.lazygit_command.clone()
+            };
+            match PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
+                Ok(pty) => {
+                    terminals.insert(PaneId::LazyGit, pty);
+                }
+                Err(e) => {
+                    lazygit_error = Some(format!(
+                        "Failed to start LazyGit\n\nCommand: {}\n\nError: {}",
+                        lazygit_cmd.join(" "),
+                        e
+                    ));
+                }
             }
         }
 
-        // 3. User Terminal (from Config)
-        let shell = &config.terminal.shell_path;
-        let args = &config.terminal.shell_args;
-        let mut cmd = vec![shell.clone()];
-        cmd.extend(args.clone());
-
+        // 3. User Terminal (lazy-init: spawn only if pane is configured to be visible)
         let mut terminal_error: Option<String> = None;
-        match PseudoTerminal::new(&cmd, rows, cols, &cwd) {
-            Ok(pty) => {
-                terminals.insert(PaneId::Terminal, pty);
-            }
-            Err(e) => {
-                terminal_error = Some(format!(
-                    "Failed to start shell\n\nCommand: {}\n\nError: {}",
-                    cmd.join(" "),
-                    e
-                ));
+        if config.ui.show_terminal {
+            let shell = &config.terminal.shell_path;
+            let args = &config.terminal.shell_args;
+            let mut cmd = vec![shell.clone()];
+            cmd.extend(args.clone());
+
+            match PseudoTerminal::new(&cmd, rows, cols, &cwd) {
+                Ok(pty) => {
+                    terminals.insert(PaneId::Terminal, pty);
+                }
+                Err(e) => {
+                    terminal_error = Some(format!(
+                        "Failed to start shell\n\nCommand: {}\n\nError: {}",
+                        cmd.join(" "),
+                        e
+                    ));
+                }
             }
         }
 

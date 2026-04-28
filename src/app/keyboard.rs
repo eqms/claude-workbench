@@ -165,6 +165,8 @@ impl App {
                 let _ = crate::config::save_config(&self.config);
                 if self.show_terminal {
                     self.active_pane = PaneId::Terminal;
+                    // Lazy-init: spawn Terminal PTY on first show (no-op if already up)
+                    self.ensure_pty_for_pane(PaneId::Terminal);
                     // Sync directory when showing terminal
                     if was_hidden {
                         self.sync_terminal_to_current_dir(PaneId::Terminal);
