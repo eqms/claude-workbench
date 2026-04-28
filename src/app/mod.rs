@@ -86,9 +86,11 @@ pub struct App {
     pub wizard: WizardState,
     pub settings: SettingsState,
     pub about: AboutState,
-    // Claude PTY error tracking
+    // PTY error tracking (shown as red border + message inside pane)
     pub claude_error: Option<String>,
     pub claude_command_used: String,
+    pub lazygit_error: Option<String>,
+    pub terminal_error: Option<String>,
     // Startup prefix dialog
     pub claude_startup: ui::claude_startup::ClaudeStartupState,
     // Permission mode selection dialog
@@ -215,8 +217,18 @@ impl App {
         } else {
             config.pty.lazygit_command.clone()
         };
-        if let Ok(pty) = PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
-            terminals.insert(PaneId::LazyGit, pty);
+        let mut lazygit_error: Option<String> = None;
+        match PseudoTerminal::new(&lazygit_cmd, rows, cols, &cwd) {
+            Ok(pty) => {
+                terminals.insert(PaneId::LazyGit, pty);
+            }
+            Err(e) => {
+                lazygit_error = Some(format!(
+                    "Failed to start LazyGit\n\nCommand: {}\n\nError: {}",
+                    lazygit_cmd.join(" "),
+                    e
+                ));
+            }
         }
 
         // 3. User Terminal (from Config)
@@ -225,8 +237,18 @@ impl App {
         let mut cmd = vec![shell.clone()];
         cmd.extend(args.clone());
 
-        if let Ok(pty) = PseudoTerminal::new(&cmd, rows, cols, &cwd) {
-            terminals.insert(PaneId::Terminal, pty);
+        let mut terminal_error: Option<String> = None;
+        match PseudoTerminal::new(&cmd, rows, cols, &cwd) {
+            Ok(pty) => {
+                terminals.insert(PaneId::Terminal, pty);
+            }
+            Err(e) => {
+                terminal_error = Some(format!(
+                    "Failed to start shell\n\nCommand: {}\n\nError: {}",
+                    cmd.join(" "),
+                    e
+                ));
+            }
         }
 
         let syntax_manager = SyntaxManager::new();
@@ -266,6 +288,8 @@ impl App {
             about: AboutState::default(),
             claude_error,
             claude_command_used: claude_command_str,
+            lazygit_error,
+            terminal_error,
             claude_startup: ui::claude_startup::ClaudeStartupState::default(),
             permission_mode_dialog,
             claude_permission_mode,

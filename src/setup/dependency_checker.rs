@@ -103,20 +103,32 @@ fn check_command(name: &str, args: &[&str], required: bool) -> DependencyStatus 
 
     // If direct execution fails, try via user's shell in interactive mode
     // This handles shell functions/aliases like Claude Code
-    // Use shell-escaped arguments to prevent injection
-    let shell_cmd = std::iter::once(name.to_string())
-        .chain(args.iter().map(|a| a.to_string()))
-        .map(|a| shell_escape::escape(std::borrow::Cow::Owned(a)).into_owned())
-        .collect::<Vec<_>>()
-        .join(" ");
+    // On Windows there is no equivalent to `-i -c "<cmd>"` for cmd.exe;
+    // PowerShell-based fallbacks rarely add value here (no aliases to resolve),
+    // so we treat direct-execution failure as "not found" on Windows.
+    #[cfg(windows)]
+    let shell_result: std::io::Result<std::process::Output> = Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "shell-fallback not supported on Windows",
+    ));
 
-    // Get user's default shell from $SHELL environment variable
-    let user_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+    #[cfg(not(windows))]
+    let shell_result = {
+        // Use shell-escaped arguments to prevent injection
+        let shell_cmd = std::iter::once(name.to_string())
+            .chain(args.iter().map(|a| a.to_string()))
+            .map(|a| shell_escape::escape(std::borrow::Cow::Owned(a)).into_owned())
+            .collect::<Vec<_>>()
+            .join(" ");
 
-    // Try interactive shell mode (-i flag) to load shell functions/aliases
-    let shell_result = Command::new(&user_shell)
-        .args(["-i", "-c", &shell_cmd])
-        .output();
+        // Get user's default shell from $SHELL environment variable
+        let user_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+
+        // Try interactive shell mode (-i flag) to load shell functions/aliases
+        Command::new(&user_shell)
+            .args(["-i", "-c", &shell_cmd])
+            .output()
+    };
 
     match shell_result {
         Ok(output) if output.status.success() => {
@@ -158,12 +170,17 @@ fn extract_version(stdout: &[u8], name: &str) -> Option<String> {
     Some(first_line)
 }
 
-/// Find executable path using 'which' command
+/// Find executable path using `which` (Unix) or `where` (Windows)
 fn find_executable_path(name: &str) -> Option<PathBuf> {
+    #[cfg(windows)]
+    let output = Command::new("where").arg(name).output().ok()?;
+    #[cfg(not(windows))]
     let output = Command::new("which").arg(name).output().ok()?;
 
     if output.status.success() {
-        let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        // `where` on Windows may return multiple lines (one per match); take the first.
+        let raw = String::from_utf8_lossy(&output.stdout);
+        let path_str = raw.lines().next().unwrap_or("").trim().to_string();
         if !path_str.is_empty() {
             // Handle Fish/Zsh alias output like "claude: aliased to /path/to/claude"
             if path_str.contains("aliased to ") {
@@ -201,10 +218,27 @@ fn find_executable_path(name: &str) -> Option<PathBuf> {
 
 /// Check for available shells
 fn check_available_shells() -> Vec<DependencyStatus> {
-    ["bash", "zsh", "fish", "sh"]
+    #[cfg(windows)]
+    let candidates: &[&str] = &["pwsh", "powershell", "cmd"];
+    #[cfg(not(windows))]
+    let candidates: &[&str] = &["bash", "zsh", "fish", "sh"];
+
+    candidates
         .iter()
-        .map(|shell| check_command(shell, &["--version"], false))
-        .filter(|s| s.found) // Only include found shells
+        .map(|shell| {
+            // `cmd /?` prints help and exits 0; `pwsh --version` works on PS7+.
+            // For Windows-classic `cmd.exe` we use `/?` to avoid spawning a sub-shell.
+            #[cfg(windows)]
+            let args: &[&str] = if *shell == "cmd" {
+                &["/?"]
+            } else {
+                &["--version"]
+            };
+            #[cfg(not(windows))]
+            let args: &[&str] = &["--version"];
+            check_command(shell, args, false)
+        })
+        .filter(|s| s.found)
         .collect()
 }
 

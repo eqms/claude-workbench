@@ -1,5 +1,44 @@
 # Release Notes
 
+## Version 0.82.0 (28.04.2026)
+
+### Fixed
+- **Windows: Terminal-Pane bleibt tot unter PowerShell 7.6** — Bislang setzte
+  `Config::default()` den `shell_path` hardcoded auf `/bin/bash`; auf Windows
+  existiert dieser Pfad nicht, der PTY-Spawn schlug fehl, und der Fehler
+  wurde still verschluckt — F6 zeigte ein unbenutzbares Pane.
+- **PTY-Spawn-Fehler werden jetzt sichtbar** — Nicht nur Claude, sondern auch
+  LazyGit und Terminal zeigen bei Spawn-Fehler einen roten Border + Fehlertext
+  inklusive verwendetem Kommando. Bisheriges Verhalten (`if let Ok(pty) = …`
+  ohne Else-Zweig) ließ Fehler unbemerkt verpuffen.
+
+### Added
+- **`config::default_shell_path()` plattform-bewusst** — Windows-Lookup-Reihenfolge
+  `%COMSPEC%` → `pwsh.exe` (PATH-Probe via `-NoLogo -NoProfile -Command "exit 0"`)
+  → `powershell.exe` → `C:\Windows\System32\cmd.exe`. Unix-Lookup: `$SHELL` →
+  `/bin/bash`. Wird in `Config::default()` für `terminal.shell_path` verwendet.
+- **`lazygit_error` und `terminal_error` Felder** in `App` (analog zu
+  `claude_error`); rendert in `terminal_pane.rs` als roter Border + ⚠-Header
+  + Kommando + Original-Fehlertext.
+
+### Changed
+- **`setup/dependency_checker.rs`: Windows-Pfade** — `find_executable_path()`
+  nutzt `where` auf Windows statt `which`; mehrzeilige Ausgabe wird per
+  `lines().next()` korrekt verarbeitet. `check_available_shells()` prüft
+  `pwsh`/`powershell`/`cmd` auf Windows, `bash`/`zsh`/`fish`/`sh` sonst —
+  `cmd` mit `/?` statt `--version`. Shell-Fallback (`-i -c "<cmd>"`) wird auf
+  Windows übersprungen, weil `cmd.exe` keine Entsprechung kennt.
+- **macOS/Linux: `$SHELL` wird respektiert** — User mit explizit gesetztem
+  `$SHELL` (z. B. Fish via Homebrew) bekommen ihren Shell als Default; Konfigs
+  mit explizitem `terminal.shell_path` bleiben unangetastet.
+
+### Tests
+- 3 neue Unit-Tests in `src/config.rs`: `default_shell_path_is_nonempty`,
+  `default_shell_path_unix_is_absolute_or_shell_env`,
+  `config_default_terminal_shell_path_is_set`. Plus `#[cfg(windows)]`
+  `default_shell_path_windows_is_not_unix`. Suite jetzt 99 Tests (+3
+  Integration), alle grün.
+
 ## Version 0.81.0 (22.04.2026)
 
 ### Added

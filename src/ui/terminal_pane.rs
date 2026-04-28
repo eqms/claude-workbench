@@ -39,8 +39,14 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
         x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
     };
 
-    // Check for Claude error - show red border if error
-    let has_error = pane_id == PaneId::Claude && app.claude_error.is_some();
+    // Check for PTY spawn error - show red border if error
+    let pane_error: Option<&String> = match pane_id {
+        PaneId::Claude => app.claude_error.as_ref(),
+        PaneId::LazyGit => app.lazygit_error.as_ref(),
+        PaneId::Terminal => app.terminal_error.as_ref(),
+        _ => None,
+    };
+    let has_error = pane_error.is_some();
     let (border_style, border_type) = if is_drop_target {
         (
             Style::default()
@@ -68,29 +74,33 @@ pub fn render(f: &mut Frame, area: Rect, pane_id: PaneId, app: &App) {
 
     f.render_widget(block, area);
 
-    // Show error message for Claude if PTY failed
-    if pane_id == PaneId::Claude {
-        if let Some(error) = &app.claude_error {
-            let error_lines: Vec<Line> = vec![
-                Line::from(vec![
-                    Span::styled("⚠ ", Style::default().fg(Color::Yellow)),
-                    Span::styled(
-                        "Claude CLI Error",
-                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                    ),
-                ]),
-                Line::from(""),
-            ]
-            .into_iter()
-            .chain(error.lines().map(|l| Line::from(l.to_string())))
-            .collect();
+    // Show error message if PTY spawn failed
+    if let Some(error) = pane_error {
+        let error_title = match pane_id {
+            PaneId::Claude => "Claude CLI Error",
+            PaneId::LazyGit => "LazyGit Error",
+            PaneId::Terminal => "Shell Error",
+            _ => "PTY Error",
+        };
+        let error_lines: Vec<Line> = vec![
+            Line::from(vec![
+                Span::styled("⚠ ", Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    error_title,
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(""),
+        ]
+        .into_iter()
+        .chain(error.lines().map(|l| Line::from(l.to_string())))
+        .collect();
 
-            let error_paragraph = Paragraph::new(error_lines)
-                .style(Style::default().fg(Color::White))
-                .wrap(Wrap { trim: false });
-            f.render_widget(error_paragraph, inner_area);
-            return;
-        }
+        let error_paragraph = Paragraph::new(error_lines)
+            .style(Style::default().fg(Color::White))
+            .wrap(Wrap { trim: false });
+        f.render_widget(error_paragraph, inner_area);
+        return;
     }
 
     if let Some(pty) = app.terminals.get(&pane_id) {

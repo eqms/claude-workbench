@@ -48,6 +48,44 @@ fn default_copy_lines_count() -> usize {
     50
 }
 
+/// Detect the best available default shell for this platform.
+///
+/// Windows lookup order:
+///   1. `%COMSPEC%` env var (set by Windows itself, usually `C:\Windows\System32\cmd.exe`)
+///   2. `pwsh.exe` (PowerShell 7+) if reachable via PATH
+///   3. `powershell.exe` (Windows PowerShell 5.x) if reachable via PATH
+///   4. Hardcoded `C:\Windows\System32\cmd.exe` as last-resort fallback
+///
+/// Unix lookup order:
+///   1. `$SHELL` env var
+///   2. `/bin/bash` fallback
+pub fn default_shell_path() -> String {
+    #[cfg(windows)]
+    {
+        if let Ok(comspec) = std::env::var("COMSPEC") {
+            if !comspec.is_empty() {
+                return comspec;
+            }
+        }
+        for candidate in &["pwsh.exe", "powershell.exe"] {
+            let probe = std::process::Command::new(candidate)
+                .arg("-NoLogo")
+                .arg("-NoProfile")
+                .arg("-Command")
+                .arg("exit 0")
+                .output();
+            if probe.map(|o| o.status.success()).unwrap_or(false) {
+                return (*candidate).to_string();
+            }
+        }
+        r"C:\Windows\System32\cmd.exe".to_string()
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
+    }
+}
+
 impl Default for PtyConfig {
     fn default() -> Self {
         Self {
@@ -197,7 +235,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             terminal: TerminalConfig {
-                shell_path: "/bin/bash".into(),
+                shell_path: default_shell_path(),
                 shell_args: vec![],
             },
             ui: UiConfig {
@@ -648,4 +686,43 @@ pub fn save_config(config: &Config) -> Result<()> {
 /// Get the config file path (for display purposes)
 pub fn get_config_path() -> Option<std::path::PathBuf> {
     get_config_dir().map(|d| d.join("config.yaml"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_shell_path_is_nonempty() {
+        let s = default_shell_path();
+        assert!(!s.is_empty(), "default_shell_path() must not return empty");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn default_shell_path_windows_is_not_unix() {
+        let s = default_shell_path();
+        assert!(
+            !s.starts_with("/bin/"),
+            "On Windows the default shell must not be a Unix path, got: {s}"
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn default_shell_path_unix_is_absolute_or_shell_env() {
+        let s = default_shell_path();
+        let from_env = std::env::var("SHELL").ok();
+        let acceptable = s.starts_with('/') || from_env.as_deref() == Some(s.as_str());
+        assert!(
+            acceptable,
+            "On Unix default_shell_path() must be absolute or match $SHELL, got: {s}"
+        );
+    }
+
+    #[test]
+    fn config_default_terminal_shell_path_is_set() {
+        let cfg = Config::default();
+        assert!(!cfg.terminal.shell_path.is_empty());
+    }
 }
