@@ -1,5 +1,27 @@
 # Release Notes
 
+## Version 0.84.0 (28.04.2026)
+
+### Added
+- **Startup-Indikator vor `ratatui::init()`** — Drei Zeilen Status auf Stderr,
+  während Config geladen und Panes gespawnt werden:
+  ```
+  claude-workbench v0.84.0 starting...
+    config loaded (12 ms)
+    spawning panes...
+  ```
+  Sichtbar bevor der Alternate-Screen aktiviert wird; Stderr bleibt im
+  normalen Buffer und stört die TUI-Ausgabe nicht. Wirkt sich primär unter
+  Windows aus, wo ConPTY-Spawn spürbar mehr Zeit kostet als Unix-PTY.
+- **Wall-clock-Timing für config-Load** — `Instant::now()` vor `load_config()`,
+  Differenz wird ausgegeben. Macht Latenz-Regressionen sichtbar.
+
+### Notes
+- Output kommt nur im echten TUI-Modus (kein Output bei `--check-update`,
+  `--update-to <version>` oder `--fake-version <v>` falls deren Codepfad
+  vor der Stderr-Zeile abbricht — `main()` verlässt diese Modi vor
+  `async_main()`).
+
 ## Version 0.83.0 (28.04.2026)
 
 ### Performance

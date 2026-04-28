@@ -185,8 +185,32 @@ async fn async_main(fake_version: Option<String>) -> Result<()> {
         libc::signal(libc::SIGTSTP, libc::SIG_IGN);
     }
 
+    // Startup-Indikator: zeilenweise auf Stderr — sichtbar bevor ratatui::init()
+    // den Alternate-Screen auf Stdout zieht. Stderr bleibt im normalen Buffer
+    // und stoert die TUI-Ausgabe nicht. Auf Windows mit ConPTY ist der
+    // Spawn-Pfad spuerbar langsamer, daher dort das groesste UX-Plus.
+    let t0 = std::time::Instant::now();
+    {
+        let mut err = std::io::stderr();
+        let _ = writeln!(
+            err,
+            "claude-workbench v{} starting...",
+            env!("CARGO_PKG_VERSION")
+        );
+    }
+
     let config = load_config()?;
+    {
+        let mut err = std::io::stderr();
+        let _ = writeln!(err, "  config loaded ({} ms)", t0.elapsed().as_millis());
+    }
+
     let session = load_session();
+
+    {
+        let mut err = std::io::stderr();
+        let _ = writeln!(err, "  spawning panes...");
+    }
 
     let terminal = ratatui::init();
     crossterm::execute!(
