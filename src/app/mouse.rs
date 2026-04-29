@@ -987,6 +987,43 @@ impl App {
                     }
                 }
             }
+            MouseEventKind::Down(crossterm::event::MouseButton::Right) => {
+                // Right-click behavior — replicates Kitty's
+                // `mouse_map right press ungrabbed paste_from_clipboard` for
+                // the case where mouse capture is active and Kitty cannot
+                // intercept the click itself. This also clears any stuck
+                // mouse selection (Alt+drag) so it doesn't visually freeze.
+                let x = mouse.column;
+                let y = mouse.row;
+                let is_inside = |rect: Rect, x: u16, y: u16| -> bool {
+                    x >= rect.x
+                        && x < rect.x.saturating_add(rect.width)
+                        && y >= rect.y
+                        && y < rect.y.saturating_add(rect.height)
+                };
+
+                // Drop any active mouse selection first — its visual
+                // remnants would otherwise persist after a right-click.
+                if self.mouse_selection.selecting {
+                    self.mouse_selection.clear();
+                    return;
+                }
+
+                // Focus the pane the user right-clicked, then paste.
+                if is_inside(claude, x, y) {
+                    self.active_pane = PaneId::Claude;
+                    self.paste_from_clipboard_to_active_pane();
+                } else if is_inside(lazygit, x, y) {
+                    self.active_pane = PaneId::LazyGit;
+                    self.paste_from_clipboard_to_active_pane();
+                } else if is_inside(term, x, y) {
+                    self.active_pane = PaneId::Terminal;
+                    self.paste_from_clipboard_to_active_pane();
+                } else if is_inside(preview, x, y) {
+                    self.active_pane = PaneId::Preview;
+                    self.paste_from_clipboard_to_active_pane();
+                }
+            }
             _ => {}
         }
     }

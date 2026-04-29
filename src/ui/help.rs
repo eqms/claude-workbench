@@ -161,6 +161,10 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Universal Paste — inject system clipboard into active pane"),
         ]),
         Line::from(vec![
+            Span::styled("  Right-click  ", Style::default().fg(Color::Cyan)),
+            Span::raw("Paste into pane under cursor (or clear stuck selection)"),
+        ]),
+        Line::from(vec![
             Span::styled("               ", Style::default().fg(Color::Cyan)),
             Span::raw("(workaround for XRDP / broken bracketed-paste forwarding)"),
         ]),

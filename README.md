@@ -103,8 +103,17 @@ cd claude-workbench && cargo build --release
 | Ctrl+S | Selection mode (in Terminal/Preview) |
 | Ctrl+C | Copy selection to System Clipboard |
 | F11 | Universal Paste — inject system clipboard into active pane (XRDP / broken bracketed-paste workaround) |
+| Right-click | Paste from system clipboard into pane under cursor (mirrors Kitty's `mouse_map right press paste`) |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
+
+### What's New in v0.86.2
+
+- **Right-click = Paste in PTY/Preview panes** — `EnableMouseCapture` was swallowing right-clicks, so Kitty's `mouse_map right press ungrabbed paste_from_clipboard` could never fire under XRDP. Right-click now uses the same fallback chain as F11 (arboard → xclip → xsel → wl-paste) and pastes into the pane under the cursor. If an Alt+drag mouse selection is active, right-click clears it instead — fixes the XRDP-only "screen blocked, selection won't go away" bug.
+
+### What's New in v0.86.1
+
+- **macOS boot hang hotfix** — v0.86.0 invoked `check_command()` for the four new clipboard helpers at startup, falling back to `$SHELL -i -c "..."` when direct exec failed. On macOS the helpers are typically absent → 4× `fish -i -c` with job-control init → terminal state corrupted on next launch. Helper detection now uses pure-Rust PATH lookup (`crate::clipboard::which()`), no subprocess.
 
 ### What's New in v0.86.0
 
@@ -370,8 +379,17 @@ cd claude-workbench && cargo build --release
 | Ctrl+S | Auswahlmodus (in Terminal/Vorschau) |
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 | F11 | Universal Paste — System-Clipboard in aktive Pane einfügen (Workaround für XRDP / defektes Bracketed-Paste-Forwarding) |
+| Rechtsklick | Paste aus System-Clipboard in Pane unter dem Cursor (entspricht Kittys `mouse_map right press paste`) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.86.2
+
+- **Rechtsklick = Paste in PTY/Preview-Panes** — `EnableMouseCapture` schluckte Rechtsklicks, sodass Kittys `mouse_map right press ungrabbed paste_from_clipboard` unter XRDP nie greifen konnte. Rechtsklick nutzt jetzt dieselbe Fallback-Kette wie F11 (arboard → xclip → xsel → wl-paste) und pastet in die Pane unter dem Cursor. Bei aktiver Alt+Drag-Mausselektion clearet Rechtsklick stattdessen die Selektion — behebt den XRDP-only Bug "Bildschirm blockiert, Markierung lässt sich nicht entfernen".
+
+### Neu in v0.86.1
+
+- **macOS Boot-Hänger Hotfix** — v0.86.0 rief beim Start `check_command()` für die vier neuen Clipboard-Helper auf, mit Fallback auf `$SHELL -i -c "..."` wenn direct exec scheiterte. Auf macOS sind die Helper typischerweise nicht installiert → 4× `fish -i -c` mit Job-Control-Init → Terminal-State korrumpiert nach Beenden. Helper-Detection nutzt jetzt pure-Rust PATH-Lookup (`crate::clipboard::which()`), kein Subprocess.
 
 ### Neu in v0.86.0
 

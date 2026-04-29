@@ -1,5 +1,28 @@
 # Release Notes
 
+## Version 0.86.2 (29.04.2026)
+
+### Fixed
+- **Rechtsklick im Terminal-Pane unter XRDP/Kitty** — Bisher schluckte
+  `EnableMouseCapture` alle Mausevents, sodass Kittys eigenes
+  `mouse_map right press ungrabbed paste_from_clipboard` nicht griff
+  (Bedingung `ungrabbed` ist nur erfüllt wenn die Maus *nicht* von der
+  App gegrabbed ist). Folge: Rechtsklick fiel auf den `_ => {}`-Default-Arm
+  in `handle_mouse_event`, machte nichts und ließ aktive Alt+Drag-
+  Selektionen visuell stehen ("Bildschirm blockiert, Markierung lässt
+  sich nicht entfernen").
+
+### Added
+- **Rechtsklick = Paste in der App** — Neuer Match-Arm in `src/app/mouse.rs`
+  für `MouseEventKind::Down(MouseButton::Right)`:
+  - Wenn eine Mouse-Selection (Alt+Drag) aktiv ist → Selection wird
+    geclearet, kein Paste. Behebt das visuelle Hängenbleiben.
+  - Sonst: Pane unter dem Cursor wird fokussiert (Claude / LazyGit /
+    Terminal / Preview) und `paste_from_clipboard_to_active_pane()`
+    wird aufgerufen — exakt derselbe Pfad wie F11 (arboard → xclip
+    → xsel → wl-paste). Konsistent mit Kittys eigenem Verhalten,
+    funktioniert auch wenn Mouse Capture aktiv ist.
+
 ## Version 0.86.1 (29.04.2026) — Hotfix
 
 ### Fixed
