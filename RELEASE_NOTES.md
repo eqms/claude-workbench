@@ -1,5 +1,29 @@
 # Release Notes
 
+## Version 0.86.1 (29.04.2026) — Hotfix
+
+### Fixed
+- **Boot-Hänger auf macOS** — v0.86.0 rief beim App-Start `DependencyReport::check()`
+  auf, der für die vier neuen Clipboard-Helper (`xclip`, `xsel`, `wl-copy`,
+  `wl-paste`) `check_command()` mit interactive-shell-Fallback (`$SHELL -i -c "..."`)
+  ausführte, wenn direct-exec scheiterte. Auf macOS sind diese Helper
+  typischerweise nicht installiert → 4× Fish-Init mit `-i`-Flag und
+  Job-Control-Aktivierung → Terminal-State korrumpiert. Symptom: App friert
+  beim Start, mehrfaches `Ctrl+C` nötig, danach nur Cursor oben links
+  (Terminal nicht sauber wiederhergestellt). Linux blieb unbetroffen, weil
+  dort `xclip` meist installiert ist und direct-exec greift.
+
+### Changed
+- **Pure-Rust Helper-Detection** — `ClipboardHelpers::check()` nutzt jetzt
+  `crate::clipboard::which()` (PATH-Lookup ohne Subprocess) statt
+  `check_command()`. Helper-Binaries sind keine Shell-Aliases, sondern
+  einfache Executables — ein interactive-shell-Fallback ist hier nicht
+  sinnvoll. Neue Hilfsfunktion `check_binary(name)` in
+  `src/setup/dependency_checker.rs`. Versionsabfrage entfällt — die
+  Strategy-Wahl in `src/clipboard.rs` braucht sie nicht.
+- **Startup-Latenz** auf macOS reduziert: vorher mehrere Sekunden für die
+  4 Helper-Probes, jetzt <1 ms (nur PATH-Splits in Rust).
+
 ## Version 0.86.0 (29.04.2026)
 
 ### Fixed

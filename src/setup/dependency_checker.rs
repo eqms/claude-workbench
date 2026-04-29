@@ -59,10 +59,16 @@ impl DependencyReport {
             lazygit: check_command("lazygit", &["--version"], false),
             shells: check_available_shells(),
             clipboard_helpers: ClipboardHelpers {
-                xclip: check_command("xclip", &["-version"], false),
-                xsel: check_command("xsel", &["--version"], false),
-                wl_copy: check_command("wl-copy", &["--version"], false),
-                wl_paste: check_command("wl-paste", &["--version"], false),
+                // Use pure-Rust PATH lookup for clipboard helpers — they are
+                // simple binaries, never shell aliases, so we don't need the
+                // interactive-shell fallback that `check_command` does. On
+                // macOS the helpers are typically absent, and triggering 4×
+                // `fish -i -c "..."` fallbacks at startup activated job
+                // control and corrupted the terminal state on next launch.
+                xclip: check_binary("xclip"),
+                xsel: check_binary("xsel"),
+                wl_copy: check_binary("wl-copy"),
+                wl_paste: check_binary("wl-paste"),
             },
         }
     }
@@ -112,6 +118,22 @@ impl DependencyReport {
         }
 
         (found, missing_required, missing_optional)
+    }
+}
+
+/// Lightweight PATH-only existence check for simple binaries (no version
+/// query, no interactive-shell fallback). Used for clipboard helpers where
+/// invoking the binary at startup just to read a version string was costly
+/// on macOS (helpers absent → 4× `fish -i -c` fallback → terminal job
+/// control corruption on next launch).
+fn check_binary(name: &str) -> DependencyStatus {
+    let path = crate::clipboard::which(name);
+    DependencyStatus {
+        name: name.to_string(),
+        found: path.is_some(),
+        path,
+        version: None,
+        required: false,
     }
 }
 
