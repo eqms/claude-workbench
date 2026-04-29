@@ -13,6 +13,33 @@ pub struct DependencyStatus {
     pub required: bool,
 }
 
+/// Clipboard helper binaries detected at startup. Used by the clipboard
+/// fallback chain (X11 sessions, esp. XRDP) and rendered in F12 help.
+#[derive(Debug, Clone, Default)]
+pub struct ClipboardHelpers {
+    pub xclip: DependencyStatus,
+    pub xsel: DependencyStatus,
+    pub wl_copy: DependencyStatus,
+    pub wl_paste: DependencyStatus,
+}
+
+impl ClipboardHelpers {
+    /// At least one X11 selection helper is present.
+    pub fn linux_x11_ok(&self) -> bool {
+        self.xclip.found || self.xsel.found
+    }
+
+    /// Both Wayland helpers present (need both for copy + paste).
+    pub fn linux_wayland_ok(&self) -> bool {
+        self.wl_copy.found && self.wl_paste.found
+    }
+
+    /// True if no helper at all is available — Linux fallback to OSC 52 only.
+    pub fn none_available(&self) -> bool {
+        !self.xclip.found && !self.xsel.found && !self.wl_copy.found && !self.wl_paste.found
+    }
+}
+
 /// All dependencies checked at startup
 #[derive(Debug, Clone, Default)]
 pub struct DependencyReport {
@@ -20,6 +47,7 @@ pub struct DependencyReport {
     pub claude_cli: DependencyStatus,
     pub lazygit: DependencyStatus,
     pub shells: Vec<DependencyStatus>,
+    pub clipboard_helpers: ClipboardHelpers,
 }
 
 impl DependencyReport {
@@ -30,6 +58,12 @@ impl DependencyReport {
             claude_cli: check_command("claude", &["--version"], false),
             lazygit: check_command("lazygit", &["--version"], false),
             shells: check_available_shells(),
+            clipboard_helpers: ClipboardHelpers {
+                xclip: check_command("xclip", &["-version"], false),
+                xsel: check_command("xsel", &["--version"], false),
+                wl_copy: check_command("wl-copy", &["--version"], false),
+                wl_paste: check_command("wl-paste", &["--version"], false),
+            },
         }
     }
 

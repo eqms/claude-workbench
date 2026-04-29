@@ -3,5 +3,5 @@
 pub mod dependency_checker;
 pub mod wizard;
 
-pub use dependency_checker::{DependencyReport, DependencyStatus};
+pub use dependency_checker::{ClipboardHelpers, DependencyReport, DependencyStatus};
 pub use wizard::{WizardState, WizardStep};

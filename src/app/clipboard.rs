@@ -1,4 +1,5 @@
-use crate::types::PaneId;
+use crate::clipboard::ClipboardOutcome;
+use crate::types::{EditorMode, PaneId};
 use crate::ui;
 
 use super::App;
@@ -90,7 +91,8 @@ impl App {
         // Join lines and copy to system clipboard
         let text = lines.join("\n");
 
-        crate::clipboard::copy_to_clipboard(&text);
+        let outcome = crate::clipboard::copy_to_clipboard(&text);
+        self.handle_copy_outcome(outcome);
     }
 
     /// Copy the last N lines from the active terminal pane to the system clipboard.
@@ -111,9 +113,12 @@ impl App {
                 .collect();
             if !lines.is_empty() {
                 let text = lines.join("\n");
-                crate::clipboard::copy_to_clipboard(&text);
-                self.last_copy_time = Some(std::time::Instant::now());
-                self.copy_flash_lines = lines.len();
+                let outcome = crate::clipboard::copy_to_clipboard(&text);
+                if outcome.is_success() {
+                    self.last_copy_time = Some(std::time::Instant::now());
+                    self.copy_flash_lines = lines.len();
+                }
+                self.handle_copy_outcome(outcome);
             }
         }
     }
@@ -190,6 +195,67 @@ impl App {
         }
 
         // Copy to system clipboard
-        crate::clipboard::copy_to_clipboard(&text);
+        let outcome = crate::clipboard::copy_to_clipboard(&text);
+        self.handle_copy_outcome(outcome);
+    }
+
+    /// Set an error flash on the footer if the copy failed.
+    /// Successful copies are already reflected by `last_copy_time`/`copy_flash_lines`.
+    pub(super) fn handle_copy_outcome(&mut self, outcome: ClipboardOutcome) {
+        if let ClipboardOutcome::Failed(reason) = outcome {
+            self.set_clipboard_error_flash(format!("Clipboard error: {}", reason));
+        }
+    }
+
+    /// Read text from the system clipboard (with fallback chain) and inject
+    /// it into the active pane. F11 binding — bypasses Kitty's bracketed-paste
+    /// bridge entirely, which is the key workaround for XRDP sessions where
+    /// Kitty cannot read the system clipboard.
+    pub(super) fn paste_from_clipboard_to_active_pane(&mut self) {
+        let Some(text) = crate::clipboard::paste_from_clipboard() else {
+            self.set_clipboard_error_flash("Clipboard empty or unavailable".to_string());
+            return;
+        };
+
+        match self.active_pane {
+            PaneId::Claude => {
+                // Claude CLI doesn't understand bracketed paste sequences.
+                // Send raw bytes — for multiline, the user must use \ continuation.
+                if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
+                    let _ = pty.write_input(text.as_bytes());
+                }
+            }
+            PaneId::LazyGit | PaneId::Terminal => {
+                if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
+                    let bracketed = format!("\x1b[200~{}\x1b[201~", text);
+                    let _ = pty.write_input(bracketed.as_bytes());
+                }
+            }
+            PaneId::Preview => {
+                if self.preview.mode == EditorMode::Edit {
+                    if let Some(editor) = &mut self.preview.editor {
+                        editor.insert_str(&text);
+                        self.preview.update_modified();
+                        self.preview.update_edit_highlighting(&self.syntax_manager);
+                    } else {
+                        self.set_clipboard_error_flash("Preview editor unavailable".to_string());
+                    }
+                } else {
+                    self.set_clipboard_error_flash(
+                        "Preview is read-only — press i to enter edit mode".to_string(),
+                    );
+                }
+            }
+            PaneId::FileBrowser => {
+                self.set_clipboard_error_flash(
+                    "F11 paste only works in PTY or Edit panes".to_string(),
+                );
+            }
+        }
+    }
+
+    /// Set the clipboard error flash (visible in the footer for ~3 s).
+    pub(super) fn set_clipboard_error_flash(&mut self, message: String) {
+        self.clipboard_error_flash = Some((message, std::time::Instant::now()));
     }
 }

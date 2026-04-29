@@ -1,5 +1,92 @@
 # Release Notes
 
+## Version 0.86.0 (29.04.2026)
+
+### Fixed
+- **Clipboard unter XRDP / Kitty / Xfce funktioniert wieder** — Auf Debian 13
+  (Trixie) mit Kitty als Terminal und XRDP-Zugriff funktionierte das Clipboard
+  in beide Richtungen nicht: F9 (Copy Last N Lines) zeigte zwar den Footer-
+  Flash, aber das System-Clipboard blieb leer; Paste in die PTY-Panes
+  (Claude/LazyGit/Terminal) kam gar nicht erst durch. Ursache war die
+  unzuverlässige OSC-52-Brücke unter XRDP und das Fehlen jeglichen Fallbacks
+  für `arboard`.
+
+### Added
+- **Mehrstufige Clipboard-Fallback-Kette in `src/clipboard.rs`** — Copy
+  versucht in dieser Reihenfolge: `arboard` → `xclip` → `xsel` → `wl-copy`
+  → OSC 52. Paste analog: `arboard` → `xclip -o` → `xsel -b -o`
+  → `wl-paste --no-newline`. Die Subprocess-Helper schreiben direkt in die
+  X11-Selection — exakt der Pfad, den `xrdp-chansrv` zum RDP-Kanal synct.
+- **`ClipboardOutcome`-Enum** — Statt `bool` liefert `copy_to_clipboard()`
+  jetzt `Arboard` / `Xclip` / `Xsel` / `WlCopy` / `Osc52` / `Failed(reason)`.
+  Aufrufer können den genutzten Backend für Diagnose und User-Feedback
+  auslesen.
+- **`ClipboardStrategy` mit Environment-Detection** — `ArboardFirst` (macOS,
+  native Linux) vs `SubprocessFirst` (XRDP/X11 mit xclip/xsel verfügbar).
+  Detection via `XRDP_SESSION` und `XDG_SESSION_TYPE`, einmalig per
+  `OnceLock` cached. In XRDP-Sessions wird arboard übersprungen, weil
+  dessen `wayland-data-control`-Feature dort hängen kann.
+- **F11 — Universal Paste** — Liest das System-Clipboard via Fallback-Kette
+  und schreibt direkt in die aktive Pane: raw bytes für Claude (kein
+  bracketed paste), `\x1b[200~…\x1b[201~`-gewrappt für LazyGit/Terminal,
+  `editor.insert_str()` für Preview-Edit. **Schlüssel-Workaround für XRDP**,
+  weil Kitty's bracketed-paste-Bridge dort versagt — F11 umgeht sie komplett.
+- **Startup-Dependency-Check für Clipboard-Helpers** — `DependencyReport`
+  in `src/setup/dependency_checker.rs` um `ClipboardHelpers`-Struct
+  erweitert (xclip / xsel / wl-copy / wl-paste). Auf Linux ohne Helper
+  erscheint 10 Sekunden lang ein gelber Footer-Banner:
+  `⚠ xclip / xsel / wl-copy fehlen — Clipboard eingeschränkt. F12 für Details.`
+- **Footer-Error-Flash** — Fehlgeschlagene Clipboard-Operationen zeigen
+  3 Sekunden lang `❌ Clipboard error: <reason>` (rot). Vorrang vor
+  `✓ N Zeilen` (Copy-Flash) und Auto-Save-Flash. Schluss mit stillem
+  Versagen bei F9 unter XRDP.
+- **CLI-Option `--clipboard-diag`** — `claude-workbench --clipboard-diag`
+  startet die TUI nicht, sondern druckt: aktive `ClipboardStrategy`,
+  Helper-Pfade (`xclip` / `xsel` / `wl-copy` / `wl-paste`), Environment-
+  Variablen (`DISPLAY` / `WAYLAND_DISPLAY` / `XDG_SESSION_TYPE` /
+  `XRDP_SESSION` / `SSH_TTY`) und einen Copy/Paste-Roundtrip-Test mit
+  Match-Verifikation.
+- **F11-Eintrag im F12-Help-Screen** — Neue Zeile dokumentiert F11 als
+  Universal Paste mit XRDP-Workaround-Hinweis.
+
+### Changed
+- **`paste_from_clipboard()` mit Fallback-Kette** — Bisher nur `arboard.get_text()`
+  ohne Fallback, gab `None` ohne Fehler zurück wenn arboard scheiterte.
+  Jetzt versucht arboard → xclip → xsel → wl-paste.
+- **`copy_to_clipboard()`-Aufrufer** in `src/app/clipboard.rs:93,114,193`
+  werten den `ClipboardOutcome` aus und setzen den Footer-Error-Flash bei
+  `Failed(_)`. F9 setzt `last_copy_time` nur noch bei tatsächlichem Erfolg.
+- **README.md (DE+EN) und Skill-Doku aktualisiert** — Neuer Abschnitt
+  "Clipboard troubleshooting" mit XRDP/Kitty-Setup-Schritten:
+  ```bash
+  sudo apt install xclip xsel xfce4-clipman-plugin
+  pgrep -af xrdp-chansrv
+  # ~/.config/kitty/kitty.conf:
+  clipboard_control write-clipboard write-primary read-clipboard read-primary no-append
+  ```
+
+### Tests
+- 5 neue Unit-Tests in `src/clipboard.rs`: `test_outcome_label_and_success`,
+  `test_which_finds_common_binary`, `test_which_returns_none_for_missing`,
+  `test_diag_collect_does_not_panic`, plus erhaltener `test_base64_encode`.
+- Test-Count: **103 unit + 3 integration = 106 Tests** (vorher 99 / 102).
+
+### Architecture
+- Bestehende `osc52_copy()` und `base64_encode()` (Z. 40-81 in der alten
+  `src/clipboard.rs`) bleiben als Stufe 5 der Fallback-Kette erhalten.
+- `arboard 3.6` mit `wayland-data-control`-Feature unverändert — bleibt
+  wertvoll auf nativen Wayland-Sessions, wird in XRDP-Sessions nur
+  übersprungen.
+
+## Version 0.85.0 (28.04.2026)
+
+### Fixed
+- **Windows Self-Update** — `archive-zip` + `compression-zip-deflate` Features
+  für `self_update` aktiviert (Cargo.toml). PowerShell `Compress-Archive`
+  erzeugt DEFLATE-komprimierte ZIPs auf Windows; ohne diese Features schlug
+  die Extraktion mit `ArchiveNotEnabled: Archive extension 'zip' not supported`
+  fehl. Linux/macOS-Pfade unverändert (weiterhin `.tar.gz`).
+
 ## Version 0.84.0 (28.04.2026)
 
 ### Added

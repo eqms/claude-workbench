@@ -147,6 +147,23 @@ impl App {
             None
         };
 
+        // Clipboard error flash (3 s) — replaces copy_flash on the right side.
+        let clipboard_error = self
+            .clipboard_error_flash
+            .as_ref()
+            .filter(|(_, t)| t.elapsed().as_secs() < 3)
+            .map(|(msg, _)| msg.clone());
+
+        // Persistent clipboard warning banner (10 s, dismissable).
+        let clipboard_warning = if self.clipboard_warning_dismissed {
+            None
+        } else {
+            self.clipboard_warning
+                .as_ref()
+                .filter(|(_, t)| t.elapsed().as_secs() < 10)
+                .map(|(msg, _)| msg.clone())
+        };
+
         if footer.height > 0 {
             let footer_widget = ui::footer::Footer {
                 active_pane: self.active_pane,
@@ -159,6 +176,8 @@ impl App {
                 copy_flash_lines,
                 copy_flash_message,
                 preview_maximized: self.preview_maximized,
+                clipboard_error,
+                clipboard_warning,
             };
             frame.render_widget(footer_widget, footer);
         }

@@ -59,6 +59,10 @@ pub struct Footer {
     pub copy_flash_lines: usize,
     pub copy_flash_message: Option<String>,
     pub preview_maximized: bool,
+    /// Error flash for failed clipboard operations (3 s, red).
+    pub clipboard_error: Option<String>,
+    /// Persistent warning banner for missing clipboard helpers (10 s, yellow).
+    pub clipboard_warning: Option<String>,
 }
 
 /// Format current date/time for footer display
@@ -120,6 +124,8 @@ impl Default for Footer {
             copy_flash_lines: 0,
             copy_flash_message: None,
             preview_maximized: false,
+            clipboard_error: None,
+            clipboard_warning: None,
         }
     }
 }
@@ -323,7 +329,47 @@ impl Widget for Footer {
         let datetime_text = format_datetime();
         let version = env!("CARGO_PKG_VERSION");
 
-        let right_spans = if self.copy_flash {
+        let right_spans = if let Some(ref msg) = self.clipboard_warning {
+            // Persistent banner for missing clipboard helpers — yellow ⚠
+            use ratatui::style::Modifier;
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    format!(" \u{26A0} {} ", msg),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
+        } else if let Some(ref msg) = self.clipboard_error {
+            // Short-lived error flash — red ❌
+            use ratatui::style::Modifier;
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    format!(" \u{274C} {} ", msg),
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::Red)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
+        } else if self.copy_flash {
             // Flash state for copy/export feedback
             use ratatui::style::Modifier;
             let is_progress = self

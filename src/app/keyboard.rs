@@ -767,6 +767,16 @@ impl App {
             return true;
         }
 
+        // F11: Universal paste — read system clipboard via fallback chain
+        // (arboard → xclip → xsel → wl-paste) and inject into the active
+        // pane. Bypasses Kitty's bracketed-paste bridge entirely; this is
+        // the workaround for XRDP sessions where Kitty cannot read the
+        // system clipboard.
+        if key.code == KeyCode::F(11) && key.modifiers.is_empty() {
+            self.paste_from_clipboard_to_active_pane();
+            return true;
+        }
+
         // Ctrl+P: Open fuzzy finder
         if key.code == KeyCode::Char('p') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.fuzzy_finder.open(&self.file_browser.current_dir);

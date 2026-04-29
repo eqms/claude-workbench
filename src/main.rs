@@ -48,6 +48,13 @@ struct Args {
     /// Update to a specific version (for testing/downgrade, e.g., "v0.38.5" or "0.38.5")
     #[arg(long)]
     update_to: Option<String>,
+
+    /// Diagnose clipboard backends and exit (without starting TUI).
+    /// Reports which fallback chain stage is active, which helper binaries
+    /// (xclip/xsel/wl-copy/wl-paste) are present, relevant environment
+    /// variables, and runs a copy/paste roundtrip test.
+    #[arg(long)]
+    clipboard_diag: bool,
 }
 
 /// Run update check from CLI and exit
@@ -142,6 +149,76 @@ fn restore_terminal() {
     let _ = std::io::stdout().flush();
 }
 
+/// Run clipboard diagnostic from CLI and exit.
+fn run_clipboard_diag_cli() -> Result<()> {
+    use clipboard::{ClipboardDiag, ClipboardOutcome};
+
+    println!(
+        "claude-workbench v{} — clipboard diagnostic",
+        env!("CARGO_PKG_VERSION")
+    );
+    println!();
+
+    let diag = ClipboardDiag::collect();
+    println!("Strategy:           {:?}", diag.strategy);
+    println!();
+    println!("Helper binaries:");
+    fn show(name: &str, path: &Option<std::path::PathBuf>) {
+        match path {
+            Some(p) => println!("  {:<10} ✓ {}", name, p.display()),
+            None => println!("  {:<10} ✗ not found", name),
+        }
+    }
+    show("xclip", &diag.xclip);
+    show("xsel", &diag.xsel);
+    show("wl-copy", &diag.wl_copy);
+    show("wl-paste", &diag.wl_paste);
+    println!();
+
+    println!("Environment:");
+    fn show_env(name: &str, val: &Option<String>) {
+        match val {
+            Some(v) if !v.is_empty() => println!("  {:<18} = {}", name, v),
+            _ => println!("  {:<18} = (unset)", name),
+        }
+    }
+    show_env("DISPLAY", &diag.display);
+    show_env("WAYLAND_DISPLAY", &diag.wayland_display);
+    show_env("XDG_SESSION_TYPE", &diag.xdg_session_type);
+    show_env("XRDP_SESSION", &diag.xrdp_session);
+    show_env("SSH_TTY", &diag.ssh_tty);
+    println!();
+
+    let test_marker = format!("workbench-diag-{}", std::process::id());
+    println!("Roundtrip test (marker: {}):", test_marker);
+    let outcome = clipboard::copy_to_clipboard(&test_marker);
+    println!("  Copy backend:     {} ({:?})", outcome.label(), outcome);
+    if matches!(outcome, ClipboardOutcome::Osc52) {
+        println!("  Note: OSC 52 has no read path, skipping paste verification.");
+    } else {
+        match clipboard::paste_from_clipboard() {
+            Some(text) if text == test_marker => {
+                println!("  Paste roundtrip:  ✓ matches");
+            }
+            Some(text) => {
+                println!(
+                    "  Paste roundtrip:  ✗ mismatch (read back: {:?})",
+                    text.chars().take(40).collect::<String>()
+                );
+            }
+            None => {
+                println!("  Paste roundtrip:  ✗ paste returned None");
+            }
+        }
+    }
+    println!();
+    println!("F11 in the TUI uses the same fallback chain to inject paste");
+    println!("into the active pane — useful when Kitty's bracketed-paste");
+    println!("forwarding is broken (e.g., under XRDP).");
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     // Parse args early - before tokio runtime
     let args = Args::parse();
@@ -160,6 +237,11 @@ fn main() -> Result<()> {
     // Handle --update-to CLI mode (update to specific version and exit)
     if let Some(target_version) = args.update_to {
         return run_update_to_version_cli(&target_version);
+    }
+
+    // Handle --clipboard-diag CLI mode (exit without starting TUI)
+    if args.clipboard_diag {
+        return run_clipboard_diag_cli();
     }
 
     // Run the async main with tokio runtime

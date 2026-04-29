@@ -157,6 +157,14 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("About / License Info"),
         ]),
         Line::from(vec![
+            Span::styled("  F11          ", Style::default().fg(Color::Cyan)),
+            Span::raw("Universal Paste — inject system clipboard into active pane"),
+        ]),
+        Line::from(vec![
+            Span::styled("               ", Style::default().fg(Color::Cyan)),
+            Span::raw("(workaround for XRDP / broken bracketed-paste forwarding)"),
+        ]),
+        Line::from(vec![
             Span::styled("  F7           ", Style::default().fg(Color::Cyan)),
             Span::raw("Toggle ~/.claude (press again to go back)"),
         ]),

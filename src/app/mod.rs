@@ -138,6 +138,15 @@ pub struct App {
     pub last_copy_time: Option<std::time::Instant>,
     pub copy_flash_lines: usize,
     pub copy_flash_message: Option<String>,
+    /// Short-lived footer error flash (3 s) for failed clipboard ops.
+    pub clipboard_error_flash: Option<(String, std::time::Instant)>,
+    /// Startup banner shown when no Linux clipboard helpers are present.
+    /// Auto-hides after 10 s or when dismissed via Esc.
+    pub clipboard_warning: Option<(String, std::time::Instant)>,
+    /// Whether the user dismissed the clipboard warning banner.
+    pub clipboard_warning_dismissed: bool,
+    /// Cached dependency report for F12 help and clipboard status display.
+    pub dependency_report: crate::setup::DependencyReport,
     // Temp files created for browser previews (cleaned up on exit)
     pub temp_preview_files: Vec<std::path::PathBuf>,
     // Export format chooser (Ctrl+X on Markdown files)
@@ -320,11 +329,31 @@ impl App {
             last_copy_time: None,
             copy_flash_lines: 0,
             copy_flash_message: None,
+            clipboard_error_flash: None,
+            clipboard_warning: None,
+            clipboard_warning_dismissed: false,
+            dependency_report: crate::setup::DependencyReport::default(),
             temp_preview_files: Vec::new(),
             export_chooser: crate::types::ExportChooserState::default(),
             export_receiver: None,
             export_browser: None,
         };
+
+        // Run dependency check and seed the clipboard warning banner if no
+        // Linux helpers are available (xclip / xsel / wl-copy / wl-paste).
+        // On macOS / Windows / native Linux with arboard the helpers are
+        // optional, so we only nag on Linux without any helper present.
+        app.dependency_report = crate::setup::DependencyReport::check();
+        #[cfg(target_os = "linux")]
+        {
+            let helpers = &app.dependency_report.clipboard_helpers;
+            if helpers.none_available() {
+                app.clipboard_warning = Some((
+                    "xclip / xsel / wl-copy fehlen — Clipboard eingeschränkt. F12 für Details, Esc zum Schließen.".to_string(),
+                    std::time::Instant::now(),
+                ));
+            }
+        }
 
         // Open wizard on first run
         if should_open_wizard {

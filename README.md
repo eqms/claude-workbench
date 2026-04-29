@@ -102,8 +102,28 @@ cd claude-workbench && cargo build --release
 | Ctrl+E | Open in External Editor (context-aware) |
 | Ctrl+S | Selection mode (in Terminal/Preview) |
 | Ctrl+C | Copy selection to System Clipboard |
+| F11 | Universal Paste — inject system clipboard into active pane (XRDP / broken bracketed-paste workaround) |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
+
+### What's New in v0.86.0
+
+- **Clipboard fallback chain** — `arboard` → `xclip` → `xsel` → `wl-copy` → OSC 52 for copy; `arboard` → `xclip -o` → `xsel -b -o` → `wl-paste` for paste. Restores clipboard sync under XRDP / Kitty / Xfce where Kitty's bracketed-paste forwarding fails.
+- **F11 Universal Paste** — Reads the system clipboard via the fallback chain and injects it directly into the active pane (Claude / LazyGit / Terminal / Preview-Edit). Bypasses Kitty's bracketed-paste bridge entirely — the workaround when Kitty cannot read the system clipboard under XRDP.
+- **Startup dependency check** — Detects `xclip`, `xsel`, `wl-copy`, `wl-paste` at launch. On Linux without any helper, a yellow footer banner appears for 10 seconds. F12 (Help) shows the current strategy and detected helpers.
+- **`--clipboard-diag` CLI** — `claude-workbench --clipboard-diag` prints the active strategy, helper paths, relevant environment variables (`DISPLAY`, `WAYLAND_DISPLAY`, `XRDP_SESSION`, `XDG_SESSION_TYPE`, `SSH_TTY`) and runs a copy/paste roundtrip test.
+- **Footer error flash** — Failed clipboard operations now show `❌ Clipboard error: ...` for 3 seconds, no more silent failure.
+
+#### Clipboard troubleshooting (Debian / Xfce / Kitty / XRDP)
+
+```bash
+sudo apt install xclip xsel xfce4-clipman-plugin
+pgrep -af xrdp-chansrv      # must be running (default with xrdp)
+# ~/.config/kitty/kitty.conf:
+clipboard_control write-clipboard write-primary read-clipboard read-primary no-append
+```
+
+With `xclip` installed, the app picks `SubprocessFirst` strategy automatically and writes directly into the X11 selection — exactly the path `xrdp-chansrv` syncs to the RDP channel.
 
 ### What's New in v0.81.0
 
@@ -349,8 +369,28 @@ cd claude-workbench && cargo build --release
 | Ctrl+E | In externem Editor öffnen (kontextabhängig) |
 | Ctrl+S | Auswahlmodus (in Terminal/Vorschau) |
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
+| F11 | Universal Paste — System-Clipboard in aktive Pane einfügen (Workaround für XRDP / defektes Bracketed-Paste-Forwarding) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.86.0
+
+- **Clipboard-Fallback-Kette** — `arboard` → `xclip` → `xsel` → `wl-copy` → OSC 52 für Copy; `arboard` → `xclip -o` → `xsel -b -o` → `wl-paste` für Paste. Stellt Clipboard-Sync unter XRDP / Kitty / Xfce wieder her, wenn Kittys Bracketed-Paste-Forwarding nicht funktioniert.
+- **F11 Universal Paste** — Liest das System-Clipboard über die Fallback-Kette und schreibt direkt in die aktive Pane (Claude / LazyGit / Terminal / Preview-Edit). Umgeht Kittys Bracketed-Paste-Bridge komplett — der Workaround, wenn Kitty unter XRDP das System-Clipboard nicht lesen kann.
+- **Startup-Dependency-Check** — Erkennt `xclip`, `xsel`, `wl-copy`, `wl-paste` beim Start. Auf Linux ohne Helper erscheint 10 Sekunden lang ein gelbes Banner im Footer. F12 (Hilfe) zeigt die aktive Strategie und gefundene Helper.
+- **`--clipboard-diag` CLI** — `claude-workbench --clipboard-diag` druckt die aktive Strategie, Helper-Pfade, relevante Umgebungsvariablen (`DISPLAY`, `WAYLAND_DISPLAY`, `XRDP_SESSION`, `XDG_SESSION_TYPE`, `SSH_TTY`) und führt einen Copy/Paste-Roundtrip aus.
+- **Footer-Error-Flash** — Fehlgeschlagene Clipboard-Operationen zeigen jetzt `❌ Clipboard error: ...` für 3 Sekunden, kein stilles Versagen mehr.
+
+#### Clipboard-Troubleshooting (Debian / Xfce / Kitty / XRDP)
+
+```bash
+sudo apt install xclip xsel xfce4-clipman-plugin
+pgrep -af xrdp-chansrv      # muss laufen (Standard bei xrdp)
+# ~/.config/kitty/kitty.conf:
+clipboard_control write-clipboard write-primary read-clipboard read-primary no-append
+```
+
+Mit `xclip` installiert wählt die App automatisch die `SubprocessFirst`-Strategie und schreibt direkt in die X11-Selection — exakt der Pfad, den `xrdp-chansrv` zum RDP-Kanal synct.
 
 ### Neu in v0.81.0
 
