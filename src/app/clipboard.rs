@@ -201,8 +201,20 @@ impl App {
 
     /// Set an error flash on the footer if the copy failed.
     /// Successful copies are already reflected by `last_copy_time`/`copy_flash_lines`.
+    /// `Submitted` is intentionally a no-op — the real outcome arrives later
+    /// via `poll_clipboard_outcome()` and is handled there.
     pub(super) fn handle_copy_outcome(&mut self, outcome: ClipboardOutcome) {
         if let ClipboardOutcome::Failed(reason) = outcome {
+            self.set_clipboard_error_flash(format!("Clipboard error: {}", reason));
+        }
+    }
+
+    /// Drain any clipboard worker outcome that completed since the last
+    /// frame and surface failures via the footer error flash. Called once
+    /// per event-loop tick. Successful outcomes are silent — the caller
+    /// already showed an immediate copy flash on `Submitted`.
+    pub(super) fn poll_clipboard_outcome(&mut self) {
+        if let Some(ClipboardOutcome::Failed(reason)) = crate::clipboard::take_pending_outcome() {
             self.set_clipboard_error_flash(format!("Clipboard error: {}", reason));
         }
     }

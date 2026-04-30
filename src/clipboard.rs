@@ -20,7 +20,9 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::OnceLock;
+use std::sync::mpsc::{self, Sender};
+use std::sync::{Mutex, OnceLock};
+use std::thread;
 use std::time::{Duration, Instant};
 
 /// Maximum time we wait for any clipboard helper subprocess (xclip/xsel/wl-*)
@@ -42,6 +44,10 @@ pub enum ClipboardOutcome {
     WlCopy,
     Osc52,
     Failed(String),
+    /// Copy job was queued for the background worker thread. The real
+    /// outcome will appear later via `take_pending_outcome()`. Treated
+    /// as success at the call site so the user sees an immediate flash.
+    Submitted,
 }
 
 impl ClipboardOutcome {
@@ -57,6 +63,7 @@ impl ClipboardOutcome {
             ClipboardOutcome::WlCopy => "wl-copy",
             ClipboardOutcome::Osc52 => "OSC 52",
             ClipboardOutcome::Failed(_) => "failed",
+            ClipboardOutcome::Submitted => "submitted",
         }
     }
 }
@@ -121,11 +128,90 @@ pub fn which(name: &str) -> Option<PathBuf> {
     None
 }
 
-/// Copy text to clipboard via fallback chain.
+// =====================================================================
+// Worker thread — runs all clipboard subprocess calls off the main loop.
+// =====================================================================
+//
+// Even with the 500 ms subprocess timeout from v0.86.4, every copy call
+// could still freeze the UI for half a second whenever the X-server
+// clipboard hangs. The worker thread decouples the call site from the
+// helper's wall-clock cost: the main loop returns immediately with
+// `Submitted`, and the worker reports the real outcome (success or
+// `Failed(reason)`) into a shared slot that the app polls per frame.
+//
+// Design notes:
+// - One worker thread, single mpsc channel — clipboard jobs are
+//   inherently serial (the system clipboard has one slot).
+// - The worker is spawned lazily on first use and lives until process
+//   exit. We do not implement explicit shutdown because joining on
+//   exit would deadlock if a helper subprocess is still draining.
+// - Only Copy is async. Paste stays synchronous because callers need
+//   the pasted text immediately to inject into a PTY/editor; the
+//   subprocess timeout is sufficient there.
+
+enum ClipboardJob {
+    Copy(String),
+}
+
+static WORKER_TX: OnceLock<Sender<ClipboardJob>> = OnceLock::new();
+static OUTCOME_SLOT: OnceLock<Mutex<Option<ClipboardOutcome>>> = OnceLock::new();
+
+fn outcome_slot() -> &'static Mutex<Option<ClipboardOutcome>> {
+    OUTCOME_SLOT.get_or_init(|| Mutex::new(None))
+}
+
+fn ensure_worker() -> &'static Sender<ClipboardJob> {
+    WORKER_TX.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<ClipboardJob>();
+        thread::Builder::new()
+            .name("clipboard-worker".into())
+            .spawn(move || {
+                while let Ok(job) = rx.recv() {
+                    match job {
+                        ClipboardJob::Copy(text) => {
+                            let outcome = copy_to_clipboard_sync(&text);
+                            // Overwrite any prior pending outcome — the
+                            // most recent copy is always the relevant one
+                            // for the user's mental model.
+                            if let Ok(mut slot) = outcome_slot().lock() {
+                                *slot = Some(outcome);
+                            }
+                        }
+                    }
+                }
+            })
+            .expect("spawn clipboard worker thread");
+        tx
+    })
+}
+
+/// Take the most recent worker outcome, if any. Called once per frame
+/// by the event loop to surface success/failure to the user (footer
+/// flash for errors). Returns `None` if no copy has completed since
+/// the last poll.
+pub fn take_pending_outcome() -> Option<ClipboardOutcome> {
+    outcome_slot().lock().ok().and_then(|mut g| g.take())
+}
+
+/// Copy text to clipboard via the background worker thread.
 ///
-/// Returns the `ClipboardOutcome` describing which backend succeeded
-/// (or `Failed(reason)` if every backend failed).
+/// Returns immediately with `ClipboardOutcome::Submitted` — the real
+/// outcome is available later via [`take_pending_outcome()`], which the
+/// app event loop polls once per frame. This keeps the UI responsive
+/// even when xclip/xsel hangs for the full subprocess timeout window.
 pub fn copy_to_clipboard(text: &str) -> ClipboardOutcome {
+    let tx = ensure_worker();
+    if tx.send(ClipboardJob::Copy(text.to_owned())).is_err() {
+        // Worker thread died — fall back to synchronous path so the user
+        // still gets a real outcome (which will show as Failed if so).
+        return copy_to_clipboard_sync(text);
+    }
+    ClipboardOutcome::Submitted
+}
+
+/// Synchronous copy — used by `--clipboard-diag` and as the worker's
+/// inner implementation. Blocks for up to ~500 ms per helper attempt.
+pub fn copy_to_clipboard_sync(text: &str) -> ClipboardOutcome {
     let mut errors: Vec<String> = Vec::new();
 
     let try_arboard = |errors: &mut Vec<String>| -> Option<ClipboardOutcome> {

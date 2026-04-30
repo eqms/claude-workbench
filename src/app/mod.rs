@@ -440,6 +440,9 @@ impl App {
             self.poll_update_check();
             self.poll_update_result();
 
+            // Drain clipboard worker outcomes (footer flash on Failed)
+            self.poll_clipboard_outcome();
+
             terminal.draw(|frame| self.draw(frame))?;
 
             if event::poll(std::time::Duration::from_millis(16))? {

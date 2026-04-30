@@ -107,6 +107,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.87.0
+
+- **Async clipboard worker thread** — `copy_to_clipboard()` now dispatches to a dedicated `clipboard-worker` thread and returns immediately with `ClipboardOutcome::Submitted`. The event loop polls `take_pending_outcome()` once per frame and only flashes the footer on real `Failed`. The UI stays responsive even when the X-server clipboard hangs for the full 500 ms timeout from v0.86.4. Paste remains synchronous (callers need the result immediately to inject into PTY/editor).
+
 ### What's New in v0.86.4
 
 - **Clipboard subprocess timeout (500 ms)** — Real root cause of the "app frozen, no key/mouse response" symptom on XRDP: `xclip -i` and `xsel -i` block indefinitely under XRDP when the X11 selection-owner negotiation never completes. Because copy/paste run synchronously in the main thread, the entire event loop froze. `run_with_stdin()` and `run_capture()` now wait at most 500 ms and kill the child on timeout, falling back to the next helper or OSC 52 instead of hanging.
@@ -391,6 +395,10 @@ cd claude-workbench && cargo build --release
 | Rechtsklick | Paste aus System-Clipboard in Pane unter dem Cursor (entspricht Kittys `mouse_map right press paste`) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.87.0
+
+- **Async-Clipboard im Worker-Thread** — `copy_to_clipboard()` dispatcht jetzt an einen dedizierten `clipboard-worker`-Thread und returnt sofort mit `ClipboardOutcome::Submitted`. Der Event-Loop pollt einmal pro Frame `take_pending_outcome()` und zeigt nur bei realem `Failed` den Footer-Flash. Die UI bleibt responsiv, selbst wenn der X-Server-Clipboard die volle 500 ms-Timeout-Spanne aus v0.86.4 ausschöpft. Paste bleibt synchron (Caller brauchen das Ergebnis sofort für PTY/Editor-Inject).
 
 ### Neu in v0.86.4
 

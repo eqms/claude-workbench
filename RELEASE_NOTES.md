@@ -1,5 +1,41 @@
 # Release Notes
 
+## Version 0.87.0 (30.04.2026)
+
+### Added
+- **Async-Clipboard im Worker-Thread** — Alle `copy_to_clipboard()`-Aufrufe
+  werden jetzt an einen dedizierten Background-Thread (`clipboard-worker`)
+  delegiert. Der Main-Loop returnt sofort mit `ClipboardOutcome::Submitted`
+  (neue Variante), der Worker führt die echte X11/Wayland/OSC-52-Sequenz
+  aus. Der App-Event-Loop pollt einmal pro Frame `take_pending_outcome()`
+  und zeigt nur bei `Failed(reason)` den Footer-Error-Flash. Folge: Die
+  UI bleibt **immer** responsiv, selbst wenn der X-Server-Clipboard
+  hängt — die 500 ms-Wartezeit aus v0.86.4 ist jetzt komplett unsichtbar
+  für den User.
+- **`copy_to_clipboard_sync()`** — Synchroner Pfad als öffentliche API
+  erhalten, wird intern vom Worker aufgerufen und vom `--clipboard-diag`
+  genutzt (damit der Roundtrip-Report das echte Backend-Ergebnis zeigt
+  statt nur "Submitted").
+- **`take_pending_outcome()`** — Public API zum Abholen des zuletzt
+  fertig gestellten Worker-Outcomes (None bei leerer Queue).
+
+### Changed
+- **Architektur**: Single-Worker-Thread + `mpsc::channel<ClipboardJob>` +
+  `Mutex<Option<ClipboardOutcome>>`-Slot. Lazy-Init via `OnceLock`. Worker
+  lebt bis Process-Exit (kein expliziter Shutdown — joinen würde bei
+  noch hängenden Helper-Subprocessen deadlocken). Aktuelle Queue-Politik:
+  jeder neue Outcome überschreibt den alten Slot (relevant ist immer der
+  letzte Copy für die User-Wahrnehmung).
+- **Paste bleibt synchron** — Caller brauchen den Text sofort zum
+  PTY-/Editor-Inject, asynchron würde keinen Mehrwert bieten. Das
+  500 ms-Subprocess-Timeout aus v0.86.4 reicht hier.
+
+### Notes
+- Die `Submitted`-Variante zählt für `is_success()` als true → Caller
+  sehen sofort den grünen Copy-Flash, bevor das echte Outcome kommt.
+- Worker-Thread ist nach Name auffindbar (`pthread_setname_np`-äquivalent
+  via `Thread::Builder::name`) — hilft beim Debugging mit `top -H`.
+
 ## Version 0.86.4 (30.04.2026)
 
 ### Fixed

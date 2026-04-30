@@ -200,7 +200,9 @@ fn run_clipboard_diag_cli() -> Result<()> {
 
     let test_marker = format!("workbench-diag-{}", std::process::id());
     println!("Roundtrip test (marker: {}):", test_marker);
-    let outcome = clipboard::copy_to_clipboard(&test_marker);
+    // Diag uses the synchronous path so the reported outcome is the
+    // real backend result — not the worker's `Submitted` placeholder.
+    let outcome = clipboard::copy_to_clipboard_sync(&test_marker);
     println!("  Copy backend:     {} ({:?})", outcome.label(), outcome);
     if matches!(outcome, ClipboardOutcome::Osc52) {
         println!("  Note: OSC 52 has no read path, skipping paste verification.");
