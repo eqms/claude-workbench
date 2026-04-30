@@ -1,5 +1,51 @@
 # Release Notes
 
+## Version 0.86.4 (30.04.2026)
+
+### Fixed
+- **Clipboard-Subprocess-Hänger unter XRDP** — Wahre Wurzel des "App
+  reagiert auf nichts mehr"-Symptoms: `xclip -selection clipboard -i`
+  und `xsel --clipboard --input` blockieren unter XRDP indefinit, wenn
+  die X11-Selection-Owner-Negotiation mit `xrdp-xorgxrdp` keinen
+  Empfänger findet. Da `copy_to_clipboard()` und `paste_from_clipboard()`
+  synchron im Main-Thread laufen, friert der gesamte Event-Loop ein
+  (kein Render, kein Tastatur-/Maus-Input) — passt zum Symptom
+  "Selektion bleibt, Esc/Pfeiltasten reagieren nicht". `--clipboard-diag`
+  hing aus demselben Grund im Roundtrip-Test. Diagnose-bestätigt durch
+  `^C`-Abbruch des Roundtrips.
+
+### Changed
+- **Subprocess-Timeout (500 ms) für alle Clipboard-Helper** —
+  `run_with_stdin()` und `run_capture()` in `src/clipboard.rs` nutzen
+  jetzt `wait_or_kill()`: Polling von `try_wait()` mit 20 ms-Intervall,
+  nach 500 ms wird der Child gekillt und gereapt. Statt sekundenlang zu
+  hängen, fällt die App jetzt sofort auf den nächsten Helper bzw. OSC 52
+  zurück. `stderr` wird auf `Stdio::null()` gestellt, um Pipe-Deadlocks
+  bei vollem stderr-Buffer zu verhindern.
+
+### Added
+- **`CLAUDE_WORKBENCH_CLIPBOARD`-ENV-Override** — Kill-Switch für
+  Sessions, in denen die X-Server-Clipboard-Negotiation komplett kaputt
+  ist:
+  - `CLAUDE_WORKBENCH_CLIPBOARD=osc52` → neue `ClipboardStrategy::Osc52Only`
+    überspringt arboard, xclip, xsel, wl-copy/-paste komplett. Copy
+    sendet ausschließlich OSC 52 ans Terminal (Kitty/XTerm/iTerm
+    übernehmen). Paste liefert `None` (OSC 52 hat keinen Read-Pfad).
+  - `CLAUDE_WORKBENCH_CLIPBOARD=arboard` / `subprocess` für manuelles
+    Strategy-Pinning, falls Auto-Detection daneben liegt.
+  - Unbekannte Werte fallen zurück auf Auto-Detection (warning-frei).
+- **`--clipboard-diag` zeigt ENV-Override** — Neuer "ENV override:"-Eintrag
+  in der Diag-Ausgabe. Hilft beim Erkennen, ob der User im Override-Modus
+  läuft.
+
+### Notes
+- v0.86.3 hat zwei Selection-Cleanup-Pfade hinzugefügt (Esc + Down(Left)
+  vorab-Clear), aber das war nicht das Hauptproblem — der UI-Freeze kam
+  vom hängenden xclip im Main-Thread. Beide Fixes bleiben aktiv und
+  nützlich, sobald das Subprocess-Timeout-Problem behoben ist.
+- Async-Clipboard im Worker-Thread (Main-Loop bleibt responsiv selbst
+  wenn der Helper die volle 500 ms wartet) ist für v0.87.0 vorgesehen.
+
 ## Version 0.86.3 (30.04.2026)
 
 ### Fixed

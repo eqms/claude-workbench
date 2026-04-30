@@ -17,10 +17,21 @@
 //! (xclip/xsel) write directly into the X11 selection, which xrdp-chansrv
 //! does forward.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
+
+/// Maximum time we wait for any clipboard helper subprocess (xclip/xsel/wl-*)
+/// to complete. Under XRDP, the X11 selection protocol can hang indefinitely
+/// when the X-server's clipboard owner negotiation never completes — without
+/// this timeout, every copy/paste call blocks the main event loop.
+const SUBPROCESS_TIMEOUT: Duration = Duration::from_millis(500);
+
+/// Poll-interval while waiting for a child to exit. Kept small so the
+/// observed wait time stays close to `SUBPROCESS_TIMEOUT`.
+const WAIT_POLL_INTERVAL: Duration = Duration::from_millis(20);
 
 /// Outcome of a copy attempt — which backend succeeded, or why all failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,7 +69,14 @@ pub enum ClipboardStrategy {
     /// X11/XRDP — prefer xclip/xsel over arboard to avoid wayland-data-control
     /// stalls in XRDP sessions.
     SubprocessFirst,
+    /// Force OSC 52 only — skip every X11/Wayland helper. Used when the
+    /// X-server's clipboard owner negotiation hangs (`CLAUDE_WORKBENCH_CLIPBOARD=osc52`).
+    Osc52Only,
 }
+
+/// ENV override that takes precedence over auto-detection.
+/// Set `CLAUDE_WORKBENCH_CLIPBOARD=osc52` to bypass xclip/xsel/wl-* entirely.
+pub const STRATEGY_ENV: &str = "CLAUDE_WORKBENCH_CLIPBOARD";
 
 static STRATEGY: OnceLock<ClipboardStrategy> = OnceLock::new();
 
@@ -67,6 +85,16 @@ fn strategy() -> ClipboardStrategy {
 }
 
 fn detect_strategy() -> ClipboardStrategy {
+    // ENV override has highest priority — used as kill-switch when the
+    // X-server hangs and subprocess timeouts still feel sluggish.
+    if let Ok(val) = std::env::var(STRATEGY_ENV) {
+        match val.trim().to_ascii_lowercase().as_str() {
+            "osc52" | "osc-52" | "osc_52" => return ClipboardStrategy::Osc52Only,
+            "arboard" => return ClipboardStrategy::ArboardFirst,
+            "subprocess" | "xclip" | "xsel" => return ClipboardStrategy::SubprocessFirst,
+            _ => {} // fall through to auto-detection on unknown values
+        }
+    }
     if cfg!(not(target_os = "linux")) {
         return ClipboardStrategy::ArboardFirst;
     }
@@ -116,25 +144,31 @@ pub fn copy_to_clipboard(text: &str) -> ClipboardOutcome {
         }
     };
 
-    if matches!(strategy(), ClipboardStrategy::ArboardFirst) {
-        if let Some(outcome) = try_arboard(&mut errors) {
+    let strat = strategy();
+
+    // Osc52Only: skip every X11/Wayland helper (the user opted out because
+    // the X-server hangs). Fall through to the OSC 52 emit below.
+    if !matches!(strat, ClipboardStrategy::Osc52Only) {
+        if matches!(strat, ClipboardStrategy::ArboardFirst) {
+            if let Some(outcome) = try_arboard(&mut errors) {
+                return outcome;
+            }
+        }
+
+        if let Some(outcome) = try_xclip_copy(text, &mut errors) {
             return outcome;
         }
-    }
-
-    if let Some(outcome) = try_xclip_copy(text, &mut errors) {
-        return outcome;
-    }
-    if let Some(outcome) = try_xsel_copy(text, &mut errors) {
-        return outcome;
-    }
-    if let Some(outcome) = try_wl_copy(text, &mut errors) {
-        return outcome;
-    }
-
-    if matches!(strategy(), ClipboardStrategy::SubprocessFirst) {
-        if let Some(outcome) = try_arboard(&mut errors) {
+        if let Some(outcome) = try_xsel_copy(text, &mut errors) {
             return outcome;
+        }
+        if let Some(outcome) = try_wl_copy(text, &mut errors) {
+            return outcome;
+        }
+
+        if matches!(strat, ClipboardStrategy::SubprocessFirst) {
+            if let Some(outcome) = try_arboard(&mut errors) {
+                return outcome;
+            }
         }
     }
 
@@ -152,6 +186,12 @@ pub fn copy_to_clipboard(text: &str) -> ClipboardOutcome {
 /// Returns `None` if every backend fails or yields empty text.
 pub fn paste_from_clipboard() -> Option<String> {
     let strategy = strategy();
+
+    // Osc52Only has no read path — return None so callers can fall back to
+    // their own behavior (e.g., refusing the F11 paste).
+    if matches!(strategy, ClipboardStrategy::Osc52Only) {
+        return None;
+    }
 
     let try_arboard = || -> Option<String> {
         let mut cb = arboard::Clipboard::new().ok()?;
@@ -233,37 +273,67 @@ fn try_wl_paste() -> Option<String> {
     run_capture("wl-paste", &["--no-newline"]).filter(|s| !s.is_empty())
 }
 
+/// Wait for `child` to exit, killing it if it does not finish within
+/// `SUBPROCESS_TIMEOUT`. Returns `Ok(status)` on clean exit, `Err(reason)`
+/// on timeout or wait error. After timeout, the child is killed and reaped
+/// to avoid zombies.
+fn wait_or_kill(child: &mut std::process::Child) -> Result<std::process::ExitStatus, String> {
+    let deadline = Instant::now() + SUBPROCESS_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("timeout ({} ms)", SUBPROCESS_TIMEOUT.as_millis()));
+                }
+                std::thread::sleep(WAIT_POLL_INTERVAL);
+            }
+            Err(e) => return Err(format!("wait: {}", e)),
+        }
+    }
+}
+
 fn run_with_stdin(cmd: &str, args: &[&str], input: &str) -> Result<(), String> {
     let mut child = Command::new(cmd)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("spawn: {}", e))?;
-    {
-        let mut stdin = child.stdin.take().ok_or("stdin unavailable")?;
+    if let Some(mut stdin) = child.stdin.take() {
         stdin
             .write_all(input.as_bytes())
             .map_err(|e| format!("write: {}", e))?;
+        // stdin closed on drop here so the child sees EOF and proceeds
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("wait: {}", e))?;
-    if output.status.success() {
+    let status = wait_or_kill(&mut child)?;
+    if status.success() {
         Ok(())
     } else {
-        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        Err(format!("exit {}: {}", output.status, err))
+        Err(format!("exit {}", status))
     }
 }
 
 fn run_capture(cmd: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(cmd).args(args).output().ok()?;
-    if !output.status.success() {
+    let mut child = Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let status = wait_or_kill(&mut child).ok()?;
+    if !status.success() {
         return None;
     }
-    Some(String::from_utf8_lossy(&output.stdout).into_owned())
+    let mut buf = Vec::new();
+    if let Some(mut stdout) = child.stdout.take() {
+        let _ = stdout.read_to_end(&mut buf);
+    }
+    Some(String::from_utf8_lossy(&buf).into_owned())
 }
 
 /// Send text to clipboard via OSC 52 escape sequence.
@@ -314,6 +384,7 @@ fn base64_encode(input: &str) -> String {
 #[derive(Debug, Clone)]
 pub struct ClipboardDiag {
     pub strategy: ClipboardStrategy,
+    pub strategy_env: Option<String>,
     pub xclip: Option<PathBuf>,
     pub xsel: Option<PathBuf>,
     pub wl_copy: Option<PathBuf>,
@@ -329,6 +400,7 @@ impl ClipboardDiag {
     pub fn collect() -> Self {
         Self {
             strategy: strategy(),
+            strategy_env: std::env::var(STRATEGY_ENV).ok(),
             xclip: which("xclip"),
             xsel: which("xsel"),
             wl_copy: which("wl-copy"),

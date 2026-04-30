@@ -107,6 +107,11 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.86.4
+
+- **Clipboard subprocess timeout (500 ms)** — Real root cause of the "app frozen, no key/mouse response" symptom on XRDP: `xclip -i` and `xsel -i` block indefinitely under XRDP when the X11 selection-owner negotiation never completes. Because copy/paste run synchronously in the main thread, the entire event loop froze. `run_with_stdin()` and `run_capture()` now wait at most 500 ms and kill the child on timeout, falling back to the next helper or OSC 52 instead of hanging.
+- **`CLAUDE_WORKBENCH_CLIPBOARD=osc52` kill-switch** — Forces the new `Osc52Only` strategy: skips arboard, xclip, xsel, wl-copy/-paste entirely and emits OSC 52 only. Use in sessions where the X-server clipboard is completely broken. Other accepted values: `arboard`, `subprocess`. `--clipboard-diag` shows the active override.
+
 ### What's New in v0.86.3
 
 - **XRDP/Kitty selection-freeze fix (left-click drag)** — Under XRDP, the RDP transport reliably swallows the `ButtonRelease` event when `EnableMouseCapture` is active, while `ButtonPress` and motion events come through. Result: `mouse_selection.selecting` stays `true`, the highlight visually freezes, and further clicks are interpreted as drag extensions. Two defensive fixes: **Esc** now cancels an active mouse selection (global handler, runs after modal dismissals), and a new `Down(Left)` event clears any stale selection before starting a fresh one — clicks on footer/scrollbar/modal areas no longer leave a frozen highlight behind. Complements v0.86.2 which only addressed right-click.
@@ -386,6 +391,11 @@ cd claude-workbench && cargo build --release
 | Rechtsklick | Paste aus System-Clipboard in Pane unter dem Cursor (entspricht Kittys `mouse_map right press paste`) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.86.4
+
+- **Clipboard-Subprocess-Timeout (500 ms)** — Wahre Ursache des "App reagiert auf nichts mehr"-Symptoms unter XRDP: `xclip -i` und `xsel -i` blockieren indefinit, wenn die X11-Selection-Owner-Negotiation keinen Empfänger findet. Da Copy/Paste synchron im Main-Thread laufen, fror der gesamte Event-Loop ein. `run_with_stdin()` und `run_capture()` warten jetzt maximal 500 ms und killen den Child bei Timeout — Fallback auf nächsten Helper bzw. OSC 52 statt Hänger.
+- **`CLAUDE_WORKBENCH_CLIPBOARD=osc52` Kill-Switch** — Erzwingt die neue `Osc52Only`-Strategy: arboard/xclip/xsel/wl-copy/-paste werden komplett übersprungen, ausschließlich OSC 52 ans Terminal. Für Sessions, in denen der X-Server-Clipboard komplett kaputt ist. Weitere Werte: `arboard`, `subprocess`. `--clipboard-diag` zeigt den aktiven Override.
 
 ### Neu in v0.86.3
 

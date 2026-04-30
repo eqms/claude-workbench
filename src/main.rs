@@ -161,6 +161,15 @@ fn run_clipboard_diag_cli() -> Result<()> {
 
     let diag = ClipboardDiag::collect();
     println!("Strategy:           {:?}", diag.strategy);
+    match &diag.strategy_env {
+        Some(v) if !v.is_empty() => {
+            println!("  ENV override:     {}={}", clipboard::STRATEGY_ENV, v)
+        }
+        _ => println!(
+            "  ENV override:     (unset — set {}=osc52 to bypass xclip/xsel)",
+            clipboard::STRATEGY_ENV
+        ),
+    }
     println!();
     println!("Helper binaries:");
     fn show(name: &str, path: &Option<std::path::PathBuf>) {
