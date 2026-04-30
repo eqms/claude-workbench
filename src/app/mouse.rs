@@ -147,6 +147,15 @@ impl App {
 
         match mouse.kind {
             MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                // XRDP-defensive: clear any stale selection from a prior
+                // interaction whose Up(Left) event may have been swallowed
+                // by the RDP transport. If the user clicks inside a pane,
+                // start() below will begin a fresh selection. If the click
+                // lands on a non-pane area (footer, scrollbar, modal),
+                // selecting stays false instead of leaving a frozen highlight.
+                if self.mouse_selection.selecting {
+                    self.mouse_selection.clear();
+                }
                 // Block all background interaction when any modal is open
                 // Update dialog - handle before other modals
                 if self.update_state.show_dialog {

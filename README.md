@@ -107,6 +107,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.86.3
+
+- **XRDP/Kitty selection-freeze fix (left-click drag)** — Under XRDP, the RDP transport reliably swallows the `ButtonRelease` event when `EnableMouseCapture` is active, while `ButtonPress` and motion events come through. Result: `mouse_selection.selecting` stays `true`, the highlight visually freezes, and further clicks are interpreted as drag extensions. Two defensive fixes: **Esc** now cancels an active mouse selection (global handler, runs after modal dismissals), and a new `Down(Left)` event clears any stale selection before starting a fresh one — clicks on footer/scrollbar/modal areas no longer leave a frozen highlight behind. Complements v0.86.2 which only addressed right-click.
+
 ### What's New in v0.86.2
 
 - **Right-click = Paste in PTY/Preview panes** — `EnableMouseCapture` was swallowing right-clicks, so Kitty's `mouse_map right press ungrabbed paste_from_clipboard` could never fire under XRDP. Right-click now uses the same fallback chain as F11 (arboard → xclip → xsel → wl-paste) and pastes into the pane under the cursor. If an Alt+drag mouse selection is active, right-click clears it instead — fixes the XRDP-only "screen blocked, selection won't go away" bug.
@@ -382,6 +386,10 @@ cd claude-workbench && cargo build --release
 | Rechtsklick | Paste aus System-Clipboard in Pane unter dem Cursor (entspricht Kittys `mouse_map right press paste`) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.86.3
+
+- **XRDP/Kitty Selection-Freeze Fix (Linksklick-Drag)** — Unter XRDP verschluckt das RDP-Backend bei aktivem `EnableMouseCapture` zuverlässig den `ButtonRelease`-Event, während `ButtonPress` und Bewegung durchkommen. Folge: `mouse_selection.selecting` bleibt `true`, der Highlight friert ein, weitere Klicks werden als Drag-Erweiterung interpretiert. Zwei defensive Fixes: **Esc** cancelt jetzt eine aktive Mausselektion (globaler Handler, greift nach Modal-Dismissals), und ein neues `Down(Left)` clearet stale Selection vorab — Klicks auf Footer/Scrollbar/Modal lassen keinen eingefrorenen Highlight mehr zurück. Ergänzt v0.86.2, das nur Rechtsklick adressierte.
 
 ### Neu in v0.86.2
 

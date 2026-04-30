@@ -64,6 +64,15 @@ impl App {
             return;
         }
 
+        // XRDP-defensive: Esc cancels a stuck mouse selection.
+        // Under XRDP/Kitty, ButtonRelease events for the left mouse button
+        // can be dropped by the RDP transport, leaving `selecting` true and
+        // the highlight visually frozen. Esc provides a manual escape hatch.
+        if key.code == KeyCode::Esc && self.mouse_selection.selecting {
+            self.mouse_selection.clear();
+            return;
+        }
+
         // Global shortcuts (F12/F10/F7/?/F9 variants, Ctrl+P/O/X/E, F8, Ctrl+Shift+W)
         if self.handle_global_shortcut(key) {
             return;

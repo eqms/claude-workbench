@@ -178,7 +178,7 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  Esc          ", Style::default().fg(Color::Cyan)),
-            Span::raw("Close Dialogs / Help"),
+            Span::raw("Close Dialogs / Help / cancel stuck mouse selection (XRDP)"),
         ]),
         Line::from(""),
         // Context Shortcuts

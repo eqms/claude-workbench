@@ -1,5 +1,37 @@
 # Release Notes
 
+## Version 0.86.3 (30.04.2026)
+
+### Fixed
+- **Eingefrorene Mausselektion unter XRDP/Kitty** — Selektionen per
+  Linksklick-Drag blieben nach dem Loslassen permanent stehen, der Pane
+  fror visuell ein und reagierte nicht mehr auf weitere Klicks. Ursache:
+  XRDPs RDP-Backend (`xrdp-xorgxrdp`) verschluckt bei aktivem
+  `EnableMouseCapture` zuverlässig den `ButtonRelease`-Event,
+  während `ButtonPress` und `ButtonMotion` durchkommen. Der Inhalt landet
+  zwar korrekt in der Zwischenablage (Drag-Update läuft), aber
+  `mouse_selection.selecting` bleibt `true`, weil `clear()` nur im
+  `Up(Left)`-Match-Arm aufgerufen wird. Folge: Jeder weitere Klick wird
+  als Drag-Erweiterung interpretiert, der Pane scheint blockiert. v0.86.2
+  hatte das nur für Rechtsklick adressiert; Linksklick-Selektion blieb
+  betroffen. Tritt nicht in nativen Shells (iTerm, Kitty lokal) auf — dort
+  liefert das OS Up-Events zuverlässig.
+
+### Added
+- **Esc cancelt aktive Mausselektion** — Globaler Tasten-Handler in
+  `src/app/keyboard.rs` ruft `mouse_selection.clear()` auf, wenn Esc
+  gedrückt wird und `selecting=true` ist. Modal-Handler (Help, Settings,
+  Dialoge etc.) werden nicht beeinflusst, da der Esc-Selection-Cancel
+  erst nach allen Modal-Returns greift.
+
+### Changed
+- **`Down(Left)` clearet stale Selection vorab** — In `src/app/mouse.rs`
+  wird beim Empfang eines neuen Linksklick-Down-Events zuerst eine
+  hängengebliebene Selection geclearet, bevor (ggf.) eine neue gestartet
+  wird. Klickt der User in einen Pane, beginnt `start()` direkt eine
+  frische Selektion. Klickt er auf Footer, Scrollbar oder Modal,
+  bleibt `selecting=false` zurück — kein eingefrorener Highlight mehr.
+
 ## Version 0.86.2 (29.04.2026)
 
 ### Fixed
