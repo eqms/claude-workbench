@@ -24,6 +24,8 @@ pub struct Config {
     pub claude: ClaudeConfig,
     #[serde(default)]
     pub document: DocumentConfig,
+    #[serde(default)]
+    pub ssh: SshConfig,
 }
 
 /// PTY configuration for all terminal panes
@@ -163,6 +165,39 @@ fn default_show_permission_dialog() -> bool {
     true
 }
 
+/// SSH-specific configuration.
+///
+/// Activates when `clipboard::is_ssh_session()` reports true. Image paste in
+/// the Claude pane (`Ctrl+V`) cannot read the upstream Mac/Windows pasteboard
+/// over an SSH PTY — the workbench surfaces this via a one-time footer hint
+/// and offers `cc-clip` (https://github.com/ShunmeiCho/cc-clip) as a tested
+/// integration path.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SshConfig {
+    /// Enable SSH-specific behavior (footer hint, wizard step). Defaults to
+    /// true; users can opt out via Settings if false-positives appear.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Optional override path to the `cc-clip` binary used for image paste
+    /// over SSH. `None` lets the workbench fall back to a `$PATH` lookup.
+    #[serde(default)]
+    pub image_paste_helper: Option<String>,
+    /// Persisted flag: once the user has seen the SSH paste hint, do not
+    /// flash it again. Reset via Settings → SSH.
+    #[serde(default)]
+    pub notification_dismissed: bool,
+}
+
+impl Default for SshConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            image_paste_helper: None,
+            notification_dismissed: false,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TerminalConfig {
     pub shell_path: String,
@@ -255,6 +290,7 @@ impl Default for Config {
             setup: SetupConfig::default(),
             claude: ClaudeConfig::default(),
             document: DocumentConfig::default(),
+            ssh: SshConfig::default(),
         }
     }
 }

@@ -55,6 +55,13 @@ struct Args {
     /// variables, and runs a copy/paste roundtrip test.
     #[arg(long)]
     clipboard_diag: bool,
+
+    /// Diagnose SSH image-paste readiness and exit (without starting TUI).
+    /// Reports SSH session state, presence of the `cc-clip` helper on
+    /// `$PATH`, and TCP reachability of the cc-clip daemon port (9998).
+    /// Use when image paste in the Claude pane fails over SSH from a Mac.
+    #[arg(long)]
+    ssh_paste_diag: bool,
 }
 
 /// Run update check from CLI and exit
@@ -230,6 +237,71 @@ fn run_clipboard_diag_cli() -> Result<()> {
     Ok(())
 }
 
+/// Run SSH-image-paste diagnostic from CLI and exit.
+///
+/// Three checks:
+///  1. SSH session detection (`SSH_TTY` / `SSH_CONNECTION`).
+///  2. `cc-clip` binary on `$PATH`.
+///  3. TCP reachability of the cc-clip daemon on `127.0.0.1:9998` —
+///     when set up correctly the user runs `ssh -R 9998:localhost:9998`
+///     so the remote port forwards to the Mac-side daemon.
+fn run_ssh_paste_diag_cli() -> Result<()> {
+    use std::net::{SocketAddr, TcpStream};
+    use std::time::Duration;
+
+    println!(
+        "claude-workbench v{} — SSH image-paste diagnostic",
+        env!("CARGO_PKG_VERSION")
+    );
+    println!();
+
+    // 1. SSH session detection
+    let in_ssh = clipboard::is_ssh_session();
+    println!("SSH session:");
+    if in_ssh {
+        println!("  ✓ detected (SSH_TTY or SSH_CONNECTION set)");
+    } else {
+        println!("  ✗ not detected — these settings only matter when running over SSH");
+    }
+    if let Ok(v) = std::env::var("SSH_TTY") {
+        println!("    SSH_TTY        = {}", v);
+    }
+    if let Ok(v) = std::env::var("SSH_CONNECTION") {
+        println!("    SSH_CONNECTION = {}", v);
+    }
+    println!();
+
+    // 2. cc-clip on PATH
+    println!("cc-clip helper:");
+    match clipboard::which("cc-clip") {
+        Some(p) => println!("  ✓ found: {}", p.display()),
+        None => {
+            println!("  ✗ not on $PATH");
+            println!("    Install on this host:  cargo install cc-clip");
+            println!("    Project page:           https://github.com/ShunmeiCho/cc-clip");
+        }
+    }
+    println!();
+
+    // 3. cc-clip daemon port reachability (the daemon runs on the Mac;
+    //    `ssh -R 9998:localhost:9998` exposes it on this host).
+    println!("Daemon reachability (127.0.0.1:9998):");
+    let addr: SocketAddr = "127.0.0.1:9998".parse().expect("hardcoded address parses");
+    match TcpStream::connect_timeout(&addr, Duration::from_millis(500)) {
+        Ok(_) => println!("  ✓ port 9998 reachable — daemon or reverse-tunnel is up"),
+        Err(e) => {
+            println!("  ✗ port 9998 unreachable: {}", e);
+            println!("    On your Mac:    start the cc-clip daemon");
+            println!("    ~/.ssh/config:  RemoteForward 9998 localhost:9998");
+        }
+    }
+    println!();
+    println!("If all three checks pass, image paste in the Claude pane");
+    println!("(Ctrl+V) will route through cc-clip and inject the image path.");
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     // Parse args early - before tokio runtime
     let args = Args::parse();
@@ -253,6 +325,11 @@ fn main() -> Result<()> {
     // Handle --clipboard-diag CLI mode (exit without starting TUI)
     if args.clipboard_diag {
         return run_clipboard_diag_cli();
+    }
+
+    // Handle --ssh-paste-diag CLI mode (exit without starting TUI)
+    if args.ssh_paste_diag {
+        return run_ssh_paste_diag_cli();
     }
 
     // Run the async main with tokio runtime

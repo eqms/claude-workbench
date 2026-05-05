@@ -259,6 +259,52 @@ When copying to Claude, output is automatically filtered:
 - Prompts to pull if remote is ahead
 - Color-coded file status in file browser
 
+### SSH Image Paste
+
+When you connect from a Mac via SSH (e.g. iTerm2 → Linux server) and run
+claude-workbench remotely, **text paste (`Cmd+V`) works** but **image paste
+(`Ctrl+V`)** in the Claude pane does **not** — Claude Code on the remote
+host can only see the local Linux clipboard, not your Mac pasteboard.
+
+claude-workbench detects this scenario and integrates with
+[`cc-clip`](https://github.com/ShunmeiCho/cc-clip), an external bridge that
+forwards images from your Mac pasteboard to the remote host over an SSH
+reverse tunnel.
+
+**Setup (one-time):**
+
+```bash
+# 1. On your Mac
+brew install shunmeicho/tap/cc-clip
+cc-clip-daemon &     # or as a LaunchAgent
+
+# 2. ~/.ssh/config (Mac side)
+Host my-server
+    RemoteForward 9998 localhost:9998
+
+# 3. On the remote server
+cargo install cc-clip
+```
+
+**Verification:**
+
+```bash
+claude-workbench --ssh-paste-diag
+```
+
+The diagnostic checks (1) SSH session detection, (2) `cc-clip` on `$PATH`,
+and (3) reverse-tunnel reachability of port 9998. All three must pass for
+image paste to work.
+
+**Behavior in the TUI:**
+
+- The first `Ctrl+V` in the Claude pane during an SSH session triggers a
+  one-time yellow footer hint pointing here.
+- The wizard (first run) shows an SSH-specific step with detection status
+  and setup instructions when started over SSH.
+- Settings (F8) → SSH lets you toggle the feature, override the helper
+  path, or reset the dismissed-hint flag.
+
 ---
 
 <a name="deutsch"></a>
@@ -515,3 +561,50 @@ Beim Kopieren zu Claude wird die Ausgabe automatisch gefiltert:
 - Automatische Prüfung auf Remote-Änderungen beim Repository-Wechsel
 - Aufforderung zum Pullen wenn Remote voraus ist
 - Farbcodierte Dateistatus im Dateibrowser
+
+### Bild-Paste über SSH
+
+Wenn Du Dich von einem Mac via SSH (z. B. iTerm2 → Linux-Server) verbindest
+und claude-workbench dort startest, funktioniert **Text-Paste (`Cmd+V`)**
+problemlos, aber **Bild-Paste (`Ctrl+V`)** im Claude-Pane **nicht** —
+Claude Code auf dem Server liest nur das lokale Linux-Clipboard, nicht
+das Mac-Pasteboard.
+
+claude-workbench erkennt diese Situation und integriert mit
+[`cc-clip`](https://github.com/ShunmeiCho/cc-clip), einer externen Bridge
+die Bilder vom Mac-Pasteboard über einen SSH-Reverse-Tunnel zum Server
+überträgt.
+
+**Einmaliges Setup:**
+
+```bash
+# 1. Auf dem Mac
+brew install shunmeicho/tap/cc-clip
+cc-clip-daemon &     # oder als LaunchAgent
+
+# 2. ~/.ssh/config (Mac-Seite)
+Host mein-server
+    RemoteForward 9998 localhost:9998
+
+# 3. Auf dem Server
+cargo install cc-clip
+```
+
+**Verifikation:**
+
+```bash
+claude-workbench --ssh-paste-diag
+```
+
+Die Diagnose prüft (1) SSH-Session-Erkennung, (2) `cc-clip` auf `$PATH`
+und (3) Reverse-Tunnel-Erreichbarkeit von Port 9998. Alle drei müssen
+grün sein, damit Bild-Paste funktioniert.
+
+**Verhalten im TUI:**
+
+- Beim ersten `Ctrl+V` im Claude-Pane während einer SSH-Session erscheint
+  ein einmaliger gelber Footer-Hinweis mit Verweis auf diese Doku.
+- Der Setup-Wizard (Erststart) zeigt einen SSH-spezifischen Schritt mit
+  Detection-Status und Setup-Anleitung, sofern er über SSH läuft.
+- Einstellungen (F8) → SSH erlauben das Feature zu deaktivieren, den
+  Helper-Pfad zu überschreiben oder den Hinweis-Status zurückzusetzen.

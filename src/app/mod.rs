@@ -5,6 +5,7 @@ mod git_ops;
 mod keyboard;
 mod mouse;
 mod pty;
+mod ssh_paste;
 mod update;
 
 use anyhow::Result;
@@ -145,6 +146,12 @@ pub struct App {
     pub clipboard_warning: Option<(String, std::time::Instant)>,
     /// Whether the user dismissed the clipboard warning banner.
     pub clipboard_warning_dismissed: bool,
+    /// One-time footer hint shown when the user presses Ctrl+V in the Claude
+    /// pane during an SSH session. Image paste cannot work over an SSH PTY
+    /// without a helper such as `cc-clip`. Auto-hides after 10 s. Triggering
+    /// this hint also flips `config.ssh.notification_dismissed` to `true` so
+    /// the user is not reminded again.
+    pub ssh_image_paste_hint: Option<(String, std::time::Instant)>,
     /// Cached dependency report for F12 help and clipboard status display.
     pub dependency_report: crate::setup::DependencyReport,
     // Temp files created for browser previews (cleaned up on exit)
@@ -332,6 +339,7 @@ impl App {
             clipboard_error_flash: None,
             clipboard_warning: None,
             clipboard_warning_dismissed: false,
+            ssh_image_paste_hint: None,
             dependency_report: crate::setup::DependencyReport::default(),
             temp_preview_files: Vec::new(),
             export_chooser: crate::types::ExportChooserState::default(),

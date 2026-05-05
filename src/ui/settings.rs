@@ -18,6 +18,7 @@ pub enum SettingsCategory {
     Layout,
     Paths,
     Document,
+    Ssh,
     About,
 }
 
@@ -28,6 +29,7 @@ impl SettingsCategory {
             SettingsCategory::Layout,
             SettingsCategory::Paths,
             SettingsCategory::Document,
+            SettingsCategory::Ssh,
             SettingsCategory::About,
         ]
     }
@@ -38,6 +40,7 @@ impl SettingsCategory {
             SettingsCategory::Layout => "Layout",
             SettingsCategory::Paths => "Paths",
             SettingsCategory::Document => "Document",
+            SettingsCategory::Ssh => "SSH",
             SettingsCategory::About => "About",
         }
     }
@@ -47,7 +50,8 @@ impl SettingsCategory {
             SettingsCategory::General => SettingsCategory::Layout,
             SettingsCategory::Layout => SettingsCategory::Paths,
             SettingsCategory::Paths => SettingsCategory::Document,
-            SettingsCategory::Document => SettingsCategory::About,
+            SettingsCategory::Document => SettingsCategory::Ssh,
+            SettingsCategory::Ssh => SettingsCategory::About,
             SettingsCategory::About => SettingsCategory::General,
         }
     }
@@ -58,7 +62,8 @@ impl SettingsCategory {
             SettingsCategory::Layout => SettingsCategory::General,
             SettingsCategory::Paths => SettingsCategory::Layout,
             SettingsCategory::Document => SettingsCategory::Paths,
-            SettingsCategory::About => SettingsCategory::Document,
+            SettingsCategory::Ssh => SettingsCategory::Document,
+            SettingsCategory::About => SettingsCategory::Ssh,
         }
     }
 }
@@ -104,6 +109,10 @@ pub enum SettingsField {
     DocTableBorder,
     DocPageSize,
     DocPageMargin,
+    // SSH
+    SshEnabled,
+    SshHelperPath,
+    ResetSshHint, // Action item, not editable directly — toggles dismissed flag
 }
 
 // ── Dropdown types ─────────────────────────────────────────────────────
@@ -195,6 +204,10 @@ pub struct SettingsState {
     pub doc_table_border: String,
     pub doc_page_size: String,
     pub doc_page_margin: String,
+    // SSH settings (cached editable copies)
+    pub ssh_enabled: bool,
+    pub ssh_helper_path: String,
+    pub ssh_notification_dismissed: bool,
 
     // App detection (cached)
     pub dropdown: Option<AppDropdownState>,
@@ -248,6 +261,9 @@ impl Default for SettingsState {
             doc_table_border: "#999999".to_string(),
             doc_page_size: "A4".to_string(),
             doc_page_margin: "2.5cm".to_string(),
+            ssh_enabled: true,
+            ssh_helper_path: String::new(),
+            ssh_notification_dismissed: false,
             dropdown: None,
             detected_browsers: Vec::new(),
             detected_editors: Vec::new(),
@@ -308,6 +324,10 @@ impl SettingsState {
         self.doc_table_border = config.document.colors.table_border.clone();
         self.doc_page_size = config.document.pdf.page_size.clone();
         self.doc_page_margin = config.document.pdf.margin.clone();
+        // SSH
+        self.ssh_enabled = config.ssh.enabled;
+        self.ssh_helper_path = config.ssh.image_paste_helper.clone().unwrap_or_default();
+        self.ssh_notification_dismissed = config.ssh.notification_dismissed;
         self.has_changes = false;
     }
 
@@ -347,6 +367,14 @@ impl SettingsState {
         config.document.colors.table_border = self.doc_table_border.clone();
         config.document.pdf.page_size = self.doc_page_size.clone();
         config.document.pdf.margin = self.doc_page_margin.clone();
+        // SSH
+        config.ssh.enabled = self.ssh_enabled;
+        config.ssh.image_paste_helper = if self.ssh_helper_path.is_empty() {
+            None
+        } else {
+            Some(self.ssh_helper_path.clone())
+        };
+        config.ssh.notification_dismissed = self.ssh_notification_dismissed;
     }
 
     pub fn open(&mut self, config: &Config) {
@@ -388,6 +416,7 @@ impl SettingsState {
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
             SettingsCategory::Paths => 5,   // claude, lazygit, browser, external_editor, export_dir
             SettingsCategory::Document => 19,
+            SettingsCategory::Ssh => 3, // enabled, helper path, reset hint
             SettingsCategory::About => 0,
         }
     }
@@ -458,6 +487,12 @@ impl SettingsState {
                 18 => Some(SettingsField::DocPageMargin),
                 _ => None,
             },
+            SettingsCategory::Ssh => match self.selected_idx {
+                0 => Some(SettingsField::SshEnabled),
+                1 => Some(SettingsField::SshHelperPath),
+                2 => Some(SettingsField::ResetSshHint),
+                _ => None,
+            },
             _ => None,
         };
 
@@ -470,6 +505,18 @@ impl SettingsState {
                 }
                 SettingsField::ExternalEditor => {
                     self.open_editor_dropdown();
+                    return;
+                }
+                // SSH bool/action fields toggle in place — no text editor.
+                SettingsField::SshEnabled => {
+                    self.ssh_enabled = !self.ssh_enabled;
+                    self.has_changes = true;
+                    return;
+                }
+                SettingsField::ResetSshHint => {
+                    // Reset = "show the hint again next time".
+                    self.ssh_notification_dismissed = false;
+                    self.has_changes = true;
                     return;
                 }
                 _ => {}
@@ -507,9 +554,13 @@ impl SettingsState {
                 SettingsField::DocTableBorder => self.doc_table_border.clone(),
                 SettingsField::DocPageSize => self.doc_page_size.clone(),
                 SettingsField::DocPageMargin => self.doc_page_margin.clone(),
+                SettingsField::SshHelperPath => self.ssh_helper_path.clone(),
                 SettingsField::Browser | SettingsField::ExternalEditor => unreachable!(),
                 SettingsField::CheckForUpdates => {
                     unreachable!("CheckForUpdates is an action, not a field")
+                }
+                SettingsField::SshEnabled | SettingsField::ResetSshHint => {
+                    unreachable!("SSH toggles handled inline above")
                 }
             };
             self.editing = Some(f);
@@ -721,7 +772,9 @@ impl SettingsState {
                 SettingsField::DocTableBorder => self.doc_table_border = value,
                 SettingsField::DocPageSize => self.doc_page_size = value,
                 SettingsField::DocPageMargin => self.doc_page_margin = value,
+                SettingsField::SshHelperPath => self.ssh_helper_path = value,
                 SettingsField::CheckForUpdates => {} // Action, not a field to edit
+                SettingsField::SshEnabled | SettingsField::ResetSshHint => {} // Toggled inline above
             }
             self.has_changes = true;
             self.input_buffer.clear();
@@ -802,12 +855,88 @@ fn render_category_tabs(frame: &mut Frame, area: Rect, state: &SettingsState) {
     frame.render_widget(tabs_widget, area);
 }
 
+fn render_ssh(frame: &mut Frame, area: Rect, state: &SettingsState) {
+    let chunks = Layout::vertical([
+        Constraint::Length(3), // detection banner
+        Constraint::Length(1),
+        Constraint::Min(1), // settings list
+    ])
+    .split(area);
+
+    // Live SSH-session detection banner. Helps the user understand when
+    // the settings actually take effect.
+    let detected = crate::clipboard::is_ssh_session();
+    let banner_text = if detected {
+        Line::from(vec![Span::styled(
+            "  \u{2713} SSH session detected — image-paste hint is active.",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )])
+    } else {
+        Line::from(vec![Span::styled(
+            "  ℹ Not in an SSH session — these settings only apply when running over SSH.",
+            Style::default().fg(Color::DarkGray),
+        )])
+    };
+    let banner = Paragraph::new(vec![Line::from(""), banner_text]);
+    frame.render_widget(banner, chunks[0]);
+
+    // Settings list (3 items): Enabled, Helper Path, Reset hint
+    let helper_display = if state.ssh_helper_path.is_empty() {
+        "(auto-detect on $PATH)".to_string()
+    } else {
+        state.ssh_helper_path.clone()
+    };
+    let dismissed_display = if state.ssh_notification_dismissed {
+        "dismissed (Enter to reset)"
+    } else {
+        "active — will fire on next Ctrl+V"
+    };
+
+    let items: Vec<ListItem> = [
+        ("SSH features enabled", state.ssh_enabled.to_string()),
+        ("cc-clip helper path", helper_display),
+        ("Image-paste hint state", dismissed_display.to_string()),
+    ]
+    .iter()
+    .enumerate()
+    .map(|(i, (label, value))| {
+        let style = if i == state.selected_idx {
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+        };
+        let editing_marker = if state
+            .editing
+            .as_ref()
+            .is_some_and(|f| matches!(f, SettingsField::SshHelperPath if i == 1))
+        {
+            format!(" [editing: {}]", state.input_buffer)
+        } else {
+            String::new()
+        };
+        ListItem::new(Line::from(vec![
+            Span::styled(format!("  {:24}: ", label), style),
+            Span::styled(format!("{}{}", value, editing_marker), style),
+        ]))
+    })
+    .collect();
+
+    let list = List::new(items).block(Block::default());
+    frame.render_widget(list, chunks[2]);
+}
+
 fn render_category_content(frame: &mut Frame, area: Rect, state: &SettingsState) {
     match state.category {
         SettingsCategory::General => render_general(frame, area, state),
         SettingsCategory::Layout => render_layout(frame, area, state),
         SettingsCategory::Paths => render_paths(frame, area, state),
         SettingsCategory::Document => render_document(frame, area, state),
+        SettingsCategory::Ssh => render_ssh(frame, area, state),
         SettingsCategory::About => render_about(frame, area),
     }
 }

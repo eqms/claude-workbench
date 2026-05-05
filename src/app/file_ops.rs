@@ -622,6 +622,16 @@ impl App {
                     self.wizard.start_editing(field);
                 }
             }
+            KeyCode::Char('m') | KeyCode::Char('M') => {
+                // Toggle "mark as configured" on the SSH image-paste step.
+                // Persisted by `generate_config()` as
+                // `config.ssh.notification_dismissed = true` so the runtime
+                // hint stays silent.
+                if self.wizard.step == WizardStep::SshImagePaste {
+                    self.wizard.ssh_image_paste_marked_configured =
+                        !self.wizard.ssh_image_paste_marked_configured;
+                }
+            }
             _ => {}
         }
     }

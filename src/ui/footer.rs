@@ -63,6 +63,9 @@ pub struct Footer {
     pub clipboard_error: Option<String>,
     /// Persistent warning banner for missing clipboard helpers (10 s, yellow).
     pub clipboard_warning: Option<String>,
+    /// One-time hint shown after Ctrl+V in the Claude pane during an SSH
+    /// session (10 s, yellow). Explains that image paste needs a helper.
+    pub ssh_image_paste_hint: Option<String>,
 }
 
 /// Format current date/time for footer display
@@ -126,6 +129,7 @@ impl Default for Footer {
             preview_maximized: false,
             clipboard_error: None,
             clipboard_warning: None,
+            ssh_image_paste_hint: None,
         }
     }
 }
@@ -339,6 +343,26 @@ impl Widget for Footer {
                 ),
                 Span::styled(
                     format!(" \u{26A0} {} ", msg),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
+        } else if let Some(ref msg) = self.ssh_image_paste_hint {
+            // One-shot hint for image paste over SSH — yellow ℹ
+            use ratatui::style::Modifier;
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    format!(" \u{2139} {} ", msg),
                     Style::default()
                         .fg(Color::Black)
                         .bg(Color::Yellow)

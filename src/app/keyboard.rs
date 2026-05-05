@@ -1276,6 +1276,26 @@ impl App {
             }
         }
 
+        // SSH image-paste hint: Ctrl+V in the Claude pane during an SSH
+        // session cannot reach the upstream Mac/Windows pasteboard. We
+        // flash a one-time hint and persist `notification_dismissed` so
+        // the user is not nagged again. The keystroke is *not* consumed —
+        // `map_key_to_pty()` below still forwards 0x16 so the Claude CLI's
+        // own paste path keeps its current behavior.
+        //
+        // Cmd+V (SUPER) on macOS is excluded because iTerm2 intercepts it
+        // locally and forwards a bracketed-paste sequence rather than 0x16.
+        if matches!(self.active_pane, PaneId::Claude)
+            && key.code == KeyCode::Char('v')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && !key.modifiers.contains(KeyModifiers::SUPER)
+            && self.config.ssh.enabled
+            && !self.config.ssh.notification_dismissed
+            && crate::clipboard::is_ssh_session()
+        {
+            self.show_ssh_image_paste_hint();
+        }
+
         if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
             if key.modifiers.contains(KeyModifiers::SHIFT) {
                 match key.code {

@@ -1,5 +1,66 @@
 # Release Notes
 
+## Version 0.88.0 (05.05.2026)
+
+### Added
+- **SSH image-paste hint + cc-clip integration** — Adresses the long-standing
+  pain point that `Ctrl+V` (image paste) in the Claude pane silently fails
+  when claude-workbench runs on a remote Linux host reached over SSH from a
+  Mac. The remote Claude CLI reads the local X11 clipboard, which does not
+  contain the Mac pasteboard image, so the keystroke ends in nothing.
+  - New helper `clipboard::is_ssh_session()` checks `SSH_TTY` /
+    `SSH_CONNECTION` (cached via `OnceLock`).
+  - New `App` field `ssh_image_paste_hint: Option<(String, Instant)>` and
+    matching `Footer` rendering branch (10 s, yellow ℹ banner, identical
+    look to the existing `clipboard_warning` flash).
+  - `Ctrl+V` in the Claude pane during an SSH session triggers the hint
+    *once*; the keystroke is not consumed (`0x16` still flows to the PTY
+    so the Claude CLI's own paste path is unchanged).
+  - Persisted dismissed flag (`config.ssh.notification_dismissed`) silences
+    the hint on subsequent presses; resettable from Settings.
+- **Wizard step `SshImagePaste`** — Conditionally rendered between
+  `ClaudeConfig` and `Confirmation` when `is_ssh_session()` returns true.
+  Shows live `cc-clip` detection (`$PATH` lookup) and a 4-line setup
+  recipe (`brew install shunmeicho/tap/cc-clip`, daemon, `~/.ssh/config`
+  RemoteForward, `cargo install cc-clip`). The "[m] mark as configured"
+  shortcut persists `notification_dismissed = true` via `generate_config()`.
+  Total step count adapts dynamically (5 vs 6).
+- **Settings category `SSH`** (F8 → Tab to "SSH") with three items:
+  enable/disable toggle, helper-path override, and reset-hint action.
+  Live banner shows whether the current process is in an SSH session.
+- **`--ssh-paste-diag` CLI flag** — Stderr-only diagnostic before the TUI
+  starts. Reports SSH-session detection (`SSH_TTY` / `SSH_CONNECTION`),
+  `cc-clip` on `$PATH`, and TCP reachability of `127.0.0.1:9998` (the
+  `ssh -R 9998:localhost:9998` reverse tunnel target). Pattern mirrors
+  `--clipboard-diag`.
+- **`SshConfig` struct** in `config.rs` with serde-default forward-compat:
+  fields `enabled`, `image_paste_helper: Option<String>`,
+  `notification_dismissed`. Old config files without an `ssh:` section
+  load cleanly.
+- **8 new unit tests**: 5 for `detect_ssh_session()` (env-var matrix,
+  empty-string handling, no-panic guard), 3 for the SSH wizard step
+  (chain wiring, mark-configured persistence, default not persisted).
+  Total now **111 unit + 3 integration = 114 tests**.
+
+### Architecture notes
+
+- New submodule `src/app/ssh_paste.rs` keeps SSH-specific App glue
+  isolated from the core keyboard router. The flash-trigger method
+  `App::show_ssh_image_paste_hint()` lives there.
+- claude-workbench cannot modify Claude Code (separate Anthropic CLI),
+  so the integration deliberately stops at "detect, hint, recommend
+  cc-clip". OSC 5522 (Kitty image-clipboard protocol) is intentionally
+  not implemented — iTerm2 does not support it on the Mac side.
+
+### Why cc-clip?
+
+cc-clip is a small, focused, well-maintained external tool that solves
+the SSH pasteboard-bridge problem cleanly: a daemon on the Mac reads
+the pasteboard, an SSH `RemoteForward` exposes the daemon's TCP socket
+on the remote host, and the `cc-clip` client on the server fetches the
+image. Bundling the same logic into claude-workbench would duplicate
+maintenance burden for very narrow win.
+
 ## Version 0.87.0 (30.04.2026)
 
 ### Added

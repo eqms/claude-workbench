@@ -164,6 +164,13 @@ impl App {
                 .map(|(msg, _)| msg.clone())
         };
 
+        // SSH image paste hint (10 s, one-shot).
+        let ssh_image_paste_hint = self
+            .ssh_image_paste_hint
+            .as_ref()
+            .filter(|(_, t)| t.elapsed().as_secs() < 10)
+            .map(|(msg, _)| msg.clone());
+
         if footer.height > 0 {
             let footer_widget = ui::footer::Footer {
                 active_pane: self.active_pane,
@@ -178,6 +185,7 @@ impl App {
                 preview_maximized: self.preview_maximized,
                 clipboard_error,
                 clipboard_warning,
+                ssh_image_paste_hint,
             };
             frame.render_widget(footer_widget, footer);
         }

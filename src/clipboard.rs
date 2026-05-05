@@ -128,6 +128,33 @@ pub fn which(name: &str) -> Option<PathBuf> {
     None
 }
 
+static IS_SSH: OnceLock<bool> = OnceLock::new();
+
+/// Detect whether the current process runs inside an SSH session.
+///
+/// Checks `SSH_TTY` (set on every interactive SSH login) and
+/// `SSH_CONNECTION` (set whenever sshd forwards a session). Result is
+/// cached for the lifetime of the process — env-vars do not change at
+/// runtime, and callers may invoke this on the hot path (per keystroke).
+pub fn is_ssh_session() -> bool {
+    *IS_SSH.get_or_init(|| {
+        detect_ssh_session(
+            std::env::var_os("SSH_TTY").as_deref(),
+            std::env::var_os("SSH_CONNECTION").as_deref(),
+        )
+    })
+}
+
+/// Pure detection helper for testing — no env access, no caching.
+fn detect_ssh_session(
+    ssh_tty: Option<&std::ffi::OsStr>,
+    ssh_connection: Option<&std::ffi::OsStr>,
+) -> bool {
+    // Empty strings count as unset (some shells export empty defaults).
+    let nonempty = |v: Option<&std::ffi::OsStr>| v.map(|s| !s.is_empty()).unwrap_or(false);
+    nonempty(ssh_tty) || nonempty(ssh_connection)
+}
+
 // =====================================================================
 // Worker thread — runs all clipboard subprocess calls off the main loop.
 // =====================================================================
@@ -552,5 +579,35 @@ mod tests {
             diag.strategy,
             ClipboardStrategy::ArboardFirst | ClipboardStrategy::SubprocessFirst
         ));
+    }
+
+    #[test]
+    fn test_detect_ssh_session_unset() {
+        assert!(!detect_ssh_session(None, None));
+    }
+
+    #[test]
+    fn test_detect_ssh_session_only_ssh_tty() {
+        let tty = std::ffi::OsString::from("/dev/pts/3");
+        assert!(detect_ssh_session(Some(&tty), None));
+    }
+
+    #[test]
+    fn test_detect_ssh_session_only_ssh_connection() {
+        let conn = std::ffi::OsString::from("10.0.0.1 51234 10.0.0.2 22");
+        assert!(detect_ssh_session(None, Some(&conn)));
+    }
+
+    #[test]
+    fn test_detect_ssh_session_empty_strings() {
+        let empty = std::ffi::OsString::from("");
+        assert!(!detect_ssh_session(Some(&empty), Some(&empty)));
+    }
+
+    #[test]
+    fn test_is_ssh_session_does_not_panic() {
+        // Cached result is whatever the test harness sees; just ensure
+        // the call path is sound on every platform.
+        let _ = is_ssh_session();
     }
 }

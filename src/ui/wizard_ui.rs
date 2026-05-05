@@ -24,12 +24,13 @@ pub fn render(frame: &mut Frame, area: Rect, state: &WizardState) {
     // Clear background
     frame.render_widget(Clear, popup_area);
 
-    // Build title with step indicator
+    // Build title with step indicator. Step counts are dynamic — the SSH
+    // image-paste step only appears when running over SSH.
     let title = format!(
         " {} - Step {}/{} ",
         state.step.title(),
-        state.step.step_number(),
-        WizardStep::total_steps()
+        state.current_step_number(),
+        state.total_steps()
     );
 
     let block = Block::default()
@@ -46,6 +47,7 @@ pub fn render(frame: &mut Frame, area: Rect, state: &WizardState) {
         WizardStep::Dependencies => render_dependencies(frame, inner, state),
         WizardStep::ShellSelection => render_shell_selection(frame, inner, state),
         WizardStep::ClaudeConfig => render_claude_config(frame, inner, state),
+        WizardStep::SshImagePaste => render_ssh_image_paste(frame, inner, state),
         WizardStep::Confirmation => render_confirmation(frame, inner, state),
         WizardStep::Complete => render_complete(frame, inner),
     }
@@ -453,6 +455,98 @@ fn render_complete(frame: &mut Frame, area: Rect) {
     ])
     .alignment(ratatui::layout::Alignment::Center);
     frame.render_widget(content, area);
+}
+
+fn render_ssh_image_paste(frame: &mut Frame, area: Rect, state: &WizardState) {
+    let chunks = Layout::vertical([
+        Constraint::Length(3), // header
+        Constraint::Length(2), // banner
+        Constraint::Length(3), // detection result
+        Constraint::Length(8), // setup instructions
+        Constraint::Length(3), // mark configured hint
+        Constraint::Min(0),
+    ])
+    .split(area);
+
+    // Heading
+    let heading = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "SSH session detected — image paste needs a helper",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
+    ])
+    .alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(heading, chunks[0]);
+
+    // Explanation banner
+    let banner = Paragraph::new(vec![Line::from(
+        "Ctrl+V in the Claude pane cannot reach the upstream pasteboard over SSH. \
+         The recommended bridge is cc-clip (https://github.com/ShunmeiCho/cc-clip).",
+    )])
+    .wrap(Wrap { trim: true })
+    .style(Style::default().fg(Color::White));
+    frame.render_widget(banner, chunks[1]);
+
+    // cc-clip detection
+    let (status_label, status_color) = match &state.cc_clip_path {
+        Some(p) => (
+            format!(" \u{2713} cc-clip detected: {}", p.display()),
+            Color::Green,
+        ),
+        None => (
+            " \u{26A0} cc-clip not on PATH — install via `cargo install cc-clip` on this host."
+                .to_string(),
+            Color::Yellow,
+        ),
+    };
+    let detection = Paragraph::new(Line::from(Span::styled(
+        status_label,
+        Style::default()
+            .fg(status_color)
+            .add_modifier(Modifier::BOLD),
+    )))
+    .wrap(Wrap { trim: true });
+    frame.render_widget(detection, chunks[2]);
+
+    // Setup instructions (Mac side + remote side)
+    let instructions = Paragraph::new(vec![
+        Line::from(Span::styled(
+            "Setup (one-time):",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from("  1. On your Mac:    brew install shunmeicho/tap/cc-clip"),
+        Line::from("  2. On your Mac:    start the daemon (cc-clip-daemon &)"),
+        Line::from("  3. ~/.ssh/config:  add `RemoteForward 9998 localhost:9998` for this host"),
+        Line::from("  4. On this host:   cargo install cc-clip"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Re-run --ssh-paste-diag to verify.",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ])
+    .wrap(Wrap { trim: false });
+    frame.render_widget(instructions, chunks[3]);
+
+    // Mark-as-configured hint
+    let marked_label = if state.ssh_image_paste_marked_configured {
+        Span::styled(
+            "[m] \u{2713} marked as configured — paste hint silenced",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled(
+            "[m] mark as configured  •  [Enter] continue without changes",
+            Style::default().fg(Color::Cyan),
+        )
+    };
+    let mark = Paragraph::new(Line::from(marked_label));
+    frame.render_widget(mark, chunks[4]);
 }
 
 fn render_footer(frame: &mut Frame, popup_area: Rect, state: &WizardState) {

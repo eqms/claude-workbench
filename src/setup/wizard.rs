@@ -3,7 +3,10 @@
 use crate::config::Config;
 use crate::setup::dependency_checker::DependencyReport;
 
-/// Wizard step enumeration (5 steps, no template selection)
+/// Wizard step enumeration. The `SshImagePaste` step is conditionally shown
+/// only when `crate::clipboard::is_ssh_session()` reports true — see
+/// `WizardState::next_step` / `WizardState::prev_step` which skip it when
+/// not relevant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WizardStep {
     #[default]
@@ -11,6 +14,7 @@ pub enum WizardStep {
     Dependencies,
     ShellSelection,
     ClaudeConfig,
+    SshImagePaste,
     Confirmation,
     Complete,
 }
@@ -21,7 +25,8 @@ impl WizardStep {
             WizardStep::Welcome => WizardStep::Dependencies,
             WizardStep::Dependencies => WizardStep::ShellSelection,
             WizardStep::ShellSelection => WizardStep::ClaudeConfig,
-            WizardStep::ClaudeConfig => WizardStep::Confirmation,
+            WizardStep::ClaudeConfig => WizardStep::SshImagePaste,
+            WizardStep::SshImagePaste => WizardStep::Confirmation,
             WizardStep::Confirmation => WizardStep::Complete,
             WizardStep::Complete => WizardStep::Complete,
         }
@@ -33,24 +38,10 @@ impl WizardStep {
             WizardStep::Dependencies => WizardStep::Welcome,
             WizardStep::ShellSelection => WizardStep::Dependencies,
             WizardStep::ClaudeConfig => WizardStep::ShellSelection,
-            WizardStep::Confirmation => WizardStep::ClaudeConfig,
+            WizardStep::SshImagePaste => WizardStep::ClaudeConfig,
+            WizardStep::Confirmation => WizardStep::SshImagePaste,
             WizardStep::Complete => WizardStep::Confirmation,
         }
-    }
-
-    pub fn step_number(&self) -> u8 {
-        match self {
-            WizardStep::Welcome => 1,
-            WizardStep::Dependencies => 2,
-            WizardStep::ShellSelection => 3,
-            WizardStep::ClaudeConfig => 4,
-            WizardStep::Confirmation => 5,
-            WizardStep::Complete => 5,
-        }
-    }
-
-    pub fn total_steps() -> u8 {
-        5
     }
 
     pub fn title(&self) -> &'static str {
@@ -59,6 +50,7 @@ impl WizardStep {
             WizardStep::Dependencies => "Dependency Check",
             WizardStep::ShellSelection => "Shell Selection",
             WizardStep::ClaudeConfig => "Tool Configuration",
+            WizardStep::SshImagePaste => "SSH Image Paste",
             WizardStep::Confirmation => "Confirmation",
             WizardStep::Complete => "Complete",
         }
@@ -94,6 +86,14 @@ pub struct WizardState {
 
     // Current field focus (for ClaudeConfig step)
     pub focused_field: usize,
+
+    /// Detected `cc-clip` binary on the remote host (`None` = not on PATH).
+    /// Populated lazily when the wizard enters the `SshImagePaste` step so
+    /// the user sees a green check or a yellow "not found" line.
+    pub cc_clip_path: Option<std::path::PathBuf>,
+    /// User pressed "Mark as configured" on the SSH step → persisted as
+    /// `config.ssh.notification_dismissed = true` by `generate_config()`.
+    pub ssh_image_paste_marked_configured: bool,
 }
 
 impl Default for WizardState {
@@ -142,6 +142,8 @@ impl Default for WizardState {
             editing_field: None,
             input_buffer: String::new(),
             focused_field: 0,
+            cc_clip_path: crate::clipboard::which("cc-clip"),
+            ssh_image_paste_marked_configured: false,
         }
     }
 }
@@ -162,10 +164,65 @@ impl WizardState {
 
     pub fn next_step(&mut self) {
         self.step = self.step.next();
+        self.skip_inactive_step_forward();
     }
 
     pub fn prev_step(&mut self) {
         self.step = self.step.prev();
+        self.skip_inactive_step_backward();
+    }
+
+    /// Total visible steps for the current session. The SSH step is hidden
+    /// when not in an SSH session, leaving 5 steps; otherwise 6.
+    pub fn total_steps(&self) -> u8 {
+        if crate::clipboard::is_ssh_session() {
+            6
+        } else {
+            5
+        }
+    }
+
+    /// Position of the current step in the visible sequence. Used for the
+    /// "Step N/M" header — keeps numbering contiguous when the SSH step
+    /// is hidden.
+    pub fn current_step_number(&self) -> u8 {
+        let in_ssh = crate::clipboard::is_ssh_session();
+        match self.step {
+            WizardStep::Welcome => 1,
+            WizardStep::Dependencies => 2,
+            WizardStep::ShellSelection => 3,
+            WizardStep::ClaudeConfig => 4,
+            WizardStep::SshImagePaste => 5, // only reachable when in_ssh == true
+            WizardStep::Confirmation => {
+                if in_ssh {
+                    6
+                } else {
+                    5
+                }
+            }
+            WizardStep::Complete => {
+                if in_ssh {
+                    6
+                } else {
+                    5
+                }
+            }
+        }
+    }
+
+    /// If the current step is `SshImagePaste` but not in an SSH session,
+    /// advance once more so the user does not see an irrelevant step.
+    fn skip_inactive_step_forward(&mut self) {
+        if matches!(self.step, WizardStep::SshImagePaste) && !crate::clipboard::is_ssh_session() {
+            self.step = self.step.next();
+        }
+    }
+
+    /// Mirror of `skip_inactive_step_forward` for backward navigation.
+    fn skip_inactive_step_backward(&mut self) {
+        if matches!(self.step, WizardStep::SshImagePaste) && !crate::clipboard::is_ssh_session() {
+            self.step = self.step.prev();
+        }
     }
 
     pub fn start_editing(&mut self, field: WizardField) {
@@ -225,6 +282,16 @@ impl WizardState {
         config.pty.claude_command = vec![self.claude_path.clone()];
         config.pty.lazygit_command = vec![self.lazygit_path.clone()];
 
+        // SSH-image-paste: persist detected helper path and dismissed flag
+        // so the runtime check in `handle_terminal_pane_key` skips the hint
+        // for users who already configured cc-clip.
+        if let Some(p) = &self.cc_clip_path {
+            config.ssh.image_paste_helper = Some(p.to_string_lossy().to_string());
+        }
+        if self.ssh_image_paste_marked_configured {
+            config.ssh.notification_dismissed = true;
+        }
+
         // Mark wizard as complete
         config.setup.wizard_completed = true;
         config.setup.wizard_version = 1;
@@ -239,6 +306,7 @@ impl WizardState {
             WizardStep::Dependencies => self.deps.all_required_met(),
             WizardStep::ShellSelection => !self.available_shells.is_empty(),
             WizardStep::ClaudeConfig => true, // Paths can be defaults
+            WizardStep::SshImagePaste => true, // informational, always proceed
             WizardStep::Confirmation => true,
             WizardStep::Complete => false,
         }
@@ -272,5 +340,32 @@ mod tests {
         let config = state.generate_config();
         assert!(config.setup.wizard_completed);
         assert_eq!(config.pty.claude_command, vec!["/usr/local/bin/claude"]);
+    }
+
+    #[test]
+    fn test_ssh_step_in_chain() {
+        // Verify the static next/prev sequence includes SshImagePaste.
+        let mut step = WizardStep::ClaudeConfig;
+        step = step.next();
+        assert_eq!(step, WizardStep::SshImagePaste);
+        step = step.next();
+        assert_eq!(step, WizardStep::Confirmation);
+        step = step.prev();
+        assert_eq!(step, WizardStep::SshImagePaste);
+    }
+
+    #[test]
+    fn test_mark_as_configured_persisted_to_config() {
+        let mut state = WizardState::default();
+        state.ssh_image_paste_marked_configured = true;
+        let config = state.generate_config();
+        assert!(config.ssh.notification_dismissed);
+    }
+
+    #[test]
+    fn test_default_ssh_marked_not_persisted() {
+        let state = WizardState::default();
+        let config = state.generate_config();
+        assert!(!config.ssh.notification_dismissed);
     }
 }
