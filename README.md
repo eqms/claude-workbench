@@ -107,6 +107,11 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.90.0
+
+- **Phase 1 Security Hardening — Wave 1 of 3 shipped.** Eight audit findings closed in this release: predictable temp-path symlink-redirect vector (`tempfile::Builder` with `O_EXCL` in `src/browser/pdf_export.rs`); `--update-to <version>` flag debug-only via `#[cfg(debug_assertions)]` plus `filter_restart_args()` so the restart loop can't be wedged into an infinite downgrade; allow-list validation of the browser/editor config (`validate_program()` in `src/browser/opener.rs`); removal of the `$SHELL -i -c` fallback in `src/setup/dependency_checker.rs`; executable-bit check in `clipboard::which()`; `shlex::try_quote` error propagation from `sync_terminals*`; `semver::Version::max_by` release selection instead of GitHub creation-order `releases[0]`. Self-update signature verification (SEC-01) remains the only Phase 1 item still open — Wave 2 needs an operator-generated `zipsign` ed25519 keypair, Wave 3 needs at least two signed releases shipped before it can be enabled. Tests: 111 → 130.
+- **`.planning/` directory introduced** — GSD project planning artifacts (PROJECT.md, ROADMAP.md, REQUIREMENTS.md, per-phase plans/research/reviews under `.planning/phases/`, refreshed codebase maps under `.planning/codebase/`) are now committed. Source of truth for upcoming phases.
+
 ### What's New in v0.87.0
 
 - **Async clipboard worker thread** — `copy_to_clipboard()` now dispatches to a dedicated `clipboard-worker` thread and returns immediately with `ClipboardOutcome::Submitted`. The event loop polls `take_pending_outcome()` once per frame and only flashes the footer on real `Failed`. The UI stays responsive even when the X-server clipboard hangs for the full 500 ms timeout from v0.86.4. Paste remains synchronous (callers need the result immediately to inject into PTY/editor).

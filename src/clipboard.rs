@@ -637,17 +637,12 @@ mod tests {
     fn test_is_executable_respects_mode() {
         use std::os::unix::fs::PermissionsExt;
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        std::fs::set_permissions(
-            tmp.path(),
-            std::fs::Permissions::from_mode(0o644),
-        )
-        .unwrap();
-        assert!(!is_executable(tmp.path()), "0o644 file must not be executable");
-        std::fs::set_permissions(
-            tmp.path(),
-            std::fs::Permissions::from_mode(0o755),
-        )
-        .unwrap();
+        std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(
+            !is_executable(tmp.path()),
+            "0o644 file must not be executable"
+        );
+        std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
         assert!(is_executable(tmp.path()), "0o755 file must be executable");
     }
 }

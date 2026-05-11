@@ -22,9 +22,9 @@ use session::load_session;
 use std::io::Write;
 use std::panic;
 use std::path::PathBuf;
-use update::{
-    check_for_update_with_version, perform_update_to_version_sync, UpdateCheckResult, UpdateResult,
-};
+use update::{check_for_update_with_version, UpdateCheckResult};
+#[cfg(debug_assertions)]
+use update::{perform_update_to_version_sync, UpdateResult};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -116,7 +116,11 @@ fn run_update_check_cli(fake_version: Option<String>) -> Result<()> {
     Ok(())
 }
 
-/// Run update to a specific version from CLI and exit
+/// Run update to a specific version from CLI and exit.
+/// Debug-only: paired with the `#[cfg(debug_assertions)]` arm in `main()`
+/// that parses `--update-to` (gated by CR-02). Release builds neither
+/// expose the flag nor compile this handler.
+#[cfg(debug_assertions)]
 fn run_update_to_version_cli(target_version: &str) -> Result<()> {
     println!("Current version: {}", update::CURRENT_VERSION);
     println!("Target version:  {}", target_version);

@@ -1,5 +1,89 @@
 # Release Notes
 
+## Version 0.90.0 (11.05.2026)
+
+### Fixed
+
+- **Self-update `--update-to <version>` flag gated to debug builds only** —
+  Release binaries now reject `--update-to` with `unexpected argument`,
+  closing the unauthenticated downgrade vector (CR-02). The flag and its
+  handler `run_update_to_version_cli` are wrapped in
+  `#[cfg(debug_assertions)]` so they don't even compile into release
+  artifacts. Paired with new `filter_restart_args()` in
+  `src/update/install.rs` that strips one-shot flags
+  (`--check-update`, `--update-to`, etc.) from `args[]` before
+  `restart_application()` re-execs the new binary — preventing the
+  infinite-downgrade-loop that an attacker could otherwise wedge a user
+  into (IN-02 backport).
+- **`tempfile::Builder` replaces predictable PDF/HTML temp paths** —
+  `src/browser/pdf_export.rs` no longer constructs
+  `$TMPDIR/{stem}-{dd.mm.yyyy}.html` by hand. `default_preview_file()`
+  now returns `Result<tempfile::NamedTempFile>` opened with `O_EXCL`,
+  and `App::temp_preview_files: Vec<NamedTempFile>` handles deletion
+  via RAII (the manual `cleanup_temp_files()` is gone). Closes the
+  symlink-to-`~/.ssh/authorized_keys` write-to-arbitrary-file attack
+  vector on multi-user XRDP hosts (SEC-04 / CR-03).
+- **Browser/editor allow-list in `src/browser/opener.rs`** — new
+  `validate_program()` helper rejects anything that doesn't match
+  `^[A-Za-z0-9_./-]+$` before reaching `std::process::Command::new()`.
+  Called from both `open_file_with_browser` and `open_file_with_editor`.
+  Hand-rolled `split_command()` removed in favour of `shlex::split` for
+  POSIX-correct tokenization (SEC-02 / WR-01).
+- **`$SHELL -i -c "<cmd>"` fallback removed from dependency probe** —
+  `src/setup/dependency_checker.rs::check_command` no longer invokes
+  an interactive shell to look up binaries. Direct `Command::new(name)`
+  is sufficient because every probed dependency (`git`, `claude`,
+  `lazygit`, shells themselves) is a real executable on supported
+  systems, not a shell function. Removes both the injection-adjacent
+  pattern and the fish job-control init side effect that caused
+  macOS-startup hangs in earlier patch releases (SEC-03 / WR-02).
+- **`clipboard::which()` checks the executable bit** — new
+  `is_executable()` helper (`#[cfg(unix)]`, `mode() & 0o111 != 0`)
+  augments the existing `is_file()` check. Non-executable PATH entries
+  that happen to share a name with a real binary no longer cause
+  "Permission denied" deep inside subprocess spawn — they're rejected
+  during PATH resolution. Linux/macOS only; no-op on platforms without
+  Unix file modes (WR-03).
+- **`shlex::try_quote` errors propagate from `sync_terminals*`** —
+  `src/app/pty.rs` extracted a `quote_path_for_cd()` helper; all three
+  `sync_terminals*` call sites now `match` on its `Option<String>` and
+  call `log_update(...)` on `None` instead of silently falling back to
+  the unescaped path. Unescaped path bytes can no longer reach the PTY
+  shell via this code path (WR-04).
+- **Release selection uses `semver::Version::max_by`, not creation
+  order** — `src/update/check.rs` now picks the highest-semver tag
+  across all GitHub releases instead of trusting `releases[0]`
+  (which is creation order). Tie-breaker: most recent `published_at`.
+  A backdated patch release on an old branch can no longer suppress
+  legitimate newer updates (WR-05). `semver = "1"` promoted from
+  transitive to direct dependency.
+
+### Changed
+
+- **Phase 1 Security Hardening — Wave 1 of 3 shipped.** Wave 2
+  (CI-side `zipsign` signing pipeline) and Wave 3 (client-side
+  `.verifying_keys()` wiring on `Update::configure`) remain open. They
+  close the HIGH-severity self-update finding (SEC-01 / CR-01) and are
+  intentionally gated: Wave 2 requires an operator to generate an
+  ed25519 keypair and add it to GitHub Actions secrets; Wave 3 must
+  wait until at least two signed releases have shipped, or the
+  verification step bricks auto-update for every existing user.
+- **`.planning/` directory introduced** — GSD project planning
+  artifacts are now committed to the repository: `PROJECT.md`,
+  `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md`, `codebase/*.md`
+  (refreshed structural maps), and per-phase plans/research/review
+  files under `.planning/phases/`. Source of truth for what comes
+  next — Phase 2 (Test Coverage + Reliability), Phase 3 (Refactor +
+  Dependency Strategy), Phase 4 (Session Persistence).
+- **Test coverage:** 111 → 130 passing tests. New coverage includes
+  the `tempfile::NamedTempFile` lifecycle (suffix/prefix/uniqueness/
+  auto-delete), CLI integration test
+  `update_to_flag_not_present_in_release_build`, three
+  `filter_restart_args` unit tests, `validate_program` (~12
+  assertions), `check_command` after shell-fallback removal,
+  `is_executable` rejection paths, `sync_terminals*` error
+  propagation, and `semver` max-selection over creation-order.
+
 ## Version 0.89.0 (11.05.2026)
 
 ### Fixed

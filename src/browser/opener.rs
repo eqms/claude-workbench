@@ -98,8 +98,9 @@ pub fn open_file_with_browser(path: &Path, browser: &str) -> Result<()> {
     if browser.is_empty() {
         open_file(path)
     } else {
-        let tokens = shlex::split(browser)
-            .ok_or_else(|| anyhow::anyhow!("Invalid shell quoting in browser config: {:?}", browser))?;
+        let tokens = shlex::split(browser).ok_or_else(|| {
+            anyhow::anyhow!("Invalid shell quoting in browser config: {:?}", browser)
+        })?;
         let program = tokens
             .first()
             .ok_or_else(|| anyhow::anyhow!("Empty browser command"))?;

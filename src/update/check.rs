@@ -144,7 +144,11 @@ mod tests {
             })
             .max_by(|(va, _), (vb, _)| va.cmp(vb))
             .map(|(_, t)| *t);
-        assert_eq!(best, Some("v0.89.0"), "must select highest semver, not first in list");
+        assert_eq!(
+            best,
+            Some("v0.89.0"),
+            "must select highest semver, not first in list"
+        );
     }
 
     #[test]
@@ -159,7 +163,11 @@ mod tests {
             })
             .max_by(|(va, _), (vb, _)| va.cmp(vb))
             .map(|(_, t)| *t);
-        assert_eq!(best, Some("v0.89.0"), "unparseable nightly tag must be skipped");
+        assert_eq!(
+            best,
+            Some("v0.89.0"),
+            "unparseable nightly tag must be skipped"
+        );
     }
 }
 
