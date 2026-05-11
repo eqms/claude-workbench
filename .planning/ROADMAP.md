@@ -22,7 +22,15 @@ v0.89.0 audit surfaced 4 security findings, zero clipboard test coverage, a 47-f
   2. A binary with a valid signature passes verification and self-updates successfully (regression: this must still work)
   3. Each of the 3 MEDIUM findings has a code-level fix landed and a note in SECURITY-NOTES.md marking it resolved
   4. `cargo audit` reports no HIGH or MEDIUM advisories in the dependency tree
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Replace predictable temp path with tempfile::Builder (CR-03/SEC-04)
+- [ ] 01-02-PLAN.md — Gate --update-to to debug builds + strip one-shot restart flags (CR-02/IN-02)
+- [ ] 01-03-PLAN.md — Browser allow-list validate_program + remove $SHELL fallback (WR-01/SEC-02, WR-02/SEC-03)
+- [ ] 01-04-PLAN.md — Executable-bit in which(), shlex error propagation, semver release selection (WR-03/WR-04/WR-05)
+- [ ] 01-05-PLAN.md — CI release signing with zipsign ed25519 — Phase A (CR-01/SEC-01)
+- [ ] 01-06-PLAN.md — Enable signature verification in client — Phase B (CR-01/SEC-01) [depends on 01-05, requires 2+ signed releases]
 
 ### Phase 2: Test Coverage + Reliability
 **Goal**: Clipboard fallback chain is covered by automated tests and mutex-poison events are observable in production
@@ -60,7 +68,7 @@ v0.89.0 audit surfaced 4 security findings, zero clipboard test coverage, a 47-f
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security Hardening | 0/TBD | Not started | - |
+| 1. Security Hardening | 0/6 | Not started | - |
 | 2. Test Coverage + Reliability | 0/TBD | Not started | - |
 | 3. Refactor + Dependency Strategy | 0/TBD | Not started | - |
 | 4. Session Persistence | 0/TBD | Not started | - |
