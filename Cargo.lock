@@ -455,6 +455,7 @@ dependencies = [
  "ratatui",
  "regex",
  "self_update",
+ "semver",
  "serde",
  "serde_yaml_ng",
  "shlex",
