@@ -77,3 +77,30 @@ fn unknown_flag_is_rejected() {
         output.status
     );
 }
+
+/// Verify that `--update-to` is not a recognized flag in release builds.
+///
+/// The flag is gated with `#[cfg(debug_assertions)]` so it is absent from
+/// the clap argument set in release mode. Clap exits 2 for unknown arguments.
+///
+/// Only runs under `cargo test --release` (not(debug_assertions)).
+#[test]
+#[cfg(not(debug_assertions))]
+fn update_to_flag_not_present_in_release_build() {
+    let output = Command::new(workbench_binary())
+        .args(["--update-to", "0.1.0"])
+        .output()
+        .expect("failed to invoke binary");
+    // clap exits 2 for unknown arguments
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "--update-to should be unknown in release builds"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unexpected argument") || stderr.contains("unrecognized"),
+        "stderr: {}",
+        stderr
+    );
+}
