@@ -173,11 +173,7 @@ fn check_command(name: &str, args: &[&str], required: bool) -> DependencyStatus 
         // Use shell-escaped arguments to prevent injection
         let shell_cmd = std::iter::once(name.to_string())
             .chain(args.iter().map(|a| a.to_string()))
-            .map(|a| {
-                shlex::try_quote(&a)
-                    .map(|c| c.into_owned())
-                    .unwrap_or(a)
-            })
+            .map(|a| shlex::try_quote(&a).map(|c| c.into_owned()).unwrap_or(a))
             .collect::<Vec<_>>()
             .join(" ");
 

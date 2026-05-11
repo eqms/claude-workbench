@@ -55,12 +55,14 @@ fn build_html_template(doc: &DocumentConfig) -> String {
 }
 
 /// Convert a single markdown file to an HTML string without writing to disk.
-/// Returns (html_string, temp_output_path).
+/// Returns (html_string, secure_temp_file).
+/// The `NamedTempFile` is created with O_EXCL but not yet written; content is
+/// written after link rewriting in the caller.
 fn convert_single_md(
     md_path: &Path,
     doc: &DocumentConfig,
     project_name: &str,
-) -> Result<(String, PathBuf)> {
+) -> Result<(String, tempfile::NamedTempFile)> {
     use pulldown_cmark::{html, Event, Options, Parser};
 
     let md_content = std::fs::read_to_string(md_path)?;
@@ -92,10 +94,10 @@ fn convert_single_md(
         .replace("{title}", title)
         .replace("{content}", &html_content);
 
-    // Compute temp path (but don't write yet)
-    let temp_path = crate::browser::pdf_export::default_preview_filename(md_path, project_name);
+    // Create secure temp file (O_EXCL) — content written after link rewriting
+    let tmp = crate::browser::pdf_export::default_preview_file(md_path, project_name)?;
 
-    Ok((html, temp_path))
+    Ok((html, tmp))
 }
 
 /// Collect relative `.md` link hrefs from rendered HTML.
@@ -163,15 +165,18 @@ fn fix_md_links(html: &str, link_map: &HashMap<String, PathBuf>) -> String {
 }
 
 /// Convert markdown file to HTML, including all directly referenced .md files.
-/// Returns a Vec of temp file paths (primary file first, then dependencies).
+/// Returns a Vec of `NamedTempFile` handles (primary first, then dependencies).
+/// Handles are kept alive so the browser can open them; files are auto-deleted on drop.
 /// All inter-document .md links are rewritten to point to the generated HTML files.
 pub fn markdown_to_html(
     md_path: &Path,
     doc: &DocumentConfig,
     project_name: &str,
-) -> Result<Vec<PathBuf>> {
+) -> Result<Vec<tempfile::NamedTempFile>> {
+    use std::io::Write;
+
     // Phase 1: Convert primary file
-    let (primary_html, primary_path) = convert_single_md(md_path, doc, project_name)?;
+    let (primary_html, primary_tmp) = convert_single_md(md_path, doc, project_name)?;
 
     // Get source directory for resolving relative paths
     let md_dir = md_path
@@ -185,10 +190,10 @@ pub fn markdown_to_html(
     // Collect all referenced .md links from primary HTML
     let md_links = collect_md_links(&primary_html);
 
-    // Build link map: normalized md filename -> temp HTML path
-    // Also collect (html_string, temp_path) for each dependency
+    // Build link map: normalized md filename -> temp HTML path (PathBuf for link rewriting)
+    // Also collect (html_string, NamedTempFile) for each dependency
     let mut link_map: HashMap<String, PathBuf> = HashMap::new();
-    let mut dep_files: Vec<(String, PathBuf)> = Vec::new();
+    let mut dep_files: Vec<(String, tempfile::NamedTempFile)> = Vec::new();
 
     for href in &md_links {
         // Strip fragment for file resolution
@@ -214,36 +219,39 @@ pub fn markdown_to_html(
 
         // Convert the referenced .md file
         match convert_single_md(&resolved, doc, project_name) {
-            Ok((dep_html, dep_path)) => {
-                link_map.insert(normalized.to_string(), dep_path.clone());
-                dep_files.push((dep_html, dep_path));
+            Ok((dep_html, dep_tmp)) => {
+                link_map.insert(normalized.to_string(), dep_tmp.path().to_path_buf());
+                dep_files.push((dep_html, dep_tmp));
             }
             Err(_) => continue, // Conversion failed, leave link unchanged
         }
     }
 
+    // Add primary path to link map after dep paths are collected (not needed for link rewriting
+    // since links only point outward from primary, but record for completeness)
+    let primary_path = primary_tmp.path().to_path_buf();
+
     // Phase 2: Rewrite .md links in ALL HTML files and write to disk
-    use std::io::Write;
 
     // Write primary file
     let primary_html = fix_md_links(&primary_html, &link_map);
-    let mut file = std::fs::File::create(&primary_path)?;
-    file.write_all(primary_html.as_bytes())?;
-    file.flush()?;
+    let mut primary_tmp = primary_tmp;
+    primary_tmp.write_all(primary_html.as_bytes())?;
+    primary_tmp.flush()?;
 
-    // Collect all paths for cleanup tracking
-    let mut all_paths = vec![primary_path];
+    // Collect all NamedTempFile handles (primary first)
+    let _ = primary_path; // suppress unused warning — path used conceptually above
+    let mut all_handles = vec![primary_tmp];
 
     // Write dependency files
-    for (dep_html, dep_path) in dep_files {
+    for (dep_html, mut dep_tmp) in dep_files {
         let dep_html = fix_md_links(&dep_html, &link_map);
-        let mut file = std::fs::File::create(&dep_path)?;
-        file.write_all(dep_html.as_bytes())?;
-        file.flush()?;
-        all_paths.push(dep_path);
+        dep_tmp.write_all(dep_html.as_bytes())?;
+        dep_tmp.flush()?;
+        all_handles.push(dep_tmp);
     }
 
-    Ok(all_paths)
+    Ok(all_handles)
 }
 
 /// Fix relative image paths in HTML by converting them to absolute file:// URLs

@@ -523,17 +523,19 @@ impl App {
         if browser::can_preview_in_browser(path) {
             let preview_path = if browser::is_markdown(path) {
                 match browser::markdown_to_html(path, &self.config.document, project_name) {
-                    Ok(paths) => {
-                        let primary = paths[0].clone();
-                        self.temp_preview_files.extend(paths);
+                    Ok(handles) => {
+                        // Get the primary path before moving handles into the vec
+                        let primary = handles[0].path().to_path_buf();
+                        self.temp_preview_files.extend(handles);
                         primary
                     }
                     Err(_) => path.to_path_buf(),
                 }
             } else if browser::can_syntax_highlight(path) {
                 match browser::text_to_html(path, &self.config.document, project_name) {
-                    Ok(p) => {
-                        self.temp_preview_files.push(p.clone());
+                    Ok(tmp) => {
+                        let p = tmp.path().to_path_buf();
+                        self.temp_preview_files.push(tmp);
                         p
                     }
                     Err(_) => path.to_path_buf(),

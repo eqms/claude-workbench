@@ -4,7 +4,7 @@
 //! Delegates file type detection to the central `syntax_registry` module.
 
 use anyhow::Result;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
 
 use crate::browser::template::TemplateContext;
@@ -103,8 +103,15 @@ pub fn can_syntax_highlight(path: &Path) -> bool {
 }
 
 /// Convert text file to HTML with syntax highlighting.
-/// Uses consistent naming convention: `{project}-{stem}-{date}.html`
-pub fn text_to_html(path: &Path, doc: &DocumentConfig, project_name: &str) -> Result<PathBuf> {
+/// Returns a `NamedTempFile` handle (O_EXCL, auto-deleted on drop).
+/// Caller must keep the handle alive until the browser has opened the file.
+pub fn text_to_html(
+    path: &Path,
+    doc: &DocumentConfig,
+    project_name: &str,
+) -> Result<tempfile::NamedTempFile> {
+    use std::io::Write;
+
     let content = std::fs::read_to_string(path)?;
     let ss = SyntaxSet::load_defaults_newlines();
     let ts = ThemeSet::load_defaults();
@@ -137,11 +144,11 @@ pub fn text_to_html(path: &Path, doc: &DocumentConfig, project_name: &str) -> Re
         .replace("{lines}", &lines.to_string())
         .replace("{highlighted_code}", &highlighted);
 
-    // Write to consistently named file in temp directory
-    let temp_path = crate::browser::pdf_export::default_preview_filename(path, project_name);
-
-    std::fs::write(&temp_path, html)?;
-    Ok(temp_path)
+    // Create secure temp file (O_EXCL) and write content
+    let mut tmp = crate::browser::pdf_export::default_preview_file(path, project_name)?;
+    tmp.write_all(html.as_bytes())?;
+    tmp.flush()?;
+    Ok(tmp)
 }
 
 /// Format file size in human-readable form

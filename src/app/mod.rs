@@ -157,8 +157,8 @@ pub struct App {
     pub ssh_image_paste_hint: Option<(String, std::time::Instant)>,
     /// Cached dependency report for F12 help and clipboard status display.
     pub dependency_report: crate::setup::DependencyReport,
-    // Temp files created for browser previews (cleaned up on exit)
-    pub temp_preview_files: Vec<std::path::PathBuf>,
+    // Temp files created for browser previews (auto-deleted on drop via NamedTempFile)
+    pub temp_preview_files: Vec<tempfile::NamedTempFile>,
     // Export format chooser (Ctrl+X on Markdown files)
     pub export_chooser: crate::types::ExportChooserState,
     // Async job: PDF export
@@ -492,8 +492,7 @@ impl App {
                 } // End Match
             }
         }
-        // Clean up temporary preview files
-        self.cleanup_temp_files();
+        // temp_preview_files (Vec<NamedTempFile>) auto-delete on App drop
 
         Ok(self.should_restart)
     }

@@ -9,12 +9,6 @@ use crate::ui;
 use super::App;
 
 impl App {
-    pub(super) fn cleanup_temp_files(&self) {
-        for path in &self.temp_preview_files {
-            let _ = std::fs::remove_file(path);
-        }
-    }
-
     pub(super) fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
         let (files, preview, claude, lazygit, terminal, footer) = ui::layout::compute_layout(

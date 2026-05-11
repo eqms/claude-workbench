@@ -66,4 +66,3 @@ impl<T> JobState<T> {
         outcome
     }
 }
-

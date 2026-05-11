@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
+use tempfile::Builder;
 
 use crate::config::DocumentConfig;
 
@@ -103,20 +104,30 @@ pub(crate) fn date_now_dmy() -> String {
     )
 }
 
-/// Generate a preview filename in temp directory for browser preview.
-/// Format: `{project}-{stem}-{dd.mm.yyyy}.html` in system temp dir.
-pub fn default_preview_filename(source: &Path, project_name: &str) -> PathBuf {
+/// Create a secure temp file for browser preview using O_EXCL (via tempfile::Builder).
+///
+/// The returned `NamedTempFile` must be kept alive until the browser has finished
+/// reading the file; dropping it deletes the file automatically.
+///
+/// Replaces the former `default_preview_filename` (predictable path, symlink-attack
+/// vector CR-03 / SEC-04) with an unpredictable, kernel-enforced exclusive open.
+pub fn default_preview_file(
+    source: &Path,
+    project_name: &str,
+) -> std::io::Result<tempfile::NamedTempFile> {
     let stem = source
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("preview");
-    let date = date_now_dmy();
-    let name = if project_name.is_empty() {
-        format!("{}-{}.html", stem, date)
+    let prefix = if project_name.is_empty() {
+        format!("{}-", stem)
     } else {
-        format!("{}-{}-{}.html", project_name, stem, date)
+        format!("{}-{}-", project_name, stem)
     };
-    std::env::temp_dir().join(name)
+    Builder::new()
+        .prefix(&prefix)
+        .suffix(".html")
+        .tempfile_in(std::env::temp_dir())
 }
 
 /// Generate a default export filename based on source file, format and project name.
@@ -141,6 +152,47 @@ pub fn default_export_filename(source: &Path, format: ExportFormat, project_name
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_preview_file_has_html_suffix() {
+        let tmp = default_preview_file(Path::new("README.md"), "myproject").unwrap();
+        let name = tmp.path().file_name().unwrap().to_string_lossy();
+        assert!(name.ends_with(".html"), "expected .html suffix, got {name}");
+        assert!(
+            name.contains("myproject-README-"),
+            "expected project-stem prefix, got {name}"
+        );
+    }
+
+    #[test]
+    fn test_preview_file_empty_project_name() {
+        let tmp = default_preview_file(Path::new("doc.md"), "").unwrap();
+        let name = tmp.path().file_name().unwrap().to_string_lossy();
+        assert!(name.starts_with("doc-"), "expected stem prefix, got {name}");
+        assert!(
+            !name.starts_with('-'),
+            "must not start with dash, got {name}"
+        );
+    }
+
+    #[test]
+    fn test_preview_files_are_unique() {
+        let a = default_preview_file(Path::new("f.md"), "proj").unwrap();
+        let b = default_preview_file(Path::new("f.md"), "proj").unwrap();
+        assert_ne!(a.path(), b.path(), "two calls must produce different paths");
+    }
+
+    #[test]
+    fn test_namedtempfile_deletes_on_drop() {
+        let path = {
+            let tmp = default_preview_file(Path::new("x.md"), "p").unwrap();
+            tmp.path().to_path_buf()
+        }; // tmp drops here
+        assert!(
+            !path.exists(),
+            "file must be deleted after NamedTempFile drops"
+        );
+    }
 
     #[test]
     fn test_resolve_export_dir_empty() {
