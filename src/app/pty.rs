@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::config::Config;
 use crate::terminal::PseudoTerminal;
 use crate::types::{ClaudeEffort, ClaudeModel, ClaudePermissionMode, PaneId};
+use crate::update::log_update;
 
 use super::App;
 
@@ -148,41 +149,56 @@ impl App {
     #[allow(dead_code)]
     pub(super) fn sync_terminals_initial(&mut self) {
         let path_str = self.file_browser.current_dir.to_string_lossy();
-        let escaped = shlex::try_quote(&path_str)
-            .map(|c| c.into_owned())
-            .unwrap_or_else(|_| path_str.to_string());
-        let cmd = format!("cd {}\r", escaped);
-
-        // Only sync to Terminal, NOT Claude (Claude needs time to start)
-        if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
-            let _ = pty.write_input(cmd.as_bytes());
+        match quote_path_for_cd(&path_str) {
+            Some(cmd) => {
+                // Only sync to Terminal, NOT Claude (Claude needs time to start)
+                if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
+                    let _ = pty.write_input(cmd.as_bytes());
+                }
+            }
+            None => {
+                log_update(&format!(
+                    "sync_terminals: skipping unquotable path: {:?}",
+                    self.file_browser.current_dir
+                ));
+            }
         }
     }
 
     /// Sync directory to Terminal pane only (not Claude - Claude only gets cd at startup)
     pub(super) fn sync_terminals(&mut self) {
         let path_str = self.file_browser.current_dir.to_string_lossy();
-        let escaped = shlex::try_quote(&path_str)
-            .map(|c| c.into_owned())
-            .unwrap_or_else(|_| path_str.to_string());
-        let cmd = format!("cd {}\r", escaped);
-
-        // Only sync to Terminal, not Claude (Claude should keep its initial directory)
-        if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
-            let _ = pty.write_input(cmd.as_bytes());
+        match quote_path_for_cd(&path_str) {
+            Some(cmd) => {
+                // Only sync to Terminal, not Claude (Claude should keep its initial directory)
+                if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
+                    let _ = pty.write_input(cmd.as_bytes());
+                }
+            }
+            None => {
+                log_update(&format!(
+                    "sync_terminals: skipping unquotable path: {:?}",
+                    self.file_browser.current_dir
+                ));
+            }
         }
     }
 
     /// Send cd command to a specific terminal pane
     pub(super) fn sync_terminal_to_current_dir(&mut self, pane: PaneId) {
         let path_str = self.file_browser.current_dir.to_string_lossy();
-        let escaped = shlex::try_quote(&path_str)
-            .map(|c| c.into_owned())
-            .unwrap_or_else(|_| path_str.to_string());
-        let cmd = format!("cd {}\r", escaped);
-
-        if let Some(pty) = self.terminals.get_mut(&pane) {
-            let _ = pty.write_input(cmd.as_bytes());
+        match quote_path_for_cd(&path_str) {
+            Some(cmd) => {
+                if let Some(pty) = self.terminals.get_mut(&pane) {
+                    let _ = pty.write_input(cmd.as_bytes());
+                }
+            }
+            None => {
+                log_update(&format!(
+                    "sync_terminals: skipping unquotable path: {:?}",
+                    self.file_browser.current_dir
+                ));
+            }
         }
     }
 
@@ -409,10 +425,43 @@ impl App {
     }
 }
 
+/// Quote a filesystem path for use in a `cd` PTY command.
+///
+/// Returns `None` only when `shlex::try_quote` rejects the path — which
+/// happens exclusively for paths containing a NUL byte. On any real Unix
+/// filesystem NUL cannot appear in a path, so `None` is effectively
+/// unreachable in practice. Callers that receive `None` must **not** fall
+/// back to an unescaped path; they should log and skip instead.
+fn quote_path_for_cd(path_str: &str) -> Option<String> {
+    shlex::try_quote(path_str)
+        .ok()
+        .map(|q| format!("cd {}\r", q.into_owned()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::Config;
+
+    #[test]
+    fn test_quote_path_for_cd_handles_spaces() {
+        let result = quote_path_for_cd("/home/user/my project");
+        assert!(result.is_some(), "space path must be quotable");
+        let cmd = result.unwrap();
+        assert!(cmd.starts_with("cd "), "must start with cd");
+        assert!(cmd.ends_with('\r'), "must end with CR");
+        // shlex quotes spaces with single quotes
+        assert!(
+            cmd.contains('\'') || cmd.contains('"'),
+            "spaces must be quoted: {cmd}"
+        );
+    }
+
+    #[test]
+    fn test_quote_path_for_cd_simple_path() {
+        let result = quote_path_for_cd("/home/user/projects");
+        assert_eq!(result, Some("cd /home/user/projects\r".to_string()));
+    }
 
     fn config_with_claude_command() -> Config {
         let mut cfg = Config::default();
