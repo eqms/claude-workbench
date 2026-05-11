@@ -58,7 +58,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-11
-Stopped at: Wave 1 of Phase 1 complete (4/6 plans). Wave 2 (01-05) requires operator keypair action. Wave 3 (01-06) gated on signed releases shipping. Phase verifier not yet run.
+Stopped at: Wave 1 of Phase 1 shipped (4/6 plans). Pushed to origin (GitLab) and upstream (GitHub) at commit 45ecd68. Wave 2 (01-05) requires operator keypair action. Wave 3 (01-06) gated on signed releases shipping. Verification marked `pass (wave_1_partial)`.
 Resume file: None
 Next actions:
 1. Operator: run `zipsign generate-keys` and add `CLAUDE_WORKBENCH_SIGNING_KEY` to GitHub Actions secrets
