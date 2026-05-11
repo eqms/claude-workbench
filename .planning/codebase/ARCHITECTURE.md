@@ -7,257 +7,262 @@
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          main.rs                                     │
-│  CLI dispatch (--check-update / --clipboard-diag / --ssh-paste-diag)│
-│  tokio multi-thread runtime → async_main()                          │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │ App::new() + App::run()
-                               ▼
+│                        main.rs — Entry Point                        │
+│  CLI dispatch: --check-update / --update-to(debug) /                │
+│  --clipboard-diag / --ssh-paste-diag → exit                         │
+│  Normal path: tokio multi-thread runtime → async_main()             │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │ App::new() + App::run()
+                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     App (src/app/mod.rs)                             │
-│  Monolithic state struct — owns all sub-state                       │
-│  Event loop: draw → poll(16ms) → route to handler                   │
-│                                                                      │
-│  Sub-modules (all impl App):                                         │
-│   keyboard/   mouse.rs   drawing.rs   file_ops.rs   git_ops.rs      │
-│   clipboard.rs   pty.rs   ssh_paste.rs   update.rs                  │
-└───────┬──────────────────────────────────────────────────┬──────────┘
-        │                                                  │
-        ▼                                                  ▼
-┌───────────────────┐                         ┌───────────────────────┐
-│  Input Layer      │                         │  Async Job Layer      │
-│  src/app/keyboard/│                         │  src/app/job_state.rs │
-│  src/app/mouse.rs │                         │  src/app/update.rs    │
-│  src/input.rs     │                         │  src/app/git_ops.rs   │
-└───────────────────┘                         │  JobState<T> generic  │
-                                              └──────────┬────────────┘
-                                                         │ mpsc Receiver<T>
-        ┌────────────────────────────────────────────────┘
-        ▼
-┌───────────────────────────────────────────────────────────────────┐
-│                    PTY Layer  (src/terminal.rs)                    │
-│  PseudoTerminal — one instance per pane                           │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  Background reader thread                                   │ │
-│  │  reader.read() → vt100::Parser::process() → callbacks      │ │
-│  │  shared via Arc<Mutex<vt100::Parser<PtyCallbacks>>>         │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  write_input() → Arc<Mutex<Box<dyn Write + Send>>>                │
-│  exited: Arc<AtomicBool>                                          │
-└───────────────────────────────┬───────────────────────────────────┘
-                                │ lock parser during draw
-                                ▼
-┌───────────────────────────────────────────────────────────────────┐
-│                    UI / Render Layer  (src/ui/)                    │
-│  drawing.rs → frame.render_widget() per pane                      │
-│  layout.rs  → compute_layout() returns 6 Rect structs             │
-│  terminal_pane.rs reads vt100::Screen cells                       │
-│  file_browser.rs / preview.rs / footer.rs / help.rs / ...        │
-└───────────────────────────────────────────────────────────────────┘
+│                     app/mod.rs — App struct                         │
+│  All mutable state: terminals HashMap, pane visibility, JobState,   │
+│  temp_preview_files Vec<NamedTempFile>, async job receivers, …       │
+│                                                                     │
+│  run() event loop (16 ms poll):                                     │
+│    check_and_restart_exited_ptys()                                  │
+│    poll_git_check() / poll_export_result()                          │
+│    poll_update_check() / poll_update_result()                       │
+│    poll_clipboard_outcome()                                         │
+│    terminal.draw(|f| self.draw(f))                                  │
+│    event::read() → handle_mouse_event / handle_key_event            │
+└──────┬──────────────┬───────────────┬──────────────────────────────-┘
+       │              │               │
+       ▼              ▼               ▼
+┌─────────────┐ ┌──────────┐ ┌─────────────────────────────────────┐
+│ app/pty.rs  │ │ app/     │ │              ui/ modules             │
+│ PTY spawn   │ │keyboard/ │ │  layout.rs  file_browser.rs          │
+│ sync/cd     │ │ mouse.rs │ │  preview.rs terminal_pane.rs         │
+│ quoting     │ │          │ │  footer.rs  help.rs  dialog.rs       │
+└──────┬──────┘ └──────────┘ └─────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│               terminal.rs — PseudoTerminal                         │
+│  portable-pty master + vt100::Parser behind Arc<Mutex<>>           │
+│  Background reader thread: PTY stdout → vt100 parser               │
+│  Main thread: render from parser snapshot / write_input()          │
+└──────────────────────┬──────────────────────────────────────────────┘
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+   PaneId::Claude  PaneId::LazyGit  PaneId::Terminal
+   (claude CLI)   (lazygit)         (user shell)
 ```
 
 ## Component Responsibilities
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| `App` | Master state, event loop, sub-module dispatch | `src/app/mod.rs` |
-| `PseudoTerminal` | PTY lifecycle, background reader thread, vt100 parse | `src/terminal.rs` |
-| `JobState<T>` | Typed async job lifecycle (Idle/Running/poll) | `src/app/job_state.rs` |
-| `compute_layout` | Maps terminal Rect into 6 pane Rects | `src/ui/layout.rs` |
-| `keyboard/` | Key event dispatch, split by context | `src/app/keyboard/mod.rs` + submodules |
-| `mouse.rs` | Mouse event dispatch, hit-test, drag/select | `src/app/mouse.rs` |
-| `drawing.rs` | Full-frame render orchestration | `src/app/drawing.rs` |
-| `clipboard.rs` | 5-stage fallback chain, async worker thread | `src/clipboard.rs` |
-| `config.rs` | YAML config load/save, struct definitions | `src/config.rs` |
-| `update/` | GitHub release check, binary self-replace | `src/update/` |
+| `App` | All application state; event loop orchestration | `src/app/mod.rs` |
+| `PseudoTerminal` | PTY lifecycle, vt100 parsing, scrollback | `src/terminal.rs` |
+| `JobState<T>` | Generic async-job state machine (Idle/Running) | `src/app/job_state.rs` |
+| PTY helpers | Claude command assembly; cd quoting; lazy-init | `src/app/pty.rs` |
+| Layout engine | 6-pane Rect computation; configurable percentages | `src/ui/layout.rs` |
+| Clipboard | Multi-backend copy/paste; async worker thread | `src/clipboard.rs` |
+| Browser/opener | File→browser launch; `validate_program()` allow-list | `src/browser/opener.rs` |
+| PDF/HTML export | Temp-file RAII preview; Typst PDF generation | `src/browser/pdf_export.rs` |
+| Update/check | semver `max_by` release selection | `src/update/check.rs` |
+| Update/install | Binary self-replace; `filter_restart_args()` | `src/update/install.rs` |
+| Config | YAML load/save; all tuneable parameters | `src/config.rs` |
+| Git ops | Background git-remote check | `src/app/git_ops.rs` |
 
 ## Pattern Overview
 
-**Overall:** Single-threaded event loop with shared-state PTY threads.
+**Overall:** Single-threaded TUI event loop with background threads for blocking I/O.
 
 **Key Characteristics:**
-- `App` is a single monolithic struct (≈165 fields). All handler modules implement `App` via `impl App` blocks, not separate structs.
-- PTY output is produced on N background threads (one per pane); main thread consumes via `Arc<Mutex<vt100::Parser>>` during `draw()`.
-- Async jobs (update check, git remote check, PDF export) use `std::sync::mpsc` channels wrapped in `JobState<T>`, polled each event-loop iteration with `try_recv()`. No blocking inside the loop.
-- 16ms poll timeout gives ~60fps UI refresh rate.
+- One `App` struct owns all state; no global mutable state (clipboard worker uses `OnceLock<Mutex<>>`)
+- Async jobs use `JobState<T>` (mpsc channel) polled each frame — never block the loop
+- PTY output parsed off-main-thread; UI reads parser snapshot under short lock
+- RAII governs all temp-file lifetime (`Vec<NamedTempFile>` on `App`)
 
 ## Layers
 
-**CLI Dispatch Layer:**
-- Purpose: Parse args, handle non-TUI modes, bootstrap tokio runtime
+**Entry / CLI Layer:**
+- Purpose: CLI argument dispatch; TUI initialisation; panic hook; signal masking
 - Location: `src/main.rs`
-- Contains: `Args` (clap), `run_update_check_cli`, `run_clipboard_diag_cli`, `run_ssh_paste_diag_cli`, `async_main`
-- Depends on: `update`, `clipboard`, `session`, `config`, `app`
+- Contains: `Args` (clap), one-shot CLI modes, `async_main()`
+- Depends on: all modules
+- Used by: OS process spawner
 
-**App State Layer:**
-- Purpose: Own all application state, run the event loop
-- Location: `src/app/mod.rs`
-- Contains: `App` struct, `App::new()`, `App::run()`
-- Depends on: all other layers
-- Used by: `main.rs` only
+**Application Layer:**
+- Purpose: State ownership and event routing
+- Location: `src/app/`
+- Contains: `App`, `LayoutRects`, `SavedLayout`, sub-modules for keyboard/mouse/drawing/pty/clipboard/git_ops/update/ssh_paste
+- Depends on: `terminal`, `ui`, `browser`, `clipboard`, `update`, `config`
+- Used by: `main.rs`
 
-**Input Routing Layer:**
-- Purpose: Translate crossterm events into App mutations
-- Location: `src/app/keyboard/` (5 submodules), `src/app/mouse.rs`
-- Contains:
-  - `keyboard/mod.rs` — priority-ordered dispatch (dialogs first, then global, then pane-specific)
-  - `keyboard/global.rs` — F7/F8/F9/F10/F11/F12, Ctrl+P/O/X/E
-  - `keyboard/dialogs.rs` — fuzzy finder, update dialog, wizard, settings, permission mode, claude startup, about, help, menu, export chooser
-  - `keyboard/file_browser.rs` — j/k/l/h navigation, enter, backspace
-  - `keyboard/preview.rs` — search, edit mode (tui-textarea), read-only scroll
-  - `keyboard/terminal.rs` — pass-through to PTY, scrollback (Shift+PageUp/Down)
-- Depends on: `terminal.rs`, `types.rs`, `clipboard.rs`
-
-**PTY Threading Layer:**
-- Purpose: Manage subprocess lifecycle and terminal emulation
+**Terminal Layer:**
+- Purpose: PTY process management and VT100 screen emulation
 - Location: `src/terminal.rs`
-- Contains: `PseudoTerminal`, `PtyCallbacks` (DSR/CPR/DA response handler)
-- Shared state: `Arc<Mutex<vt100::Parser<PtyCallbacks>>>` read by UI, written by background thread
-- Writer: `Arc<Mutex<Box<dyn Write + Send>>>` — locked only during `write_input()`
-- Exit detection: `Arc<AtomicBool>` set by reader thread on EOF
+- Contains: `PseudoTerminal`, `PtyCallbacks` (DSR/DA response)
 - Depends on: `portable-pty`, `vt100`
+- Used by: `app/pty.rs`, `ui/terminal_pane.rs`
 
-**Async Job Layer:**
-- Purpose: Non-blocking background work that delivers a single result
-- Location: `src/app/job_state.rs`, used in `src/app/update.rs`, `src/app/git_ops.rs`, `src/app/clipboard.rs`
-- Contains: `JobState<T>` enum (`Idle` | `Running(Receiver<T>)`), `PollOutcome<T>` enum
-- Pattern: spawn `std::thread::spawn` → send on `mpsc::Sender<T>` → `App::run()` calls `poll()` each loop
-- Active jobs on `App`: `git_check_job`, `update_check_job`, `update_job`, `export_job`
-
-**UI Render Layer:**
-- Purpose: Stateless frame rendering from App state
+**UI Layer:**
+- Purpose: Ratatui widget rendering; no business logic
 - Location: `src/ui/`
-- Contains: one file per widget/pane (see STRUCTURE.md)
-- Depends on: `ratatui`, `vt100` (reads parser screen), `syntect` (syntax highlighting)
-- Called by: `src/app/drawing.rs` once per loop iteration
+- Contains: `layout.rs`, `file_browser.rs`, `preview.rs`, `terminal_pane.rs`, `footer.rs`, `help.rs`, `fuzzy_finder.rs`, `dialog.rs`, `update_dialog.rs`, `wizard_ui.rs`, `settings.rs`, `about.rs`, `menu.rs`, `permission_mode.rs`, `claude_startup.rs`, `drag_ghost.rs`, `syntax.rs`
+- Depends on: `types`, `app` state (read-only references during draw)
+- Used by: `app/drawing.rs`
 
-**Supporting Modules:**
-- `src/clipboard.rs` — 5-stage fallback: arboard → xclip → xsel → wl-copy → OSC 52; async worker thread for copy, sync path for diagnostics
-- `src/config.rs` — YAML via `serde_yaml_ng`, search paths: `./config.yaml` → `~/.config/claude-workbench/config.yaml`
-- `src/git/mod.rs` — git status queries for file browser coloring and remote-ahead detection
-- `src/update/` — GitHub Releases API via `self_update` crate, self-replace binary on disk
-- `src/session.rs` — session persistence (currently returns defaults)
-- `src/filter.rs` — file name filtering for fuzzy finder
-- `src/syntax_registry.rs` — syntect `SyntaxSet` singleton
+**Browser Layer:**
+- Purpose: File preview in external browser; PDF/HTML export
+- Location: `src/browser/`
+- Contains: `opener.rs`, `pdf_export.rs`, `markdown.rs`, `syntax.rs`, `template.rs`, `typst_pdf.rs`
+- Depends on: `tempfile`, optionally `typst` (feature-gated)
+- Used by: `app/file_ops.rs`, `app/keyboard/`
+
+**Clipboard Layer:**
+- Purpose: Multi-backend copy/paste with async worker; SSH/XRDP fallbacks
+- Location: `src/clipboard.rs`
+- Contains: `copy_to_clipboard()`, `paste_from_clipboard()`, `ClipboardStrategy`, worker thread, `which()`, `is_executable()`
+- Depends on: `arboard`, subprocess helpers
+- Used by: `app/clipboard.rs`, `main.rs` (diag)
+
+**Update Layer:**
+- Purpose: GitHub release check; binary self-replace; restart
+- Location: `src/update/`
+- Contains: `check.rs`, `install.rs`, `state.rs`, `version.rs`, `log.rs`, `release_notes.rs`, `mod.rs`
+- Depends on: `self_update`, `semver`
+- Used by: `app/update.rs`, `main.rs`
+
+## JobState<T> — Generic Async Job
+
+`src/app/job_state.rs` defines the canonical pattern for all background work:
+
+```rust
+pub enum JobState<T> {
+    Idle,
+    Running(Receiver<T>),
+}
+
+pub enum PollOutcome<T> { Pending, Ready(T), Disconnected }
+
+impl<T> JobState<T> {
+    pub fn poll(&mut self) -> PollOutcome<T> { … } // resets to Idle on terminal outcome
+}
+```
+
+Active `JobState` fields on `App`:
+- `git_check_job: JobState<GitRemoteCheckResult>` — remote-ahead detection
+- `update_check_job: JobState<UpdateCheckResult>` — GitHub release poll
+- `update_job: JobState<UpdateResult>` — binary download + replace
+- `export_job: JobState<Result<PathBuf, String>>` — async PDF/MD export
+
+All are polled unconditionally each frame. Callers do not hold receivers directly; `JobState` encapsulates the `Receiver<T>` and exposes only the outcome enum.
 
 ## Data Flow
 
-### Primary Event Loop Iteration
+### Primary Event Loop
 
-1. `App::run()` calls `check_and_restart_exited_ptys()` — restart any PTY whose `exited` flag is set (`src/app/pty.rs`)
-2. Auto-refresh file browser and preview if `auto_refresh_ms` elapsed
-3. Poll all `JobState` receivers: `poll_git_check()`, `poll_export_result()`, `poll_update_check()`, `poll_update_result()`, `poll_clipboard_outcome()` (`src/app/update.rs`, `src/app/git_ops.rs`, `src/app/clipboard.rs`)
-4. `terminal.draw(|frame| self.draw(frame))` — calls `src/app/drawing.rs` which calls `ui::layout::compute_layout()` then renders each pane
-5. `event::poll(16ms)` — returns when crossterm has an event or timeout
-6. Route event: `Mouse` → `handle_mouse_event()`, `Key` → `handle_key_event()`, `Paste` → `handle_paste_event()`
+1. `main.rs` calls `App::run(terminal)` (`src/app/mod.rs:427`)
+2. Each iteration: poll background jobs → `terminal.draw()` → `event::poll(16ms)`
+3. `Event::Key(k)` → `handle_key_event(k)` (`src/app/keyboard/mod.rs`)
+4. `Event::Mouse(m)` → `handle_mouse_event(m, rects)` (`src/app/mouse.rs`)
+5. `Event::Paste(text)` → `handle_paste_event(text)` (bracketed paste)
+6. Key events for terminal panes → `pty.write_input(bytes)` (`src/terminal.rs`)
 
-### PTY Output Path
+### PTY Threading Model
 
-1. Background thread in `PseudoTerminal::new()` calls `reader.read(&mut buffer)` in a loop
-2. Acquires `Arc<Mutex<vt100::Parser>>`, calls `parser.process(&buffer[..n])`
-3. `PtyCallbacks::unhandled_csi()` intercepts DSR/DA queries, queues responses
-4. Responses written back to PTY via `Arc<Mutex<Box<dyn Write>>>` before releasing lock
-5. Main thread acquires same mutex during `draw()` to read `parser.screen()` cells
+```
+Main thread                      Reader thread (per PTY)
+    │                                    │
+    │  PseudoTerminal::new()             │
+    │  ──────────────────────────────►  spawned
+    │                                    │  loop { pty_reader.read() }
+    │                                    │    → parser.lock().process()
+    │                                    │  EOF → exited.store(true)
+    │
+    │  draw(): parser.lock().screen()   ← short read lock
+    │  write_input(): writer.lock()     ← short write lock
+```
 
-### PTY Input Path
+The `Arc<Mutex<vt100::Parser<PtyCallbacks>>>` is shared between the reader thread (writer) and main thread (reader during draw). Lock contention is bounded: the reader thread holds it only for the duration of `process()` per read chunk; the main thread holds it only for `screen()` snapshot during draw.
 
-1. Key event routed to `keyboard/terminal.rs` → `handle_terminal_pane_key()`
-2. Key translated to byte sequence via `src/input.rs` (`key_event_to_bytes()`)
-3. `PseudoTerminal::write_input(bytes)` — resets scrollback to 0, then writes to `Arc<Mutex<writer>>`
+### vt100 Parser and Scrollback
 
-### Async Job Pattern (e.g. update check)
+- Parser initialized with 1000-line scrollback: `vt100::Parser::new(rows, cols, 1000)`
+- `PtyCallbacks` implements `vt100::Callbacks` to intercept DSR/DA queries and send PTY responses back synchronously
+- `write_input()` resets scroll position to 0 (bottom) so typed input is always visible
+- `Shift+PageUp/Down` and `Shift+Up/Down` adjust `App`'s scroll offset; render reads `parser.screen()` at that offset
 
-1. User presses `u` in help screen → `app.start_update_check()` (`src/app/update.rs`)
-2. `std::thread::spawn` runs blocking HTTP check, sends result on `mpsc::Sender<UpdateCheckResult>`
-3. `app.update_check_job` transitions to `JobState::Running(receiver)`
-4. Each loop iteration: `poll_update_check()` calls `update_check_job.poll()` → `try_recv()`
-5. On `PollOutcome::Ready(result)`: update `update_state`, show dialog if update available
+### Directory Sync Pattern
 
-### PTY Resize
+`sync_terminals()` (`src/app/pty.rs:169`) sends `cd <quoted-path>\r` to the Terminal pane only when the file-browser directory changes. Claude pane keeps its initial working directory permanently.
 
-1. `draw()` calls `compute_layout()` to get current `Rect` for each terminal pane
-2. For each visible terminal pane: `pty.resize(rect.height - 2, rect.width - 2)` (border accounting)
-3. `PseudoTerminal::resize()` checks current size first — no-op if unchanged
-4. On size change: `master.resize(PtySize)` + `parser.screen_mut().set_size()`
+Path quoting uses `quote_path_for_cd()` (`src/app/pty.rs:435`), a module-private helper that wraps `shlex::try_quote`. Returns `None` only for NUL-containing paths (unreachable on real filesystems). Callers receiving `None` log via `log_update()` and skip — never fall back to unescaped output.
 
-### Directory Sync
+### Browser Preview / Temp-File Lifetime (RAII)
 
-1. File browser navigates to new directory
-2. `App::sync_terminals()` sends `cd "{path}"\r` bytes to Terminal pane PTY
-3. LazyGit is restarted in new directory (killed and respawned) when F5 shows it while hidden
+`default_preview_file()` (`src/browser/pdf_export.rs:114`) creates a `tempfile::NamedTempFile` via `Builder::new().prefix(…).suffix(".html").tempfile_in(temp_dir())`. The kernel guarantees exclusive O_EXCL creation — no predictable path, no symlink-attack vector.
 
-## Key Abstractions
+The returned `NamedTempFile` is pushed into `App::temp_preview_files: Vec<tempfile::NamedTempFile>` (`src/app/mod.rs:161`). Files are deleted automatically when:
+- A new preview replaces them (old entry removed from `Vec`)
+- `App` drops at process exit
 
-**`PseudoTerminal` (`src/terminal.rs`):**
-- Purpose: Wraps portable-pty + vt100 parser into a single owned handle
-- Fields: `parser: Arc<Mutex<vt100::Parser<PtyCallbacks>>>`, `writer: Arc<Mutex<Box<dyn Write+Send>>>`, `master: Box<dyn MasterPty+Send>`, `exited: Arc<AtomicBool>`
-- Pattern: background thread shares `Arc` clones; main thread accesses via `lock_or_recover()` (poison-safe)
-- Instances: up to 3, keyed by `PaneId` in `App::terminals: HashMap<PaneId, PseudoTerminal>`
+There is no `cleanup_temp_files()` function. Deletion is purely RAII.
 
-**`JobState<T>` (`src/app/job_state.rs`):**
-- Purpose: Explicit lifecycle for single-shot async jobs replacing `Option<Receiver<T>>`
-- States: `Idle` (no job) | `Running(Receiver<T>)` (in flight)
-- `poll()` returns `PollOutcome::{Pending, Ready(T), Disconnected}` and auto-resets to `Idle`
-- Used for: `git_check_job: JobState<GitRemoteCheckResult>`, `update_check_job: JobState<UpdateCheckResult>`, `update_job: JobState<UpdateResult>`, `export_job: JobState<Result<PathBuf, String>>`
+`markdown_to_html` and `text_to_html` (callers in `app/file_ops.rs`) similarly return `NamedTempFile` values that the caller stores in `temp_preview_files`.
 
-**`LayoutRects` (`src/app/mod.rs`):**
-- Purpose: Bundle of 6 `Rect` values recomputed per mouse event to hit-test pane clicks
-- Fields: `files`, `preview`, `claude`, `lazygit`, `terminal`, `footer`
+### Update Path — filter_restart_args Invariant
 
-**`ClipboardOutcome` (`src/clipboard.rs`):**
-- Purpose: Enumerate which fallback stage succeeded or why all failed
-- Values: `Arboard | Xclip | Xsel | WlCopy | Osc52 | Failed(String) | Submitted`
-- `Submitted` is returned immediately when copy is queued to async worker; real outcome arrives later via `take_pending_outcome()`
+`restart_application()` (`src/update/install.rs:209`) re-execs the binary. Before forwarding `std::env::args()` to the new process, it calls `filter_restart_args()` (`src/update/install.rs:180`) which strips one-shot flags:
 
-## Entry Points
+- `--update-to` (+ its value argument)
+- `--check-update`
+- `--clipboard-diag`
+- `--ssh-paste-diag`
 
-**TUI application:**
-- Location: `src/main.rs` → `async_main()` → `App::new()` + `App::run()`
-- Triggers: normal `cargo run` / binary invocation without special flags
+**Invariant:** any flag that causes early-exit without starting the TUI must be listed here. Omitting a flag would cause an infinite restart loop (issue tag: IN-02).
 
-**CLI diagnostic modes (all exit without TUI):**
-- `--check-update` → `run_update_check_cli()`
-- `--update-to <version>` → `run_update_to_version_cli()`
-- `--clipboard-diag` → `run_clipboard_diag_cli()`
-- `--ssh-paste-diag` → `run_ssh_paste_diag_cli()`
+`--update-to` is `#[cfg(debug_assertions)]` in `Args` (`src/main.rs:52`) — release binaries cannot trigger intentional downgrade.
+
+Release selection in `check.rs` uses `semver::Version` `max_by` over all fetched releases rather than trusting `releases[0]` (creation-order). Unparseable tags (nightly, pre-release) are silently skipped.
 
 ## Architectural Constraints
 
-- **Threading:** Single UI thread. PTY reader threads (one per pane) share state only via `Arc<Mutex>` and `Arc<AtomicBool>`. Async jobs run on `std::thread` (not tokio tasks) and communicate via `mpsc`. Tokio runtime is present but used only for the outer `block_on`; internal async is avoided in the event loop.
-- **Global state:** `OnceLock<Mutex<Sender<ClipboardJob>>>` in `src/clipboard.rs` holds the async clipboard worker sender. `SyntaxSet` in `src/syntax_registry.rs` is effectively a module-level singleton. No other global mutable state.
-- **Circular imports:** None observed. `app/` depends on `terminal`, `ui`, `clipboard`, `config`, `types`, `git`, `update`, `setup`. `ui/` depends only on `types` and `config`.
-- **Paste handling:** Claude pane receives raw bytes (no bracketed-paste wrapping); LazyGit and Terminal panes receive `\x1b[200~{text}\x1b[201~`. This asymmetry is by design — Claude CLI does not support bracketed paste.
-- **PTY auto-restart:** When `PseudoTerminal::exited` is true, `check_and_restart_exited_ptys()` respawns using the same command. Configurable via `config.pty.auto_restart`.
+- **Threading:** Single main thread owns all `App` state. Background threads communicate via `mpsc` channels only (never share `App` references). Clipboard worker is a separate long-lived thread (`OnceLock<Sender>`).
+- **Global state:** `src/clipboard.rs` uses three `OnceLock` singletons: `STRATEGY`, `IS_SSH`, `WORKER_TX`/`OUTCOME_SLOT`. No other module-level mutable state.
+- **Circular imports:** None detected. `app/` imports `terminal`, `ui`, `browser`, `clipboard`, `update`. `ui/` imports `types` only. `browser/` does not import `app/`.
+- **Unsafe blocks:** Confined to `libc::localtime_r` in `src/browser/pdf_export.rs:89` (date formatting) and `libc::signal(SIGTSTP, SIG_IGN)` in `src/main.rs:359`. No unsafe PTY or parser code.
+- **Feature flags:** `pdf-export` gates Typst PDF rendering. `src/browser/pdf_export.rs` compiles in all configurations; only the `ExportFormat::Pdf` branch is gated.
 
 ## Anti-Patterns
 
-### Monolithic `App` struct
+### Spawning commands with unvalidated program strings
 
-**What happens:** `App` in `src/app/mod.rs` accumulates ≈165 fields. All handler submodules operate as `impl App` blocks accessing the full struct directly.
-**Why it's wrong:** Adding any new feature requires touching the `App` struct definition. Testing individual handlers requires constructing the full `App`. Compile times grow with the struct.
-**Do this instead:** Extract cohesive sub-states (e.g. `ClipboardState`, `UpdateState`) as owned sub-structs and pass them by `&mut` to handlers. `UpdateState` already exists (`src/update/state.rs`) — this pattern should be extended.
+**What happens:** Old code passed `browser`/`editor` config strings directly to `Command::new()`.
+**Why it's wrong:** Shell metacharacters in a config value could execute unintended commands.
+**Do this instead:** Call `validate_program(program)` (allow-list: alphanumeric + `_-./ +`) before any `Command::new()`. See `src/browser/opener.rs:85`.
 
-### `lock_or_recover` poison suppression
+### Predictable temp-file paths
 
-**What happens:** `src/terminal.rs`'s `lock_or_recover()` silently recovers from poisoned mutexes, returning the inner data.
-**Why it's wrong:** A panicking PTY reader thread will leave the parser in an unknown state; the main thread continues rendering corrupt screen data with no visible error.
-**Do this instead:** Log the poison event and treat the pane as errored (set `exited = true`, show error overlay). At minimum surface a debug-build assertion.
+**What happens:** Former `default_preview_filename()` returned a fixed path like `/tmp/{project}-preview.html`.
+**Why it's wrong:** Symlink attack (CR-03 / SEC-04): attacker pre-creates symlink at that path.
+**Do this instead:** Use `tempfile::Builder` with `O_EXCL` — `default_preview_file()` in `src/browser/pdf_export.rs:114`.
+
+### Selecting GitHub releases by creation order
+
+**What happens:** Former code used `releases[0]`.
+**Why it's wrong:** A backdated patch release could suppress legitimate updates.
+**Do this instead:** `max_by(semver::Version)` across all fetched releases. See `src/update/check.rs:43`.
 
 ## Error Handling
 
-**Strategy:** `anyhow::Result` at the `App::run()` boundary; PTY errors stored as `Option<String>` on `App` (e.g. `claude_error`, `lazygit_error`, `terminal_error`) and rendered as red-border overlays inside the pane.
+**Strategy:** `anyhow::Result` throughout the public API surface. PTY spawn errors stored as `Option<String>` on `App` and rendered as red-bordered pane messages. Background job failures surfaced via `PollOutcome::Disconnected` or `JobState`-wrapped `Result`.
 
 **Patterns:**
-- PTY spawn failure: stored in `App::claude_error` / `lazygit_error` / `terminal_error`, shown as pane overlay
-- PTY exit: `Arc<AtomicBool>` set by reader thread; `check_and_restart_exited_ptys()` respawns
-- Clipboard failure: `ClipboardOutcome::Failed(msg)` triggers `clipboard_error_flash` footer banner (3s)
-- Async job disconnect: `PollOutcome::Disconnected` resets job to `Idle`, UI silently returns to previous state
+- PTY errors: stored in `claude_error` / `lazygit_error` / `terminal_error` on `App`; displayed in `terminal_pane.rs`
+- Clipboard errors: `ClipboardOutcome::Failed(reason)` written to `OUTCOME_SLOT`; polled by `poll_clipboard_outcome()` → `clipboard_error_flash` footer message
+- Export errors: `export_job: JobState<Result<PathBuf, String>>` — `Err(String)` shown in dialog
 
 ## Cross-Cutting Concerns
 
-**Logging:** No structured logging framework. Startup progress written to stderr before ratatui enters alternate screen. Update operations write to `/tmp/claude-workbench-update.log`.
-**Validation:** Config loaded at startup via serde; unknown fields silently ignored.
-**Authentication:** Not applicable. Claude CLI handles its own auth.
+**Logging:** `update::log_update()` writes to `/tmp/claude-workbench-update.log`. All other operational logging is absent (TUI renders own diagnostic output).
+**Validation:** Program names validated via `validate_program()` allow-list before `Command::new()`. Path quoting via `shlex::try_quote` before PTY injection.
+**Authentication:** None (no user accounts). Claude CLI handles its own auth.
 
 ---
 

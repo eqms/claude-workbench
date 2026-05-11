@@ -5,234 +5,291 @@
 ## Test Framework
 
 **Runner:**
-- `cargo test` (standard Rust built-in test harness)
-- No separate test runner, no jest/pytest equivalents
-- Config: none (uses Cargo defaults)
+- `cargo test` (standard Rust test harness, no nextest configured)
+- Config: `Cargo.toml` — no separate test runner config file
 
 **Assertion Library:**
-- Standard `assert!`, `assert_eq!`, `assert_ne!` macros only
-- No `pretty_assertions`, `proptest`, or similar crates
+- Standard `assert!`, `assert_eq!`, `assert_ne!` macros
+- No external assertion crates (no `asserting`, no `pretty_assertions`)
+- No `assert_cmd` or `predicates` crates — CLI integration tests use `std::process::Command` directly
 
 **Run Commands:**
 ```bash
-cargo test              # Run all tests (111 passing as of v0.89.0)
-cargo test -- --nocapture  # Show println! output from tests
-cargo test test_name    # Run specific test by name substring
-cargo clippy            # Lint (16 warnings pre-audit, 0 post-audit target)
-cargo fmt -- --check    # Check formatting
+cargo test                    # Run all tests (unit + integration)
+cargo test --release          # Run all tests including #[cfg(not(debug_assertions))] tests
+cargo test test_name          # Run specific test by name substring
+cargo test -- --nocapture     # Show println!/eprintln! output
+cargo test -p claude-workbench -- --test-threads=1   # Sequential (for stateful tests)
 ```
 
 ## Test File Organization
 
-**Location:** All tests co-located in source files as inline `#[cfg(test)]` modules. No separate `tests/` directory exists. No integration test directory.
+**Location:**
+- **Unit tests**: Co-located with source — `#[cfg(test)] mod tests { ... }` at bottom of each `.rs` file
+- **Integration tests**: `tests/` directory at project root — compiled as separate crates that invoke the binary
 
-**Naming:** Test functions use `test_` prefix (enforced by convention, not tooling):
-- `test_prompt_filtering`, `test_version_newer_basic`, `test_auto_mode_cli_flag`
+**Naming:**
+- Unit test functions: `test_<what_is_tested>_<condition>` (e.g., `test_filter_restart_args_removes_one_shot_flags`)
+- Integration test files: named after the entry-point feature: `tests/cli.rs`
+- No `_spec` suffix; no `should_` prefix
 
 **Structure:**
 ```
-src/
-├── types.rs          # 8 tests — enum API correctness
-├── config.rs         # 4 tests — shell detection, config defaults
-├── filter.rs         # 4 tests — terminal output filtering logic
-├── clipboard.rs      # ~5 tests — SSH detection, strategy detection
-├── app_detector.rs   # tests — app detection helpers
-├── filter.rs         # 4 tests — line filtering, syntax detection
-├── git/mod.rs        # tests — git status parsing
-├── update/mod.rs     # 5 tests — version comparison, state transitions
-├── browser/markdown.rs    # tests — HTML generation
-├── browser/template.rs    # tests — template rendering
-├── browser/syntax.rs      # tests — syntax highlighting
-├── browser/typst_pdf.rs   # tests — PDF generation (feature-gated)
-├── browser/pdf_export.rs  # tests — PDF export
-├── setup/wizard.rs        # tests — setup wizard logic
-├── setup/dependency_checker.rs  # tests — dependency detection
-├── app/pty.rs        # tests — PTY state management
-├── ui/settings.rs    # tests — settings UI state
-└── syntax_registry.rs     # tests — syntax registry lookup
+workbench/
+├── src/
+│   ├── app/pty.rs                    # unit tests: quote_path_for_cd, build_claude_command
+│   ├── browser/opener.rs             # unit tests: validate_program
+│   ├── browser/pdf_export.rs         # unit tests: RAII tempfile, filename generation
+│   ├── clipboard.rs                  # unit tests: base64, which, is_executable, SSH detection
+│   ├── setup/dependency_checker.rs   # unit tests: check_command
+│   ├── update/check.rs               # unit tests: semver max selection
+│   └── update/install.rs             # unit tests: filter_restart_args
+└── tests/
+    └── cli.rs                        # integration tests: --help, --version, unknown flag, release-mode flag gate
 ```
+
+## Test Suite Size
+
+- **Pre-Wave-1 baseline:** 111 passing tests
+- **Post-Wave-1:** 130 passing unit tests + 3 integration tests in `tests/cli.rs`
+- Total: 133 tests
 
 ## Test Structure
 
-**Suite Organization:**
+**Unit suite organization:**
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_something() {
+    fn test_<subject>_<condition>() {
         // arrange
-        let input = vec!["line".to_string()];
+        let input = ...;
         // act
-        let result = some_function(input);
+        let result = function_under_test(input);
         // assert
-        assert_eq!(result.field, expected);
+        assert_eq!(result, expected, "descriptive failure message: {result:?}");
     }
 }
 ```
 
-**Patterns:**
-- `use super::*;` to import all items from the parent module
-- No `before_each`/`after_each` — test functions are fully self-contained
-- Arrange/act/assert structure without explicit labels
-- Platform-gated tests use `#[cfg(windows)]` / `#[cfg(not(windows))]` on the test function itself
+**Helper factory functions** (no macro-based test infrastructure):
+```rust
+fn config_with_claude_command() -> Config { ... }
+fn base_opts() -> StartupOptions { ... }
+```
+These are plain `fn` inside the `mod tests` block — not `#[fixture]` or similar.
+
+**Integration test structure** (`tests/cli.rs`):
+```rust
+fn workbench_binary() -> &'static str {
+    env!("CARGO_BIN_EXE_claude-workbench")  // resolves binary path at compile time
+}
+
+#[test]
+fn help_prints_usage_and_exits_zero() {
+    let output = Command::new(workbench_binary())
+        .arg("--help")
+        .output()
+        .expect("failed to invoke claude-workbench --help");
+    assert!(output.status.success(), "...");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Usage"), "...");
+}
+```
 
 ## Mocking
 
-**Framework:** None. No `mockall`, `mock_it`, or similar crates.
+**Framework:** None — no mock crate (`mockall`, `double`, etc.) in use.
 
 **Patterns:**
-- Pure helper functions extracted specifically to enable testing without env access:
-  ```rust
-  // Public cached version (untestable — reads env, uses OnceLock)
-  pub fn is_ssh_session() -> bool { *IS_SSH.get_or_init(|| detect_ssh_session(...)) }
+- External processes tested via real binaries (`git`, `sh`) — no process mocking
+- File system tested via `tempfile::NamedTempFile` for RAII temp files (`src/browser/pdf_export.rs`)
+- Platform-specific behavior isolated with `#[cfg(unix)]` / `#[cfg(windows)]` blocks inside test functions
 
-  // Private pure helper (testable — no side effects)
-  fn detect_ssh_session(ssh_tty: Option<&OsStr>, ssh_connection: Option<&OsStr>) -> bool {
-      let nonempty = |v: Option<&OsStr>| v.map(|s| !s.is_empty()).unwrap_or(false);
-      nonempty(ssh_tty) || nonempty(ssh_connection)
-  }
-  ```
-- Git/subprocess calls not mocked — tests that require git CLI are avoided or skipped
-- No test doubles, no dependency injection infrastructure
+**What to Mock:**
+- Not applicable — pure-function unit tests dominate; integration tests hit the real binary
 
-**What to mock:** Nothing — design for testability via pure function extraction instead.
-
-**What NOT to mock:** File system, git CLI, PTY operations — these are excluded from unit tests entirely.
+**What NOT to Mock:**
+- The compiled binary in integration tests — `CARGO_BIN_EXE_*` resolves the real build artifact
 
 ## Fixtures and Factories
 
-**Test Data:** Inline literals in each test function. No shared fixtures or factory helpers:
+**Test Data:**
 ```rust
-#[test]
-fn test_prompt_filtering() {
-    let input = vec![
-        "user@host:~$ ".to_string(),
-        "ls -la".to_string(),
-        "total 123".to_string(),
-    ];
-    let options = FilterOptions::default();
-    let result = filter_lines(input, &options);
-    assert_eq!(result.lines.len(), 1);
+// Factory functions for complex structs — no fixture files
+fn config_with_claude_command() -> Config {
+    let mut cfg = Config::default();
+    cfg.pty.claude_command = vec!["claude".to_string()];
+    cfg
 }
-```
 
-**Default trait usage:** `FilterOptions::default()`, `Config::default()`, `UpdateState::new()` used as test fixtures — the `Default` impl serves as the canonical test baseline.
-
-**Location:** All fixtures inline — no `tests/fixtures/` directory, no separate data files.
-
-## Coverage
-
-**Requirements:** None enforced. No `cargo-tarpaulin` or `grcov` configured.
-
-**Current state:** 111 passing tests as of v0.89.0 (verified post-audit).
-
-**View Coverage:**
-```bash
-# Not configured — add cargo-tarpaulin for coverage reporting:
-cargo install cargo-tarpaulin
-cargo tarpaulin --out Html
-```
-
-**Known gaps:** PTY/terminal rendering, UI rendering functions, mouse event routing, clipboard async worker, most of `src/app/mod.rs` event loop — none of these have unit tests. See `CONCERNS.md`.
-
-## Test Types
-
-**Unit Tests:** 100% of tests are unit tests. Co-located inline `#[cfg(test)]` modules testing pure logic.
-
-**Integration Tests:** None (`tests/` directory does not exist).
-
-**E2E Tests:** None. No Playwright, no terminal automation.
-
-**Doc Tests:** None. No `///` examples with ```` ```rust ```` blocks that run under `cargo test`.
-
-## Common Patterns
-
-**Enum exhaustiveness testing:**
-```rust
-#[test]
-fn test_all_permission_modes_have_unique_names() {
-    let all = ClaudePermissionMode::all();
-    let names: Vec<&str> = all.iter().map(|m| m.name()).collect();
-    let unique: std::collections::HashSet<&&str> = names.iter().collect();
-    assert_eq!(names.len(), unique.len(), "duplicate permission mode names");
-}
-```
-
-**State transition testing:**
-```rust
-#[test]
-fn test_update_state_transitions() {
-    let mut state = UpdateState::new();
-    state.start_check();
-    assert!(state.checking);
-    state.set_available("1.0.0".to_string(), Some("Release notes".to_string()));
-    assert!(!state.checking);
-    assert!(state.show_dialog);
-    state.close_dialog();
-    assert!(!state.show_dialog);
-}
-```
-
-**Version comparison / ordering:**
-```rust
-#[test]
-fn test_version_newer_basic() {
-    assert!(version_newer("0.38.0", "0.37.2"));
-    assert!(version_newer("1.0.0", "0.99.99"));
-    assert!(!version_newer("0.37.2", "0.37.2"));
-}
-```
-
-**Error/boundary testing:**
-```rust
-#[test]
-fn test_traceback_preservation() {
-    let input = vec![
-        "Traceback (most recent call last):".to_string(),
-        "  File \"test.py\", line 10".to_string(),
-        "ValueError: test error".to_string(),
-    ];
-    let result = filter_lines(input, &FilterOptions::default());
-    assert!(result.contains_error);
-    assert_eq!(result.lines.len(), 3);
-}
-```
-
-**Platform-conditional tests:**
-```rust
-#[cfg(not(windows))]
-#[test]
-fn default_shell_path_unix_is_absolute_or_shell_env() {
-    let s = default_shell_path();
-    assert!(s.starts_with('/'), "got: {s}");
-}
-```
-
-## Adding New Tests
-
-**Rule:** Every pure function or state machine method should have a corresponding test in the same file's `#[cfg(test)] mod tests` block.
-
-**Template for a new testable module:**
-```rust
-// Production code above...
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_is_sane() {
-        let s = MyStruct::default();
-        assert_eq!(s.field, expected_value);
+fn base_opts() -> StartupOptions {
+    StartupOptions {
+        permission_mode: ClaudePermissionMode::Default,
+        model: ClaudeModel::Unset,
+        effort: ClaudeEffort::Unset,
+        session_name: String::new(),
+        worktree: String::new(),
+        remote_control: false,
     }
 }
 ```
 
-**When to extract a pure helper for testing** (follow the `detect_ssh_session` pattern):
-- Function reads env vars or global state → extract pure inner function taking those values as parameters
-- Function spawns threads or processes → test the pure data-transformation logic separately
+**Location:**
+- Inline within `mod tests` — no separate fixture files or `tests/fixtures/` directory
+
+## Coverage
+
+**Requirements:** None enforced (no `cargo-llvm-cov` config, no coverage gate in CI)
+
+**View Coverage** (manual):
+```bash
+cargo llvm-cov --html   # if cargo-llvm-cov installed
+```
+
+## Test Types
+
+**Unit Tests (130 passing):**
+- Scope: single function or small module in isolation
+- No I/O except `tempfile::NamedTempFile` for RAII pattern tests
+- Pure logic preferred (semver selection, arg filtering, path quoting, base64)
+
+**Integration Tests (3 in `tests/cli.rs`):**
+- Scope: full binary invocation via `std::process::Command`
+- Verify: exit codes, stdout content, stderr content
+- Use `env!("CARGO_BIN_EXE_claude-workbench")` to locate the compiled binary
+- Require `cargo build` or `cargo test` (not `cargo test --no-run`) to have run first
+
+**E2E Tests:** Not used — no Playwright or similar harness.
+
+## New Test Patterns Introduced by Wave 1
+
+### CLI Integration Pattern (`tests/cli.rs`)
+Invoke binary via `std::process::Command` + `CARGO_BIN_EXE_<name>`:
+```rust
+fn workbench_binary() -> &'static str {
+    env!("CARGO_BIN_EXE_claude-workbench")
+}
+
+let output = Command::new(workbench_binary())
+    .arg("--help")
+    .output()
+    .expect("...");
+assert!(output.status.success(), "exit code: {:?}", output.status);
+let stdout = String::from_utf8_lossy(&output.stdout);
+assert!(stdout.contains("Usage"), "stdout: {}", stdout);
+```
+
+### Compile-Time Flag Gate Testing
+Verify flags are absent in release builds using `#[cfg(not(debug_assertions))]`:
+```rust
+#[test]
+#[cfg(not(debug_assertions))]
+fn update_to_flag_not_present_in_release_build() {
+    let output = Command::new(workbench_binary())
+        .args(["--update-to", "0.1.0"])
+        .output()
+        .expect("...");
+    assert_eq!(output.status.code(), Some(2));  // clap exits 2 for unknown args
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("unexpected argument") || stderr.contains("unrecognized"));
+}
+```
+
+### Stateful Iterator Filtering Pattern (`src/update/install.rs`)
+Test `skip_next` stateful filtering by verifying full removal of flag+value pairs:
+```rust
+#[test]
+fn test_filter_restart_args_removes_one_shot_flags() {
+    let input = vec!["--update-to", "0.1.0", "--check-update", ...].map(String::from);
+    let filtered = filter_restart_args(input.into_iter());
+    assert!(filtered.is_empty(), "all one-shot flags must be removed, got: {filtered:?}");
+}
+```
+
+### RAII Tempfile Lifecycle Testing (`src/browser/pdf_export.rs`)
+Verify deletion-on-drop by capturing the path before drop then asserting absence:
+```rust
+#[test]
+fn test_namedtempfile_deletes_on_drop() {
+    let path = {
+        let tmp = default_preview_file(Path::new("x.md"), "p").unwrap();
+        tmp.path().to_path_buf()
+    }; // tmp drops here — file must be deleted
+    assert!(!path.exists(), "file must be deleted after NamedTempFile drops");
+}
+```
+
+### Unix Permission Testing (`src/clipboard.rs`)
+Test executable bit logic with `std::os::unix::fs::PermissionsExt`:
+```rust
+#[test]
+#[cfg(unix)]
+fn test_is_executable_respects_mode() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::set_permissions(tmp.path(), Permissions::from_mode(0o644)).unwrap();
+    assert!(!is_executable(tmp.path()));
+    std::fs::set_permissions(tmp.path(), Permissions::from_mode(0o755)).unwrap();
+    assert!(is_executable(tmp.path()));
+}
+```
+
+### Pure Semver Logic Testing (`src/update/check.rs`)
+Test algorithmic correctness independent of network/GitHub by constructing tag vectors inline:
+```rust
+#[test]
+fn test_max_semver_selection_ignores_creation_order() {
+    let tags = vec!["v0.85.1", "v0.89.0", "v0.88.3", "v0.85.2"];
+    let best = tags.iter()
+        .filter_map(|t| { let s = t.strip_prefix('v').unwrap_or(t); Version::parse(s).ok().map(|v| (v, t)) })
+        .max_by(|(va, _), (vb, _)| va.cmp(vb))
+        .map(|(_, t)| *t);
+    assert_eq!(best, Some("v0.89.0"));
+}
+```
+
+### Security Boundary Testing (`src/browser/opener.rs`)
+Test allowlist via reject-on-metacharacter pattern — one `assert!` per metachar with label:
+```rust
+#[test]
+fn test_validate_program_rejects_metacharacters() {
+    assert!(validate_program("").is_err(), "empty must be rejected");
+    assert!(validate_program("fire;fox").is_err(), "semicolon");
+    assert!(validate_program("$(rm -rf /)").is_err(), "subshell");
+    assert!(validate_program("a b").is_err(), "space");
+    assert!(validate_program("a|b").is_err(), "pipe");
+    assert!(validate_program("a&b").is_err(), "ampersand");
+    assert!(validate_program("a`b`").is_err(), "backtick");
+}
+```
+
+## Common Patterns
+
+**Async Testing:** Not used — async code tested indirectly through sync wrappers (e.g., `perform_update_sync`); `mpsc::channel` used for threading, tested at the sync boundary.
+
+**Error Testing:**
+```rust
+assert!(result.is_err(), "descriptive reason");
+// For specific error messages — not yet standardized; use string matching on Display
+```
+
+**Panic-safety checks** (used for `DiagCollect` and SSH detection):
+```rust
+#[test]
+fn test_diag_collect_does_not_panic() {
+    let diag = ClipboardDiag::collect();
+    assert!(matches!(diag.strategy, ClipboardStrategy::ArboardFirst | ClipboardStrategy::SubprocessFirst));
+}
+```
+
+**Assertion message convention:** Always include the actual value in the failure message:
+```rust
+assert!(condition, "descriptive label: {value:?}");
+assert_eq!(actual, expected, "context: {extra}");
+```
 
 ---
 

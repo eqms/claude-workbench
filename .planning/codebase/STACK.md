@@ -5,188 +5,109 @@
 ## Languages
 
 **Primary:**
-- Rust 2021 edition — entire codebase (`src/`)
+- Rust (edition 2021) — entire codebase (`src/`)
 
 **Secondary:**
-- YAML — configuration (`config.yaml`, `~/.config/claude-workbench/config.yaml`)
+- YAML — configuration files (`config.yaml`, `~/.config/claude-workbench/config.yaml`)
 
 ## Runtime
 
 **Environment:**
-- Native binary, no VM or interpreter
-- Single process, multi-threaded (tokio multi-thread runtime + dedicated clipboard worker thread + per-PTY reader threads)
+- Native binary (no runtime VM). Compiled to platform-native executable.
+- Targets: `aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`
 
 **Package Manager:**
-- Cargo (Rust toolchain)
-- Lockfile: `Cargo.lock` (present, committed)
+- Cargo (rustup toolchain)
+- Lockfile: `Cargo.lock` — present and committed (binary crate)
 
 ## Frameworks
 
-**TUI / Rendering:**
-- `ratatui` 0.30.0 — terminal UI framework (widgets, layout, rendering)
-- `crossterm` 0.28.1 — cross-platform terminal I/O, keyboard/mouse events, raw mode
-  - Pinned to 0.28 — `tui-textarea` fork depends on `crossterm 0.28` event types
+**Core:**
+- `ratatui` 0.30.0 — TUI rendering framework (widgets, layout, drawing)
+- `crossterm` 0.28.1 — terminal backend for ratatui; **pinned at 0.28**: `tui-textarea` fork targets crossterm 0.28 event types. Upgrading to 0.29 breaks `editor.input(Event::Key(...))` call sites.
+- `tokio` 1.44.0 (features: `rt-multi-thread`) — async runtime; used for update checks and background tasks
 
-**Terminal Emulation:**
-- `portable-pty` 0.8.1 — pseudo-terminal (PTY) creation and management for embedded shells
-- `vt100` 0.16 — VT100/ANSI escape sequence parser with scrollback buffer (1000 lines default)
-
-**Async Runtime:**
-- `tokio` 1.44.0 (`rt-multi-thread` feature) — drives the main async event loop
-
-**CLI Argument Parsing:**
-- `clap` 4.5.37 (`derive`, `env` features) — `--check-update`, `--update-to`, `--clipboard-diag`, `--ssh-paste-diag`, `--fake-version` (debug only)
-
-**Text Editing:**
-- `tui-textarea` (git: `https://github.com/0xferrous/tui-textarea.git`, branch `update-ratatui`) — inline text editor widget, patched for ratatui 0.30 compatibility
-
-**Markdown / Preview:**
-- `tui-markdown` 0.3 — Markdown rendering in TUI panes
-- `pulldown-cmark` 0.13 — Markdown parsing (CommonMark)
-
-**Syntax Highlighting:**
-- `syntect` 5.2 (`default-syntaxes`, `default-themes`, `regex-onig`) — syntax highlighting for file preview pane
-
-**PDF Export (optional feature, enabled by default):**
-- `typst` 0.14.2 — pure-Rust typesetting engine
-- `typst-pdf` 0.14.2 — PDF output backend
-- `typst-library` 0.14.2 — standard library for typst
-- `typst-kit` 0.14.2 (`fonts` feature) — font loading
-- `comemo` 0.4 — memoization required by `typst::World` trait
-- `ecow` 0.2 — `EcoString`/`EcoVec` types used in typst API
-- Feature flag: `pdf-export` (in `[features]`, on by default; disable with `--no-default-features`)
-
-**Serialization:**
-- `serde` 1.0.219 (`derive`) — config struct serialization
-- `serde_yaml_ng` 0.9 — YAML config file parsing/writing
-
-**Clipboard:**
-- `arboard` 3.6 (`wayland-data-control` feature) — cross-platform clipboard (X11 + Wayland native)
-- Subprocess fallback chain (no additional crate): `xclip` → `xsel` → `wl-copy`/`wl-paste` → OSC 52 escape sequence
-- Strategy controlled by env var `CLAUDE_WORKBENCH_CLIPBOARD` (`osc52` | `arboard` | `subprocess`)
-
-**Self-Update:**
-- `self_update` 0.42 (features: `archive-tar`, `archive-zip`, `compression-flate2`, `compression-zip-deflate`, `rustls`, `signatures`) — downloads and installs GitHub Release assets
-
-**Utilities:**
-- `anyhow` 1.0.98 — error handling and propagation
-- `dirs` 5.0 — XDG/platform-aware home/config directory resolution
-- `shlex` 1.3 — shell-style argument splitting for PTY command construction
-- `regex` 1.12 — pattern matching (git status parsing, file filtering)
-- `libc` 0.2 — SIGTSTP suppression via `libc::signal()` (Unix only, one `unsafe` block in `src/main.rs`)
-- `tempfile` 3 — temporary files for update staging
+**Build/Dev:**
+- `cargo build --release` — standard release build
+- Feature flag `pdf-export` enabled by default; disable with `--no-default-features`
 
 ## Key Dependencies
 
-**Critical (would break core functionality if removed):**
-- `ratatui` 0.30.0 — entire UI layer
-- `crossterm` 0.28.1 — terminal raw mode, events; version pinned, do not bump without updating `tui-textarea`
-- `portable-pty` 0.8.1 — embedded PTY shells (Claude, LazyGit, Terminal panes)
-- `vt100` 0.16 — PTY output rendering
-- `tokio` 1.44.0 — async main loop
+**UI & Terminal:**
+- `ratatui` 0.30.0 — widget system, layout engine (`src/ui/`)
+- `crossterm` 0.28.1 — keyboard/mouse events, raw mode, terminal control
+- `tui-textarea` (git: `https://github.com/0xferrous/tui-textarea.git`, branch `update-ratatui`) — editor widget; fork pinned to crossterm 0.28
+- `portable-pty` 0.8.1 — PTY creation and management (`src/terminal.rs`)
+- `vt100` 0.16.2 — VT100 terminal emulator / screen buffer parser; 1000-line scrollback
 
-**Version-Sensitive:**
-- `crossterm` — must stay at 0.28.x; `tui-textarea` fork branch `update-ratatui` imports `crossterm 0.28` event types. Bumping to 0.29 breaks `editor.input(Event::Key(...))` call sites.
-- `tui-textarea` — sourced from git fork, not crates.io. `Cargo.lock` must be committed.
+**Input Safety:**
+- `shlex` 1.3.0 — shell-quoting-aware command splitting for browser/editor config values (`src/browser/opener.rs`). Replaces former hand-rolled `split_command`. Used with `validate_program` allow-list check.
 
-**Infrastructure:**
-- `self_update` 0.42 — GitHub Releases API, binary download, extraction, atomic self-replace
-- `arboard` 3.6 — clipboard; `wayland-data-control` feature needed for Wayland sessions
+**Clipboard:**
+- `arboard` 3.6.1 (features: `wayland-data-control`) — cross-platform clipboard (X11 + Wayland primary path)
+
+**Syntax & Markup:**
+- `syntect` 5.2 (features: `default-syntaxes`, `default-themes`, `regex-onig`) — syntax highlighting (`src/ui/syntax.rs`)
+- `tui-markdown` 0.3 — Markdown rendering in TUI panes
+- `pulldown-cmark` 0.13 — Markdown → HTML for browser preview
+
+**PDF Export (feature-gated, default ON):**
+- `typst` 0.14.2 — pure-Rust document typesetting engine
+- `typst-pdf` 0.14.2 — PDF output backend
+- `typst-library` 0.14.2 — Typst standard library
+- `typst-kit` 0.14.2 (features: `fonts`) — font loading utilities
+- `comemo` 0.4 — memoization required by `typst::World` trait
+- `ecow` 0.2 — `EcoString`/`EcoVec` used in Typst API
+
+**Serialization:**
+- `serde` 1.0.219 (features: `derive`) — serialization framework
+- `serde_yaml_ng` 0.9 — YAML config parsing
+
+**CLI:**
+- `clap` 4.5.37 (features: `derive`, `env`) — CLI argument parsing (`--check-update`, `--fake-version`, `--update-to`, `--config`)
+
+**Temp Files (direct dependency, promoted from transitive):**
+- `tempfile` 3.24.0 — secure temp file creation via `tempfile::Builder` with `O_EXCL`. Used in `src/browser/pdf_export.rs` (`default_preview_file`). Replaces former predictable `/tmp/{name}.html` path (SEC-04/CR-03 fix).
+
+**Version Parsing (promoted to direct dependency in v0.89.0):**
+- `semver` 1.0.27 — semantic version parsing and comparison. Used in self-update logic to compare current vs GitHub release versions. **Promoted from transitive-only to direct `[dependencies]` in v0.89.0** to make the dependency explicit and pin-able.
+
+**Self-Update:**
+- `self_update` 0.42.0 (features: `archive-tar`, `archive-zip`, `compression-flate2`, `compression-zip-deflate`, `rustls`, `signatures`) — downloads and applies binary updates from GitHub Releases. The `signatures` feature pulls in `zipsign-api` 0.1.5 (transitive) for ZIP signature verification.
+- `rustls` — TLS backend (via self_update); no OpenSSL dependency.
+
+**Utilities:**
+- `anyhow` 1.0.98 — error handling and propagation
+- `regex` 1.12 — pattern matching (git status parsing, version extraction)
+- `libc` 0.2 — `localtime_r`/`localtime_s` for local date formatting in PDF export (`src/browser/pdf_export.rs`)
+- `dirs` 5.0 — platform home/download directory resolution
 
 ## Configuration
 
-**Format:** YAML, parsed/written via `serde_yaml_ng`
+**Environment:**
+- Config loaded from (priority order): `./config.yaml` → `~/.config/claude-workbench/config.yaml` → built-in defaults
+- No `.env` file; no environment variable-based secrets
+- Shell used by user terminal pane: configured via `terminal.shell_path` in `config.yaml`
 
-**Load priority (first match wins):**
-1. `./config.yaml` — project-local override (CWD)
-2. `~/.config/claude-workbench/config.yaml` — XDG user config (`$XDG_CONFIG_HOME/claude-workbench/config.yaml` if `XDG_CONFIG_HOME` set)
-3. Compiled-in defaults (via `Config::default()`)
-
-**Config sections and key fields (`src/config.rs`):**
-```yaml
-terminal:
-  shell_path: "/bin/bash"     # auto-detected from $SHELL / $COMSPEC
-  shell_args: []
-
-ui:
-  theme: "default"
-  show_file_browser: true
-  show_terminal: false
-  show_lazygit: false
-  show_preview: true
-  browser: ""                 # empty = system default (open/xdg-open)
-  external_editor: ""
-  export_dir: ""              # empty = ~/Downloads
-
-layout:
-  claude_height_percent: 40
-  file_browser_width_percent: 20
-  preview_width_percent: 50
-  right_panel_width_percent: 30
-
-file_browser:
-  show_hidden: true
-  show_file_info: true
-  date_format: "%d.%m.%Y %H:%M:%S"
-  auto_refresh_ms: 2000
-
-pty:
-  claude_command: []          # empty = use terminal shell; user starts claude manually
-  lazygit_command: ["lazygit"]
-  scrollback_lines: 1000
-  auto_restart: true
-  copy_lines_count: 50        # lines copied by F9
-
-claude:
-  startup_prefixes: []
-  default_permission_mode: null
-  show_permission_dialog: true
-  remote_control: false
-  default_model: Unset        # ClaudeModel enum
-  default_effort: Unset       # ClaudeEffort enum
-  default_session_name: ""
-  default_worktree: ""
-
-ssh:
-  enabled: true
-  image_paste_helper: null    # path to cc-clip binary; null = $PATH lookup
-  notification_dismissed: false
-
-document:
-  company: { name, footer_text, author, website }
-  fonts: { body, code }
-  colors: { accent, table_header_bg, ... }   # 13 color fields
-  sizes: { title, h1, h2, h3, body, table, code, footer, header, line_height, ... }
-  pdf: { page_size: "A4", margin: "2.5cm" }
-```
-
-**Saved with 0600 permissions** on Unix (owner read/write only).
-
-**Build configuration:**
-- `Cargo.toml` — single source of truth for dependencies
-- Features: `default = ["pdf-export"]`; disable Typst PDF with `cargo build --no-default-features`
+**Build:**
+- `Cargo.toml` — single source of truth
+- `Cargo.lock` — committed (binary crate, ensures reproducible builds)
+- Feature flags: `pdf-export` (default enabled)
 
 ## Platform Requirements
 
 **Development:**
-- Rust stable toolchain (2021 edition)
+- Rust toolchain (edition 2021)
 - `cargo build` / `cargo run`
-- `cargo clippy`, `cargo fmt`, `cargo test`
+- `cargo clippy`, `cargo fmt` for linting/formatting
 
-**Runtime (Linux):**
-- X11 session: `xclip` or `xsel` recommended (clipboard over XRDP)
-- Wayland session: `wl-clipboard` package (`wl-copy`, `wl-paste`)
-- `lazygit` binary on `$PATH` (LazyGit pane)
-- `claude` CLI on `$PATH` (Claude pane, if `pty.claude_command` not set)
-
-**Runtime (macOS):**
-- `arboard` uses native pasteboard — no external clipboard tools needed
-- `open` command used for browser/file opening (`src/browser/opener.rs`)
-
-**Production (binary distribution):**
-- GitHub Releases: `claude-workbench-{target}.tar.gz`
-- Supported targets: `aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`
-- Self-update: binary downloads and replaces itself at runtime
+**Production:**
+- Self-contained binary; no runtime dependencies except:
+  - Optional: `lazygit` binary (LazyGit pane)
+  - Optional: `claude` CLI binary (Claude pane)
+  - Optional: `git` binary (git status integration)
+  - Optional: clipboard helpers (`xclip`, `xsel`, `wl-copy`, `wl-paste`) on Linux
+  - Optional: system browser (`open` / `xdg-open`) for file preview
 
 ---
 

@@ -5,33 +5,29 @@
 ## Naming Patterns
 
 **Files:**
-- `snake_case` for all module files: `job_state.rs`, `file_browser.rs`, `terminal_pane.rs`
-- Descriptive compound names preferred over abbreviations: `dependency_checker.rs`, `release_notes.rs`
-- Module groups use `mod.rs` as entry point: `src/app/mod.rs`, `src/git/mod.rs`, `src/update/mod.rs`
+- `snake_case.rs` for all source files
+- Module directories use `snake_case/` with `mod.rs` or a single representative file
+- Integration tests in `tests/` mirror the feature being tested: `tests/cli.rs` for CLI entry-point contracts
 
-**Types (structs, enums):**
-- `CamelCase` universally: `PseudoTerminal`, `ClipboardOutcome`, `GitFileStatus`, `JobState<T>`
-- Enum variants: `CamelCase` — `ClipboardOutcome::Arboard`, `PollOutcome::Ready(T)`, `GitFileStatus::Untracked`
-- Generic parameters: single uppercase letter `T`
-
-**Functions and methods:**
-- `snake_case` universally: `filter_lines()`, `find_repo_root()`, `detect_strategy()`
-- Boolean predicates prefixed `is_` or `has_`: `is_running()`, `is_yolo()`, `has_meaningful_selection()`
-- Constructors use `new()` or descriptive names: `UpdateState::new()`, `JobState::running(rx)`
-- Helper functions that return static `&str`: `name()`, `label()`, `symbol()`
+**Functions:**
+- `snake_case` for all functions, methods, and closures
+- Boolean-returning predicates prefixed: `is_executable`, `is_markdown`, `is_ssh_session`
+- Constructors follow Rust convention: `check()`, `collect()`, `new()`, `default()`
+- `pub(super)` used for intra-module public API (e.g., `sync_terminals`, `sync_terminals_initial` in `src/app/pty.rs`)
 
 **Variables:**
-- `snake_case` universally
-- `_` prefix for intentionally unused: `_path` in `set_restrictive_permissions(_path: &Path)`
-- Descriptive over short: `consecutive_blanks`, `in_traceback`, not `n` or `flag`
+- `snake_case` throughout
+- Short-lived temporaries use abbreviated names: `tmp`, `cfg`, `cmd`, `arg`
+- Descriptive names for complex values: `filtered`, `skip_next`, `target_tag`
 
-**Constants:**
-- `SCREAMING_SNAKE_CASE`: `SUBPROCESS_TIMEOUT`, `WAIT_POLL_INTERVAL`, `STRATEGY_ENV`, `CURRENT_VERSION`
-- `pub(crate)` constants for cross-module sharing: `REPO_OWNER`, `REPO_NAME`, `BIN_NAME` in `src/update/mod.rs`
+**Types:**
+- Structs and enums: `PascalCase`
+- Enum variants: `PascalCase` (e.g., `ClaudePermissionMode::Auto`, `ClipboardOutcome::Arboard`)
+- Derive macros grouped: `#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]`
+- Full derive set used on public enum types in `src/types.rs`
 
-**Modules:**
-- `snake_case` directory/file names
-- Public API re-exported at module root via `pub use`: `src/update/mod.rs` re-exports all submodule items
+**Constants/Statics:**
+- `SCREAMING_SNAKE_CASE`: `CURRENT_VERSION`, `BIN_NAME`, `REPO_OWNER`, `REPO_NAME`
 
 ## Code Style
 
@@ -41,170 +37,124 @@
 - `reorder_imports = true`
 - `reorder_modules = true`
 - `newline_style = "Unix"`
-- No explicit line-length override — Rust edition 2021 default (100 chars)
 
 **Linting:**
-- Tool: `clippy` with `clippy.toml`
-- `cognitive-complexity-threshold = 30` (relaxed from default 25)
-- `too-many-arguments-threshold = 8` (relaxed from default 7)
-- `type-complexity-threshold = 300` (relaxed from default 250)
-- `#[allow(clippy::type_complexity)]` used sparingly for `MouseSelection::finish()` return type
+- Tool: `cargo clippy`
+- 15 `collapsible_match` warnings pre-exist in `src/input/keyboard/dialogs.rs`, `src/input/mouse.rs`, `src/app/file_ops.rs`, `src/ui/typst_pdf.rs` — deferred, not to be introduced in new code
+- Targeted `#[allow(clippy::...)]` at call-site rather than module-wide suppression
+- Known inline suppression: `#[allow(clippy::type_complexity)]` in `src/types.rs:606`, `#[allow(clippy::needless_range_loop)]` in `src/app/clipboard.rs:162`
 
 ## Import Organization
 
-**Order** (enforced by `reorder_imports = true`):
-1. Standard library (`std::`)
-2. External crates (`anyhow`, `serde`, `ratatui`, etc.)
-3. Internal crate imports (`crate::types`, `crate::config`, `super::*`)
+**Order (enforced by rustfmt `reorder_imports = true`):**
+1. `std::` standard library
+2. External crates (alphabetical)
+3. `super::` or `crate::` local imports
 
-**Pattern:**
+**Example pattern** (from `src/update/install.rs`):
 ```rust
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::Path;
+use std::sync::mpsc;
+use std::thread;
 
-use crate::types::{ClaudeEffort, ClaudeModel, ClaudePermissionMode};
+use self_update::backends::github::Update;
+
+use super::check::get_target;
+use super::log::log_update;
 ```
 
-**Platform-specific imports:**
-```rust
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-```
-
-**No wildcard imports** except in `#[cfg(test)] mod tests { use super::*; }`.
+**Path Aliases:** None in use — explicit paths preferred.
 
 ## Error Handling
 
-**Primary pattern:** `anyhow::Result<T>` for all fallible public functions.
+**Primary crate:** `anyhow` throughout the codebase.
 
-```rust
-use anyhow::Result;
+**Patterns in use:**
+- `anyhow::bail!("...")` for early return with formatted error (e.g., `src/browser/opener.rs:91`)
+- `anyhow::anyhow!("...")` with `ok_or_else(|| ...)` for `Option → Result` conversion
+- `.context("...")` for adding context to propagated errors
+- `Result<()>` as standard return type for fallible operations; `Result<T>` where value is needed
+- `anyhow::Result` aliased via `use anyhow::Result` at file top
 
-pub fn load_config() -> Result<Config> {
-    let contents = fs::read_to_string(local_config)?;   // ? propagation
-    let config: Config = serde_yaml_ng::from_str(&contents)?;
-    Ok(config)
-}
-```
+**`validate_program` error contract** (`src/browser/opener.rs`):
+- `fn validate_program(prog: &str) -> Result<()>`
+- Returns `Err` for: empty string, any char not in `[a-zA-Z0-9_\-./+]`
+- Error message: `"Unsafe program name in browser/editor config: {:?}"` with the offending string
+- Called before spawning any external process; callers must not bypass it
 
-**Internal/infallible helpers:** Return `Option<T>` — no `anyhow` involved:
-```rust
-pub fn find_repo_root(path: &Path) -> Option<PathBuf> {
-    Command::new("git").output().ok()?;  // .ok()? to convert Result→Option
-}
-```
+**`quote_path_for_cd` Option contract** (`src/app/pty.rs:435`):
+- `fn quote_path_for_cd(path_str: &str) -> Option<String>`
+- Returns `None` only when `shlex::try_quote` rejects the path (NUL byte only)
+- `None` means **skip the cd command** — callers log and skip, never fall back to unescaped path
+- Callers (`sync_terminals`, `sync_terminals_initial`) use `match` with an explicit `None` arm that logs via `eprintln!`
 
-**Static regex / must-compile patterns:** `.expect("static regex pattern must compile")` — acceptable for compile-time guaranteed patterns in `LazyLock` statics (`src/filter.rs`).
+**`filter_restart_args` contract** (`src/update/install.rs`):
+- `fn filter_restart_args(args: impl Iterator<Item = String>) -> Vec<String>`
+- Strips one-shot flags `--update-to` (+ its value), `--check-update`, `--clipboard-diag`, `--ssh-paste-diag`
+- Guards against infinite restart loops (IN-02)
+- Stateful skip: `skip_next = true` after seeing `--update-to`
 
-**No custom error types** — `anyhow::Error` used throughout; no `thiserror` dependency.
+## RAII-Over-Explicit-Cleanup Pattern
 
-**`unwrap()` policy:** Avoided in production code. `expect()` used only where a panic would be a programmer bug (static regex, impossible states). `.ok()` used to silently ignore errors in optional operations (git CLI calls).
+Established pattern after `src/browser/pdf_export.rs` refactor:
 
-**OS command errors:** Swallowed via `.ok()` / `if let Ok(output) = ...` — git/subprocess failures are non-fatal and treated as "feature unavailable":
-```rust
-let output = Command::new("git").output();
-if let Ok(output) = output {
-    if output.status.success() { /* parse */ }
-}
-```
+- Temporary files are managed via `tempfile::NamedTempFile` (returned from `default_preview_file`)
+- Caller holds the `NamedTempFile` value for the duration the file must exist; file is deleted on `Drop`
+- Functions that create temp resources return the RAII guard to the caller — **never** delete manually
+- Doc comment on `default_preview_file` explicitly states: *"The returned `NamedTempFile` must be kept alive until the browser has finished"*
+- Do **not** use `std::fs::remove_file` for cleanup; use RAII guards instead
 
 ## Logging
 
-**Framework:** None — no `log`, `tracing`, or `env_logger` crate.
+**Framework:** `eprintln!` for debug/diagnostic messages inside PTY and sync code; dedicated `log_update()` helper in `src/update/log.rs` writes to `/tmp/claude-workbench-update.log`
 
 **Patterns:**
-- `println!` used only in CLI diagnostic modes (`--check-update`, `--clipboard-diag`) in `src/main.rs`
-- TUI operation: no stdout/stderr logging during normal operation (would corrupt terminal rendering)
-- Update operations write to `/tmp/claude-workbench-update.log` via `src/update/log.rs`
-- Errors that cannot be surfaced to the user are silently dropped (by design — TUI constraint)
+- Update subsystem: all ops logged via `log_update("=== FUNCTION STARTED ===")` pattern with `===` delimiters for section headers
+- Sync failures: `eprintln!("sync_terminals: skipping unquotable path: {:?}", path)` — informational, not fatal
+- No structured logging crate (no `tracing`, no `log`)
 
 ## Comments
 
-**Module-level doc comments:** `//!` style at top of every non-trivial module:
-```rust
-//! Clipboard utility with multi-stage fallback chain.
-//!
-//! Stage order (copy):
-//!   1. arboard  — native display server
-//!   2. xclip    — X11 selection bridge
-```
+**When to Comment:**
+- Module-level `//!` doc comments on every module file (e.g., `//! Binary installation and restart logic.`)
+- `///` doc comments on public functions, especially those with non-obvious contracts
+- Inline `//` for non-obvious logic, safety invariants, and workaround explanations
+- Doc comments on `filter_restart_args` explain the IN-02 infinite-loop risk explicitly
 
-**Item-level doc comments:** `///` for all public types, methods, and functions:
-```rust
-/// Non-blocking poll. Returns the appropriate `PollOutcome` and
-/// transitions the state to `Idle` whenever a terminal outcome is observed.
-pub fn poll(&mut self) -> PollOutcome<T> {
-```
-
-**Inline comments:** `//` for non-obvious implementation decisions, especially platform quirks and non-obvious defaults:
-```rust
-// Empty = use terminal shell (Fish/Bash), user starts claude manually
-claude_command: vec![],
-```
-
-**Section separators:** `// ─────────` (Unicode box-drawing) used to visually group methods within large impls (`src/types.rs` `SearchState`).
-
-**German in UI strings:** `description_de()` methods return German user-facing strings. All code, comments, and doc comments are in English.
+**Key doc comment conventions:**
+- RAII lifetime requirements stated in doc: *"The returned X must be kept alive until..."*
+- Error paths documented: *"Returns `None` only when..."*
+- Platform-specific code blocks preceded by comment explaining the reason (e.g., Linux `/proc/self/exe (deleted)` stripping in `src/update/install.rs`)
 
 ## Function Design
 
-**Size:** Functions tend to be medium-sized (20–80 lines). The clippy threshold of 30 cognitive complexity is the practical limit.
+**Size:** Short, focused functions; complex state machines factored into helper methods
 
-**Parameters:** Maximum 8 (per clippy config). Prefer passing structs for related data over long parameter lists. State structs (`HelpState`, `SearchState`, `DragState`) group related fields and their methods together.
+**Parameters:**
+- `impl Iterator<Item = T>` preferred over `Vec<T>` for sequence consumers (e.g., `filter_restart_args`)
+- `&str` for string inputs, `&Path` for filesystem paths
+- Config structs passed by reference: `&Config`, `&StartupOptions`
 
-**Return values:**
-- Fallible operations: `Result<T>` (anyhow) or `Option<T>`
-- Infallible state mutation: `()` (methods on state structs)
-- Boolean queries: `bool`
+**Return Values:**
+- `Option<String>` for operations that can fail silently and callers must skip (e.g., `quote_path_for_cd`)
+- `Result<()>` for operations that must propagate errors (e.g., `validate_program`, `open_file_with_browser`)
+- `Vec<String>` for filtered/transformed argument lists
 
-**State mutation pattern:** Structs own their state and expose named methods:
-```rust
-impl HelpState {
-    pub fn open(&mut self) { ... }
-    pub fn close(&mut self) { ... }
-    pub fn scroll_up(&mut self, amount: usize) { ... }
-}
-```
+## Feature Flags
+
+**`#[cfg(debug_assertions)]`** used to gate development-only CLI flags:
+- `--update-to` flag is `#[cfg(debug_assertions)]` — absent from release builds
+- Tests that verify release-only behavior use `#[cfg(not(debug_assertions))]`
 
 ## Module Design
 
 **Exports:**
-- Public API declared with `pub` at item level
-- Crate-internal sharing uses `pub(crate)`
-- Re-export at module root via `pub use submodule::Item` for clean external API
+- `pub` for public API crossing module boundaries
+- `pub(super)` for items shared within a parent module but not externally
+- Private helpers (e.g., `filter_restart_args`, `validate_program`, `quote_path_for_cd`) are `fn` with no visibility modifier
 
-**Barrel files:** `mod.rs` used as module roots for multi-file modules (`app/`, `browser/`, `setup/`, `update/`, `ui/`, `git/`). Re-exports flatten internal structure.
-
-**Feature gating:** Optional features use `#[cfg(feature = "pdf-export")]` with `optional = true` in `Cargo.toml`. Feature-gated code in `src/browser/typst_pdf.rs` and `src/browser/pdf_export.rs`.
-
-**Platform gating:** `#[cfg(unix)]`, `#[cfg(windows)]`, `#[cfg(target_os = "macos")]`, `#[cfg(target_os = "linux")]` used for platform-specific paths in `src/config.rs`, `src/app_detector.rs`, `src/clipboard.rs`.
-
-**Serde defaults pattern** (prominent in `src/config.rs`): Each optional field uses a dedicated `fn default_*() -> T` function referenced via `#[serde(default = "default_*")]`. This avoids `Option` wrapping while keeping YAML backward-compatible.
-
-## Concurrency Patterns
-
-**Threading model:** Background threads communicate via `std::sync::mpsc` channels. `Arc<Mutex<vt100::Parser>>` shared between PTY reader thread and main UI thread.
-
-**`JobState<T>` pattern** (`src/app/job_state.rs`): Typed wrapper around `Receiver<T>` that makes async job lifecycle explicit (`Idle` / `Running`). Use this instead of raw `Option<Receiver<T>>`:
-```rust
-pub enum JobState<T> { Idle, Running(Receiver<T>) }
-pub enum PollOutcome<T> { Pending, Ready(T), Disconnected }
-```
-
-**`OnceLock` for process-lifetime caching** (`src/clipboard.rs`): Environment-based detection computed once:
-```rust
-static STRATEGY: OnceLock<ClipboardStrategy> = OnceLock::new();
-fn strategy() -> ClipboardStrategy { *STRATEGY.get_or_init(detect_strategy) }
-```
-
-**`LazyLock` for static regex** (`src/filter.rs`): All compiled regexes stored in `LazyLock<Vec<Regex>>`:
-```rust
-static PROMPT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| vec![
-    Regex::new(r"...").expect("static regex pattern must compile"),
-]);
-```
+**Module Files:**
+- Each module file starts with a `//!` doc comment
+- `#[cfg(test)] mod tests { ... }` at the bottom of the file containing the code under test
 
 ---
 

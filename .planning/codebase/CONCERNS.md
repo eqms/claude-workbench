@@ -4,208 +4,179 @@
 
 ---
 
-## Security Findings (from SECURITY-NOTES.md — audit 2026-05-11)
+## Resolved in Wave 1
 
-### Self-Update Supply-Chain: No Signature Verification (HIGH — open)
+The following findings from the pre-Wave-1 audit were addressed by Phase 1 Wave 1 security hardening. They are recorded here for traceability only.
 
-- Issue: `src/update/install.rs` uses `self_update` with no checksum or signature verification. Downloads are over HTTPS only. A compromised GitHub release asset installs an arbitrary binary silently with the running user's privileges. Tar-slip protection is entirely delegated to the `self_update` crate.
-- Files: `src/update/install.rs`, `Cargo.toml` (`self_update = { version = "0.42", features = ["signatures"] }`)
-- Impact: Full binary replacement attack vector on every auto-update. Silent, no user confirmation.
-- Fix approach: Two-phase rollout documented in `SECURITY-NOTES.md`:
-  1. Sign CI release archives with `zipsign` / ed25519; store private key as GitHub Actions secret; commit public key to `signing/claude-workbench-pub.bin`.
-  2. Enable `.verifying_keys([RELEASE_VERIFYING_KEY])` in `src/update/install.rs` using `include_bytes!`. Must ship signing first, then verification, never reversed. The `signatures` feature flag is already present in `Cargo.toml` — only wiring remains.
+| ID | Finding | Fix | Commit |
+|----|---------|-----|--------|
+| CR-03 / SEC-04 | Predictable temp paths (race window, symlink attack) | `tempfile::Builder` with `O_EXCL` | 4b84723, 4a0feae |
+| CR-02 | `--update-to` flag available in release builds | Gated behind `#[cfg(debug_assertions)]` | 93a6d56 |
+| IN-02 | Restart re-execs with `--update-to` in argv | `filter_restart_args()` strips debug-only flags | eb6b6cb |
+| WR-01 / SEC-02 | `opener.rs` launched arbitrary programs with no allow-list | `validate_program()` enforces an explicit allow-list | 4b6046d |
+| WR-02 / SEC-03 | `$SHELL -i -c` fallback in opener could execute arbitrary shell | Fallback removed entirely | 6fe0862 |
+| WR-03 | `clipboard` `which()` did not check executable bit | `is_executable()` helper added | 999fc2c |
+| WR-04 | `shlex` failures silently fell back to unquoted paths | Error propagated via `quote_path_for_cd()` | 3cb3668 |
+| WR-05 | Self-update selected `releases[0]` (API insertion order) instead of semver max | `max_by` semver chain | 3cb3668 |
 
-### Browser/Editor Command Construction: No Allow-List (MEDIUM — open)
+---
 
-- Issue: `src/browser/opener.rs:83-106` splits `config.ui.browser` / `config.ui.editor` strings via a hand-rolled `split_command()` and passes the first token directly to `std::process::Command::new()`. No validation of the program name against an allow-list or path pattern.
-- Files: `src/browser/opener.rs` (functions `open_file_with_browser`, `open_file_with_editor`, `split_command`)
-- Impact: Low-risk today (config is user-owned), but any future code path that derives the browser/editor field from PTY output, a URL, or a remote source becomes command injection.
-- Fix approach: After `split_command`, validate the first token matches `^[A-Za-z0-9_./-]+$` and resolves to an absolute path or a `$PATH` entry. Reject anything else with a clear error.
+## Open Security
 
-### Shell Fallback in Dependency Probe (MEDIUM — open)
+### SEC-01: Self-Update Has No Signature Verification
 
-- Issue: `src/setup/dependency_checker.rs:172-191` builds a shell command string with `shlex::try_quote`, then passes it to `$SHELL -i -c "<cmd>"`. The pattern is fragile: one careless future caller passing PTY-derived text as `args` and a `shlex` edge case yields shell injection.
-- Files: `src/setup/dependency_checker.rs` (function `check_dependency_via_shell`, lines ~172-191)
-- Current state: All static call sites today are safe. `shlex` 1.3 migration is complete (replaced unmaintained `shell-escape`).
-- Fix approach: Replace `$SHELL -i -c` with `Command::new(name).args(args)` for binary lookups. The `-i` flag is only needed to resolve shell aliases/functions, which is unnecessary for the dependency probe's purpose.
+**Risk:** The self-update path (`src/update/install.rs`) downloads a tarball from GitHub Releases over HTTPS and replaces the running binary with no cryptographic integrity check. A compromised GitHub account, CDN MITM, or accidental release asset corruption would silently install a malicious binary.
 
-### Predictable Temp File Path (MEDIUM — open)
+**Files:**
+- `src/update/install.rs` — download + atomic replace (no verification step)
+- `src/update/check.rs` — release metadata fetch
+- `.planning/phases/01-security-hardening/01-05-PLAN.md` — Wave 2: CI signing via zipsign ed25519
+- `.planning/phases/01-security-hardening/01-06-PLAN.md` — Wave 3: client verification using embedded `pub.bin`
 
-- Issue: `src/browser/pdf_export.rs:115-119` constructs temp paths as `$TMPDIR/{stem}-{dd.mm.yyyy}.html` and `$TMPDIR/{project}-{stem}-{dd.mm.yyyy}.{ext}`. Paths are guessable. On a multi-user system, a local attacker can pre-create the path as a symlink and redirect the write.
-- Files: `src/browser/pdf_export.rs` (lines ~107-140)
-- Fix approach: Replace with `tempfile::Builder::new().prefix(stem).suffix(".html").tempfile_in(env::temp_dir())?`. The `tempfile` crate is already in `Cargo.toml` and opens with `O_EXCL`.
+**Current state:** Neither Wave 2 (CI signs archives) nor Wave 3 (client calls `verifying_keys`) has been executed. No `RELEASE_VERIFYING_KEY` constant, no `zipsign` dependency, no `signing/claude-workbench-pub.bin` exist in the tree.
 
-### Closed: shell-escape Replaced (RESOLVED)
+**Fix approach:**
+1. Wave 2 (01-05-PLAN.md): Add `zipsign sign` step to `.github/workflows/release.yml`; commit `signing/claude-workbench-pub.bin` (public key only).
+2. Wave 3 (01-06-PLAN.md): Add `zipsign` as Cargo dependency; embed pub key via `include_bytes!`; call `verifying_keys()` in `install.rs` before extracting archive.
 
-- `shell-escape` (unmaintained) removed. Replaced with `shlex` 1.3 in `src/app/pty.rs` and `src/setup/dependency_checker.rs` as of v0.89.0.
+**Priority:** High — affects all users who use the built-in updater.
 
 ---
 
 ## Dependency Debt
 
-### crossterm Pinned at 0.28.1 (BLOCKED — open)
+### DEP-01: crossterm Pinned at 0.28.1 — Blocks Upstream Updates
 
-- Issue: `Cargo.toml` pins `crossterm = "0.28.1"` with an inline comment: "tui-textarea fork branch `update-ratatui` targets crossterm 0.28's Event types via its `From<Event> for Input` impl. Bumping to 0.29 yields a version mismatch in `editor.input(Event::Key(...))` call sites."
-- Files: `Cargo.toml`, `tui-textarea = { git = "https://github.com/0xferrous/tui-textarea.git", branch = "update-ratatui" }`
-- Impact: Cannot pick up crossterm 0.29 bug fixes or new terminal compatibility improvements. The fork dependency is git-pinned to a branch, not a tag or revision — branch tip can change unpredictably.
-- Scaling limit: crossterm 0.29 introduced breaking `Event` type changes. Unblocking requires either the fork to merge upstream changes, or a local patch/fork of `tui-textarea`.
-- Fix approach: Watch `https://github.com/0xferrous/tui-textarea` for upstream merge. Alternatively, fork `tui-textarea` under the project's own control and apply the 0.29 compatibility patch directly. Pin to a git commit hash rather than a branch name to prevent silent drift.
+**Files:**
+- `Cargo.toml` line 8: `crossterm = "0.28.1"`
 
-### tui-textarea: Git Branch Dependency (FRAGILE)
+**Root cause:** `tui-textarea` is sourced from a community fork (`github.com/0xferrous/tui-textarea`, branch `update-ratatui`) whose `From<Event> for Input` impl targets crossterm 0.28 event types. Bumping to crossterm 0.29 causes type-mismatch compile errors at `editor.input(Event::Key(...))` call sites.
 
-- Issue: `tui-textarea` is sourced from a git branch (`branch = "update-ratatui"`), not a versioned crate. Branch tips are mutable; `Cargo.lock` pins the commit hash, but any `cargo update` will silently advance it.
-- Files: `Cargo.toml` line 14
-- Fix approach: Pin to a specific `rev = "<sha>"` in `Cargo.toml`. Document the sha and reason. Revisit when a proper crates.io release is available.
+**Impact:** crossterm 0.29 and 0.30 contain terminal-handling fixes (including XRDP and Kitty improvements). Being pinned blocks those fixes and may cause transitive dependency conflicts as ratatui moves forward.
+
+**Fix approach (Phase 3):** Either upstream the fork into `tui-textarea` proper (preferred), switch to `tui-textarea`'s official crate once it tracks crossterm 0.29+, or vendor and patch locally. Requires coordinated bump of `crossterm`, `tui-textarea`, and any other event-type consumers.
 
 ---
 
-## Code Smells
+## Code Quality
 
-### panic! in Non-Test Update Code
+### REFAC-01: `App` Struct Is a God Object (50+ Fields)
 
-- Issue: `src/update/mod.rs` lines 220-223 contain `panic!("GitHub API error: {}", e)` and `panic!("No releases found for platform: ...")` that are inside `#[ignore]` integration tests but are physically in the `src/update/mod.rs` test module. Not reachable in production. No panic sites exist in non-test production code paths.
-- Files: `src/update/mod.rs` (lines 210-313, all within `#[cfg(test)]` `#[ignore]` blocks)
-- Impact: Low — only reachable via `cargo test -- --include-ignored`.
+**File:** `src/app/mod.rs` — `pub struct App` at line 68, running to line ~166.
 
-### .expect() in Production Code
+**Field count:** ~50 public/private fields covering PTY terminals, file browser state, preview state, all dialog states, clipboard flash state, drag state, mouse selection, git remote jobs, update jobs, dependency report, export state, and more.
 
-All production `expect()` calls are in low-risk or justified positions:
+**Impact:** Every feature change requires reading the entire struct. New contributors cannot understand ownership boundaries. Adding fields has zero friction, which is why the count keeps growing.
 
-- `src/main.rs:289` — `"127.0.0.1:9998".parse().expect("hardcoded address parses")` — infallible parse of a compile-time literal. Acceptable.
-- `src/main.rs:339` — `.expect("Failed to create tokio runtime")` — unrecoverable startup failure. Acceptable (process cannot function without a runtime).
-- `src/clipboard.rs:210` — `.expect("spawn clipboard worker thread")` — OS thread spawn failure at startup. Acceptable; process cannot function without the clipboard worker.
-- `src/filter.rs:52-135` (28 sites) — all `Regex::new(...).expect("static regex pattern must compile")` on compile-time literals. These are infallible in practice; consider using the `once_cell` / `std::sync::LazyLock` pattern with `Regex::new(...).unwrap()` for consistency, or a `static` initialized at startup.
+**Fix approach (Phase 3):** Extract cohesive sub-structs — e.g., `UpdateUiState` (update_state + update_check_job + update_job + update_dialog_button + update_dialog_areas), `ClipboardUiState` (clipboard_error_flash + clipboard_warning + clipboard_warning_dismissed), `FlashState` (last_autosave_time + last_copy_time + copy_flash_*), `SelectionState` (terminal_selection + drag_state + mouse_selection). App holds sub-structs, not individual fields.
 
-### Mutex Poison Recovery
+### QUAL-02: `lock_or_recover()` Silently Swallows Mutex Poison
 
-- Issue: `src/terminal.rs:11-15` defines `lock_or_recover()` which calls `unwrap_or_else(|poisoned| poisoned.into_inner())` to silently recover from mutex poisoning. This means a background PTY thread panic will be silently swallowed rather than propagated.
-- Files: `src/terminal.rs` (function `lock_or_recover`, used throughout the file)
-- Impact: If the PTY reader thread panics, the main UI thread will continue using potentially corrupt parser state without any indication. `exited: Arc<AtomicBool>` provides a separate signal but it is not checked on every lock.
-- Fix approach: Log the poison recovery event at minimum. Consider surfacing it as a PTY error in the pane border (same mechanism as `claude_error`/`lazygit_error`).
+**File:** `src/terminal.rs` lines 8–14.
 
-### App Struct God Object (40+ fields)
+```rust
+fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+```
 
-- Issue: `src/app/mod.rs:68-167` — `App` has 47 public fields covering PTY handles, UI flash state, async job receivers, drag state, mouse selection, clipboard warnings, export state, SSH hints, and more. All state lives in one struct with no sub-grouping beyond field comments.
-- Files: `src/app/mod.rs`
-- Impact: High cognitive load. Adding features requires understanding the full struct. Test isolation is impossible without constructing the entire `App`.
-- Fix approach: Group logically related fields into sub-structs (`ClipboardState`, `UpdateUiState`, `FlashState`, `ExportState`). The `JobState<T>` refactor (v0.89.0) is a good example of this pattern already applied.
+**Impact:** If the background PTY reader thread panics while holding the parser lock, the parser state may be partially corrupted. `lock_or_recover` silently recovers and continues rendering corrupted vt100 state. There is no log, no metric, and no way to detect this post-hoc. The same pattern appears in `src/ui/terminal_pane.rs:138`.
 
-### Session Persistence Stub
+**Fix approach (Phase 2):** Log the poison recovery (at minimum `eprintln!` to the update log, ideally a dedicated internal error channel). Consider resetting the parser to a clean state on recovery rather than using potentially corrupt inner data.
 
-- Issue: `src/session.rs` is entirely stubbed. `save_session()` is a no-op; `load_session()` always returns `SessionState::default()`. The struct has a comment `// Add other session data` with no fields.
-- Files: `src/session.rs`
-- Impact: Working directory, pane layout, and any user preferences set in a session are lost on every restart. CLAUDE.md documents session persistence as "stubbed."
-- Fix approach: Implement JSON/YAML serialization using `serde` (already in `Cargo.toml`) to `~/.config/claude-workbench/session.yaml`.
+### 15 Pre-existing `collapsible_match` Clippy Warnings
 
----
+`cargo clippy` reports 15 warnings (confirmed 2026-05-11), all `clippy::collapsible_match`. Locations:
 
-## Performance
+- `src/app/file_ops.rs`: lines 595, 604, 609, 617, 624, 632, 647
+- `src/app/keyboard/dialogs.rs`: lines 113, 118
+- `src/app/mouse.rs`: lines 790, 798
+- `src/browser/typst_pdf.rs`: lines 323, 328, 418, 454
 
-### Clipboard Worker Thread Architecture (v0.87.0+)
+These are mechanical fixes (`cargo clippy --fix` can auto-apply all 15). Deferred to a cleanup phase; they do not affect correctness.
 
-- Design: `src/clipboard.rs` runs `copy_to_clipboard_async()` on a dedicated OS thread (spawned at startup via `.expect("spawn clipboard worker thread")`). Copy operations are submitted via a channel; the worker serializes them and enforces a `SUBPROCESS_TIMEOUT` of 500ms per subprocess call. Paste (`copy_from_clipboard_sync()`) remains synchronous on the main event loop thread.
-- Current state: Handles XRDP/Kitty pathologies where `arboard`'s wayland-data-control feature stalls indefinitely and `xclip`/`xsel` can block beyond the subprocess timeout.
-- Residual concern: Paste is still synchronous. If `arboard` stalls during paste in an XRDP session and neither `xclip -o` nor `xsel -b -o` is available, the main event loop blocks for up to 500ms per fallback attempt.
-- Files: `src/clipboard.rs` (lines 162-228 for worker design, 391-413 for timeout enforcement)
+### Deferred Info-Severity Findings (from 01-REVIEW.md)
 
-### vt100 Parser: Fixed 1000-Line Scrollback Buffer per Pane
+#### IN-01: OSC 52 Clipboard Always Reports Success
 
-- Issue: `src/terminal.rs:86` initializes each `vt100::Parser` with a fixed 1000-line scrollback. Three PTY panes = ~3000 lines of vt100 screen cells held in memory permanently, regardless of content density.
-- Files: `src/terminal.rs:83-87`
-- Impact: Memory grows proportional to terminal output density (color spans, wide characters). No mechanism to tune this per pane or reduce it at runtime.
-- Fix approach: Make scrollback size configurable in `config.yaml` under `terminal.scrollback_lines`. Default 1000 is reasonable but heavy for low-memory targets.
+**File:** `src/clipboard.rs` line 309:
+```
+// Last resort: OSC 52. We always claim success here because we can't
+// verify whether the terminal forwarded it
+```
 
-### 16ms Event Loop Polling
+`ClipboardOutcome::Osc52` is returned even when the terminal silently discards the sequence (e.g., terminal has OSC 52 disabled). Users see no error. This is architecturally constrained (OSC 52 has no synchronous response path), but the UX could be improved with a one-time warning that OSC 52 is unverifiable.
 
-- Design: `App::run()` polls crossterm events with a 16ms timeout (≈60fps). On idle sessions with no input and no PTY output, this generates ~62 wakeups/second.
-- Files: `src/app/mod.rs` (event loop), documented in CLAUDE.md
-- Impact: Minimal on modern hardware. Could matter in SSH sessions over metered connections if terminal resize events are generated on each tick.
+**Impact:** Low — cosmetic/UX. User may think copy succeeded when it didn't.
 
----
+#### IN-03: `localtime_r` Cast Has No Bounds Guard on 64-bit for Years > 9999
 
-## Fragile Areas
+**File:** `src/ui/file_browser.rs` lines 22–27.
 
-### XRDP/SSH Clipboard Compatibility
-
-- Why fragile: Three separate failure modes exist that required fixes across v0.86.x and v0.87.0:
-  1. `ButtonRelease` events swallowed by XRDP — caused stuck mouse selections (fixed v0.86.3).
-  2. `arboard` wayland-data-control stalling the UI thread under XRDP-X11 (fixed v0.87.0 via async worker).
-  3. `xclip` blocking indefinitely when X server is unresponsive (fixed v0.86.4 via subprocess timeout).
-- Files: `src/clipboard.rs`, `src/app/mouse.rs`, `src/app/clipboard.rs`
-- Safe modification: Any change to clipboard strategy selection (`determine_clipboard_strategy()` in `src/clipboard.rs:85-115`) must be tested in an XRDP session. The `XRDP_SESSION` and `XDG_SESSION_TYPE` environment variable checks are the detection heuristic — removing or reordering them will regress XRDP users.
-- Test coverage: No automated tests for clipboard behavior under XRDP. Regressions only catchable via manual testing on an XRDP host or via the `--clipboard-diag` CLI flag.
-
-### Mouse Selection Boundary Logic
-
-- Why fragile: `src/app/mouse.rs` (1072 lines) contains character-level selection logic constrained to pane boundaries. The `is_inside(rect, x, y)` closure pattern is duplicated across multiple event handlers. Mouse coordinate math depends on border widths (1px each side = -2 from content area), which is also assumed in PTY resize logic in `src/terminal.rs`.
-- Files: `src/app/mouse.rs`, `src/ui/terminal_pane.rs`
-- Safe modification: Any layout change (border thickness, new panes) requires auditing both the resize border accounting (`-2` in terminal resize) and the hit-test math in `mouse.rs`. These are not co-located.
-
-### PTY Resize Timing
-
-- Why fragile: PTY resize runs on every `draw()` call before rendering (CLAUDE.md: "PTY resize happens during every `draw()` call"). If PTY resize fails (e.g., `portable-pty` error), the failure is silently ignored and the terminal dimensions drift from the UI.
-- Files: `src/app/drawing.rs`
-- Safe modification: Do not add expensive work to the resize path. Any resize error should at minimum be logged to the update log file at `/tmp/claude-workbench-update.log`.
-
-### Browser Preview Temp File Cleanup
-
-- Why fragile: `src/app/mod.rs:161` tracks temp preview files in `pub temp_preview_files: Vec<std::path::PathBuf>`. Cleanup happens on exit. If the process is killed (SIGKILL) or panics, temp files in `$TMPDIR` accumulate.
-- Files: `src/app/mod.rs`, `src/browser/pdf_export.rs`
-- Safe modification: Switching to `tempfile::NamedTempFile` (which auto-deletes on drop) would solve this without requiring manual tracking, and also fixes the predictable path security finding above.
+The constant `MAX_SAFE_TIMESTAMP = 253_402_300_799` caps at year 9999, and 32-bit platforms get an explicit `i32::MAX` check. However the `utc_secs as libc::time_t` cast on 64-bit platforms is unchecked between `i32::MAX` and `MAX_SAFE_TIMESTAMP` — on a 64-bit platform where `time_t` is `i64`, this range is safe, so the risk is theoretical. The identical pattern exists in `src/browser/pdf_export.rs:86–95` and `src/browser/typst_pdf.rs:168`. No action needed before Phase 3 review.
 
 ---
 
 ## Test Coverage Gaps
 
-### Clipboard Layer: No Automated Tests for Subprocess Fallback Chain
+### QUAL-01: Clipboard Fallback Chain — No Integration Tests
 
-- What's not tested: The `SubprocessFirst` clipboard strategy (xclip → xsel → wl-copy fallback chain), the async worker handoff, and the 500ms timeout enforcement.
-- Files: `src/clipboard.rs`
-- Risk: Clipboard regressions under XRDP or when specific tools are absent go undetected until user reports.
-- Priority: High — this area has had 3 separate regressions across 4 patch versions.
+**Files:**
+- `src/clipboard.rs` — `try_xclip_copy()` (line 362), `try_xsel_copy()` (line 373), `try_xclip_paste()` (line 395), `try_xsel_paste()` (line 400), `osc52_copy()` (line 476)
 
-### PTY/Terminal: No Unit Tests
+**Current coverage (Wave 1 additions):** 22 unit-level `#[test]` functions exist in `src/clipboard.rs`, covering: base64 encode, outcome labels, `which()` finding binaries, `is_executable()` mode check, SSH session detection, and `diag_collect()` not panicking.
 
-- What's not tested: `PseudoTerminal` initialization, `lock_or_recover` poison handling, scrollback behavior, PTY resize propagation.
-- Files: `src/terminal.rs`
-- Risk: Changes to the PTY threading model (e.g., the `PtyCallbacks` DSR/DA response mechanism) cannot be validated without running the full TUI.
-- Priority: Medium.
+**Gap:** The *fallback chain itself* — the decision tree that tries xclip → xsel → wl-copy → OSC 52 in sequence — has no test. If `try_xclip_copy` silently returns `None` due to a wrong exit code interpretation, the chain falls through to OSC 52 with no signal. No test covers: "xclip present but returns error → falls to xsel", "all X11 helpers absent → OSC 52 used", or "paste returns None from all helpers → empty string returned".
 
-### Mouse Selection: No Unit Tests
+**Fix approach (Phase 2):** Add integration tests using a mock `PATH` that substitutes fake `xclip`/`xsel` scripts returning controlled exit codes. Use `std::env::set_var("PATH", ...)` in test setup with a temp dir containing stubs. Test each fallback step individually and the full chain.
 
-- What's not tested: Character-level selection boundary clamping, pane hit detection, drag state transitions.
-- Files: `src/app/mouse.rs` (1072 lines, zero test functions)
-- Risk: Any layout change silently breaks selection without a failing test.
-- Priority: Medium.
-
-### Update/Self-Update: Integration Tests Require Network and Are `#[ignore]`d
-
-- What's not tested by default: `test_github_release_accessible`, `test_release_notes_fetchable`, `test_update_check_with_fake_version` — all marked `#[ignore]`.
-- Files: `src/update/mod.rs`
-- Risk: CI never runs these. A GitHub API format change or rename of release assets would be undetected until a user reports a broken auto-update.
-- Priority: Low (network tests are inherently flaky in CI, but a mock-based unit test for the version-parsing logic would be low-cost and valuable).
-
-### Session Persistence: Not Tested (Stub)
-
-- What's not tested: `save_session` and `load_session` are no-ops; there is nothing to test. This is a consequence of the stub implementation.
-- Files: `src/session.rs`
-- Priority: Low until the stub is implemented.
+**Priority:** Medium — XRDP environments where the chain matters most are also the environments most likely to break silently.
 
 ---
 
-## Scaling Limits
+## Stub
 
-### tui-textarea Fork Blocks crossterm Upgrade
+### FEAT-01: Session Persistence Is a No-Op
 
-- Current capacity: Works correctly on crossterm 0.28.1.
-- Limit: Cannot adopt crossterm 0.29+ until the `0xferrous/tui-textarea` fork is updated or replaced. Any crossterm 0.29 security/compatibility fix is inaccessible.
-- Scaling path: Pin the fork to a specific git revision (`rev = "<sha>"`). Evaluate upstreaming the ratatui 0.30 compatibility patch to `rhysd/tui-textarea` directly.
+**File:** `src/session.rs`
 
-### App Struct at 47 Fields
+```rust
+pub fn save_session(_state: &SessionState) {
+    // Implement save logic
+}
 
-- Current capacity: Manageable with the current feature set.
-- Limit: Each new feature adds fields directly to `App`. The struct is already at the boundary where adding one more cross-cutting concern (e.g., a second async PTY resize job) requires understanding all 47 existing fields to avoid conflicts.
-- Scaling path: Extract sub-structs as described in the Code Smells section above.
+pub fn load_session() -> SessionState {
+    // Implement load logic
+    SessionState::default()
+}
+```
+
+`SessionState` has one field: `pub last_cwd: String`. Neither function does anything. The application boots to `$HOME` every time regardless of where the user was working.
+
+**Impact:** Low functional impact currently. Becomes blocking once any feature relies on cross-session state (e.g., remembered pane layout, last opened file).
+
+**Fix approach (Phase 4):** Serialize to `~/.config/claude-workbench/session.json` using the already-imported `serde`/`serde_json`. Save on quit, load in `App::new`. Guard against corrupt files with `load_session() -> Option<SessionState>` fallback.
+
+---
+
+## Performance / Fragile Areas
+
+### XRDP Clipboard Pathology (Historical Context)
+
+**Files:**
+- `src/clipboard.rs` — async worker thread, `ClipboardStrategy`, `Osc52` fallback
+- `src/app/mod.rs` — `poll_clipboard_outcome()` integrated in event loop
+
+**Background:** Under XRDP+X11 sessions, two distinct failure modes were observed and fixed across v0.86.x–v0.87.0:
+
+1. **ButtonRelease swallowed** (v0.86.3/v0.86.4): XRDP's X server consumed `ButtonRelease` events during clipboard negotiation, causing the left-click drag selection to stick. Fixed by sending synthetic `ButtonRelease` on timeout.
+2. **xclip blocking** (v0.87.0): `xclip` and `xsel` called synchronously from the UI thread caused the entire TUI to freeze for 5–30 seconds when the X clipboard owner (e.g., a disconnected XRDP session) never responded. Fixed by moving clipboard writes to an async worker thread (`ClipboardWorker` in `src/clipboard.rs`).
+
+**Residual fragility:** The async worker thread is not supervised. If the worker thread panics (e.g., during `NamedTempFile::new().unwrap()` at line 639 — an `unwrap()` in non-test code), the clipboard channel becomes permanently closed and all subsequent copies silently fail with `ClipboardOutcome::Osc52` fallback. There is no worker restart logic.
+
+**Mitigation:** The `CLAUDE_WORKBENCH_CLIPBOARD=osc52` environment variable bypasses the subprocess chain entirely and is documented as the escape hatch for broken XRDP environments.
 
 ---
 
