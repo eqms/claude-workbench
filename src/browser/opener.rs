@@ -79,14 +79,33 @@ pub fn can_preview_in_browser(path: &Path) -> bool {
     crate::browser::syntax::can_syntax_highlight(path)
 }
 
+/// Validate that a program name contains only safe characters.
+/// Accepts: ASCII alphanumerics, `_`, `-`, `.`, `/`, `+`.
+/// Rejects: empty strings, spaces, shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `(`, `)`, etc.).
+fn validate_program(prog: &str) -> Result<()> {
+    if prog.is_empty()
+        || !prog
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '+'))
+    {
+        anyhow::bail!("Unsafe program name in browser/editor config: {:?}", prog);
+    }
+    Ok(())
+}
+
 /// Opens a file with a specific browser, or falls back to system default
 pub fn open_file_with_browser(path: &Path, browser: &str) -> Result<()> {
     if browser.is_empty() {
         open_file(path)
     } else {
-        let (program, args) = split_command(browser);
-        std::process::Command::new(&program)
-            .args(&args)
+        let tokens = shlex::split(browser)
+            .ok_or_else(|| anyhow::anyhow!("Invalid shell quoting in browser config: {:?}", browser))?;
+        let program = tokens
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("Empty browser command"))?;
+        validate_program(program)?;
+        std::process::Command::new(program)
+            .args(&tokens[1..])
             .arg(path)
             .spawn()?;
         Ok(())
@@ -98,42 +117,41 @@ pub fn open_file_with_editor(path: &Path, editor: &str) -> Result<()> {
     if editor.is_empty() {
         anyhow::bail!("No external editor configured");
     }
-    let (program, args) = split_command(editor);
-    std::process::Command::new(&program)
-        .args(&args)
+    let tokens = shlex::split(editor)
+        .ok_or_else(|| anyhow::anyhow!("Invalid shell quoting in editor config: {:?}", editor))?;
+    let program = tokens
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("Empty editor command"))?;
+    validate_program(program)?;
+    std::process::Command::new(program)
+        .args(&tokens[1..])
         .arg(path)
         .spawn()?;
     Ok(())
 }
 
-/// Split a command string into program and arguments with quote-aware parsing.
-/// Handles patterns like: "firefox", "open -a Firefox", "open -a \"Brave Browser\""
-fn split_command(cmd: &str) -> (String, Vec<String>) {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes = false;
-    let chars = cmd.chars().peekable();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    for c in chars {
-        match c {
-            '"' => in_quotes = !in_quotes,
-            ' ' if !in_quotes => {
-                if !current.is_empty() {
-                    tokens.push(std::mem::take(&mut current));
-                }
-            }
-            _ => current.push(c),
-        }
-    }
-    if !current.is_empty() {
-        tokens.push(current);
+    #[test]
+    fn test_validate_program_accepts_safe_names() {
+        assert!(validate_program("firefox").is_ok());
+        assert!(validate_program("open").is_ok());
+        assert!(validate_program("/usr/bin/xdg-open").is_ok());
+        assert!(validate_program("open-a-browser").is_ok());
+        assert!(validate_program("g++").is_ok());
     }
 
-    if tokens.is_empty() {
-        (cmd.to_string(), Vec::new())
-    } else {
-        let program = tokens.remove(0);
-        (program, tokens)
+    #[test]
+    fn test_validate_program_rejects_metacharacters() {
+        assert!(validate_program("").is_err(), "empty must be rejected");
+        assert!(validate_program("fire;fox").is_err(), "semicolon");
+        assert!(validate_program("$(rm -rf /)").is_err(), "subshell");
+        assert!(validate_program("a b").is_err(), "space");
+        assert!(validate_program("a|b").is_err(), "pipe");
+        assert!(validate_program("a&b").is_err(), "ampersand");
+        assert!(validate_program("a`b`").is_err(), "backtick");
     }
 }
 
