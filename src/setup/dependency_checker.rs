@@ -157,56 +157,18 @@ fn check_command(name: &str, args: &[&str], required: bool) -> DependencyStatus 
         }
     }
 
-    // If direct execution fails, try via user's shell in interactive mode
-    // This handles shell functions/aliases like Claude Code
-    // On Windows there is no equivalent to `-i -c "<cmd>"` for cmd.exe;
-    // PowerShell-based fallbacks rarely add value here (no aliases to resolve),
-    // so we treat direct-execution failure as "not found" on Windows.
-    #[cfg(windows)]
-    let shell_result: std::io::Result<std::process::Output> = Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "shell-fallback not supported on Windows",
-    ));
-
-    #[cfg(not(windows))]
-    let shell_result = {
-        // Use shell-escaped arguments to prevent injection
-        let shell_cmd = std::iter::once(name.to_string())
-            .chain(args.iter().map(|a| a.to_string()))
-            .map(|a| shlex::try_quote(&a).map(|c| c.into_owned()).unwrap_or(a))
-            .collect::<Vec<_>>()
-            .join(" ");
-
-        // Get user's default shell from $SHELL environment variable
-        let user_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-
-        // Try interactive shell mode (-i flag) to load shell functions/aliases
-        Command::new(&user_shell)
-            .args(["-i", "-c", &shell_cmd])
-            .output()
-    };
-
-    match shell_result {
-        Ok(output) if output.status.success() => {
-            let version = extract_version(&output.stdout, name);
-            // For shell functions, path might not be available
-            let path = find_executable_path(name);
-
-            DependencyStatus {
-                name: name.to_string(),
-                found: true,
-                path,
-                version,
-                required,
-            }
-        }
-        _ => DependencyStatus {
-            name: name.to_string(),
-            found: false,
-            path: None,
-            version: None,
-            required,
-        },
+    // Direct execution failed — binary not found on PATH.
+    // The interactive-shell fallback ($SHELL -i -c) was removed (SEC-03/WR-02):
+    // all probed binaries (git, claude, lazygit, shells) are real executables,
+    // not shell functions, on supported systems (Assumption A3). The fallback
+    // was an injection surface and also triggered fish job-control side-effects
+    // on macOS startup when clipboard helpers were absent.
+    DependencyStatus {
+        name: name.to_string(),
+        found: false,
+        path: None,
+        version: None,
+        required,
     }
 }
 
@@ -320,6 +282,21 @@ mod tests {
     fn test_check_command_not_found() {
         let status = check_command("nonexistent_command_12345", &["--version"], false);
         assert!(!status.found);
+        assert!(status.path.is_none());
+    }
+
+    #[test]
+    fn test_check_command_finds_git_directly() {
+        // git must be found via direct exec, not shell fallback
+        let status = check_command("git", &["--version"], true);
+        assert!(status.found, "git should be findable via direct exec");
+        assert!(status.version.is_some(), "git version should be captured");
+    }
+
+    #[test]
+    fn test_check_command_returns_false_for_nonexistent() {
+        let status = check_command("__nonexistent_binary_xyz_abc__", &[], false);
+        assert!(!status.found, "nonexistent binary should not be found");
         assert!(status.path.is_none());
     }
 }
