@@ -166,6 +166,38 @@ pub fn perform_update_async() -> mpsc::Receiver<UpdateResult> {
     rx
 }
 
+/// Filter one-shot CLI flags that must not be re-passed to the restarted process.
+///
+/// When `restart_application()` re-execs the binary it collects `std::env::args()`.
+/// Flags like `--update-to` or `--check-update` are one-shot operations and must not
+/// be forwarded — doing so would re-trigger the same operation in the new process,
+/// creating an infinite update/restart loop (IN-02).
+///
+/// Note: `--update-to` value arguments (e.g. "0.1.0") that follow the flag are also
+/// removed because the entire flag+value pair is consumed when the flag matches.
+/// However, positional removal works correctly here because clap uses `--flag value`
+/// pairs and the value string "0.1.0" would not itself match a flag name.
+fn filter_restart_args(args: impl Iterator<Item = String>) -> Vec<String> {
+    let mut filtered = Vec::new();
+    let mut skip_next = false;
+    for arg in args {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        match arg.as_str() {
+            "--update-to" | "--check-update" | "--clipboard-diag" | "--ssh-paste-diag" => {
+                // --update-to takes a value argument; skip it too
+                if arg == "--update-to" {
+                    skip_next = true;
+                }
+            }
+            _ => filtered.push(arg),
+        }
+    }
+    filtered
+}
+
 /// Restart the application by re-executing the current binary
 ///
 /// This function attempts to restart the application by:
@@ -209,8 +241,8 @@ pub fn restart_application() -> Result<(), String> {
         return Err(msg);
     }
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    log_update(&format!("Arguments: {:?}", args));
+    let args = filter_restart_args(std::env::args().skip(1));
+    log_update(&format!("Arguments (filtered): {:?}", args));
 
     #[cfg(unix)]
     {
@@ -238,5 +270,46 @@ pub fn restart_application() -> Result<(), String> {
 
         log_update("New process spawned successfully");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_restart_args_removes_one_shot_flags() {
+        let input = vec![
+            "--update-to".to_string(),
+            "0.1.0".to_string(),
+            "--check-update".to_string(),
+            "--clipboard-diag".to_string(),
+            "--ssh-paste-diag".to_string(),
+        ];
+        let filtered = filter_restart_args(input.into_iter());
+        assert!(
+            filtered.is_empty(),
+            "all one-shot flags must be removed, got: {filtered:?}"
+        );
+    }
+
+    #[test]
+    fn test_filter_restart_args_keeps_safe_flags() {
+        let input = vec!["--config".to_string(), "path/to/cfg.yaml".to_string()];
+        let filtered = filter_restart_args(input.into_iter());
+        assert_eq!(filtered, vec!["--config", "path/to/cfg.yaml"]);
+    }
+
+    #[test]
+    fn test_filter_restart_args_mixed() {
+        let input = vec![
+            "--config".to_string(),
+            "path/to/cfg.yaml".to_string(),
+            "--check-update".to_string(),
+            "--update-to".to_string(),
+            "0.5.0".to_string(),
+        ];
+        let filtered = filter_restart_args(input.into_iter());
+        assert_eq!(filtered, vec!["--config", "path/to/cfg.yaml"]);
     }
 }
