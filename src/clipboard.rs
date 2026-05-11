@@ -116,12 +116,33 @@ fn detect_strategy() -> ClipboardStrategy {
     }
 }
 
+/// Returns true if `path` has at least one executable bit set (Unix only).
+///
+/// Extracted as a standalone helper for testability. On non-Unix platforms
+/// this function is not compiled in — `which()` falls back to `is_file()` alone.
+#[cfg(unix)]
+fn is_executable(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    path.metadata()
+        .map(|m| m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
 /// Look up an executable in PATH. Returns the absolute path on first hit.
+///
+/// On Unix, only entries that are both a regular file **and** have at least one
+/// executable bit set are returned. This prevents a non-executable file on PATH
+/// (e.g. a 0644 stub) from being selected and causing a "Permission denied"
+/// error at subprocess spawn time with no clear diagnostic.
 pub fn which(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join(name);
         if candidate.is_file() {
+            #[cfg(unix)]
+            if !is_executable(&candidate) {
+                continue;
+            }
             return Some(candidate);
         }
     }
@@ -609,5 +630,24 @@ mod tests {
         // Cached result is whatever the test harness sees; just ensure
         // the call path is sound on every platform.
         let _ = is_ssh_session();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_executable_respects_mode() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::set_permissions(
+            tmp.path(),
+            std::fs::Permissions::from_mode(0o644),
+        )
+        .unwrap();
+        assert!(!is_executable(tmp.path()), "0o644 file must not be executable");
+        std::fs::set_permissions(
+            tmp.path(),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        assert!(is_executable(tmp.path()), "0o755 file must be executable");
     }
 }
