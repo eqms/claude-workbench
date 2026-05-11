@@ -45,7 +45,10 @@ struct Args {
     #[arg(long, env = "WORKBENCH_FAKE_VERSION")]
     fake_version: Option<String>,
 
-    /// Update to a specific version (for testing/downgrade, e.g., "v0.38.5" or "0.38.5")
+    /// Update to a specific version (for testing/downgrade, e.g., "v0.38.5" or "0.38.5").
+    /// Only available in debug builds — release binaries do not expose this flag
+    /// to prevent privilege-escalation via intentional downgrade to unsigned releases.
+    #[cfg(debug_assertions)]
     #[arg(long)]
     update_to: Option<String>,
 
@@ -318,6 +321,8 @@ fn main() -> Result<()> {
     }
 
     // Handle --update-to CLI mode (update to specific version and exit)
+    // Only available in debug builds (field is cfg-gated in Args struct)
+    #[cfg(debug_assertions)]
     if let Some(target_version) = args.update_to {
         return run_update_to_version_cli(&target_version);
     }
