@@ -12,6 +12,29 @@ fn is_inside(r: Rect, x: u16, y: u16) -> bool {
     x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
 }
 
+/// Resolve which pane (if any) the cursor is over. Used to eagerly move focus
+/// on Down(Left) before scrollbar/border/footer special-casing — so a single
+/// click on a border or scrollbar still focuses the adjacent pane instead of
+/// requiring a second click inside the pane content.
+///
+/// Hidden panes return Rect { width: 0, height: 0 } from the layout pass, so
+/// is_inside naturally rejects them.
+fn pane_at_position(rects: &super::LayoutRects, x: u16, y: u16) -> Option<PaneId> {
+    if is_inside(rects.files, x, y) {
+        Some(PaneId::FileBrowser)
+    } else if is_inside(rects.preview, x, y) {
+        Some(PaneId::Preview)
+    } else if is_inside(rects.claude, x, y) {
+        Some(PaneId::Claude)
+    } else if is_inside(rects.lazygit, x, y) {
+        Some(PaneId::LazyGit)
+    } else if is_inside(rects.terminal, x, y) {
+        Some(PaneId::Terminal)
+    } else {
+        None
+    }
+}
+
 impl App {
     /// Handle scrollbar drag: convert mouse Y position to scroll position for a pane
     pub(super) fn handle_scrollbar_position(&mut self, pane: PaneId, y: u16, sb: Rect) {
@@ -272,6 +295,16 @@ impl App {
                 if self.menu.visible {
                     self.menu.visible = false;
                     return;
+                }
+
+                // Eager focus: move active_pane to whichever pane contains the click,
+                // BEFORE the scrollbar / border / footer special-cases short-circuit.
+                // Without this, clicking on a pane border (resize handle, ±1 px) or on
+                // a scrollbar handle returns early without updating active_pane —
+                // forcing the user to click a second time inside the pane content to
+                // actually focus it.
+                if let Some(target) = pane_at_position(&rects, x, y) {
+                    self.active_pane = target;
                 }
 
                 // Check scrollbar click (before normal pane clicks)

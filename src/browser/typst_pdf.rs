@@ -467,10 +467,11 @@ impl TypstRenderer {
                 }
 
                 // --- Block quotes ---
-                Event::Start(Tag::BlockQuote) => {
+                // pulldown-cmark 0.13: BlockQuote variants now carry an optional kind.
+                Event::Start(Tag::BlockQuote(_)) => {
                     r.out.push_str("\n#quote(block: true)[\n");
                 }
-                Event::End(TagEnd::BlockQuote) => {
+                Event::End(TagEnd::BlockQuote(_)) => {
                     r.out.push_str("]\n");
                 }
 
@@ -534,6 +535,17 @@ impl TypstRenderer {
 
                 // --- HTML blocks ---
                 Event::Start(Tag::HtmlBlock) | Event::End(TagEnd::HtmlBlock) => {}
+
+                // --- Math (pulldown-cmark 0.13) ---
+                // Render LaTeX-like math as escaped raw text — no math typesetting.
+                Event::InlineMath(text) | Event::DisplayMath(text) => {
+                    r.push_to_active(&typst_escape(&text));
+                }
+
+                // pulldown-cmark 0.13 added DefinitionList* and Superscript/Subscript
+                // tags. Treat unmatched Start/End tags as no-ops; their inner Text
+                // events still flow through and produce reasonable output.
+                _ => {}
             }
         }
 

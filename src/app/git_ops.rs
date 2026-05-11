@@ -2,7 +2,7 @@ use crate::git;
 use crate::types::{GitRemoteCheckResult, PaneId};
 use crate::ui;
 
-use super::App;
+use super::{App, JobState, PollOutcome};
 
 impl App {
     pub(super) fn check_repo_change(&mut self) {
@@ -23,8 +23,8 @@ impl App {
                 if let Some(branch) = git::get_current_branch(repo_root) {
                     // Start async check
                     self.git_remote.checking = true;
-                    self.git_check_receiver =
-                        Some(git::check_remote_changes_async(repo_root, &branch));
+                    self.git_check_job =
+                        JobState::running(git::check_remote_changes_async(repo_root, &branch));
                 }
             }
         }
@@ -107,41 +107,44 @@ impl App {
 
     /// Poll for git remote check results and show dialog if needed
     pub(super) fn poll_git_check(&mut self) {
-        if let Some(ref receiver) = self.git_check_receiver {
-            // Non-blocking check for result
-            if let Ok(result) = receiver.try_recv() {
+        let result = match self.git_check_job.poll() {
+            PollOutcome::Ready(result) => result,
+            // Disconnected: worker thread panicked or returned early; silently
+            // reset state so the next check_repo_change() can try again.
+            PollOutcome::Disconnected => {
                 self.git_remote.checking = false;
+                return;
+            }
+            PollOutcome::Pending => return,
+        };
 
-                match result {
-                    GitRemoteCheckResult::RemoteAhead {
-                        commits_ahead,
-                        branch,
-                    } => {
-                        // Show pull confirmation dialog
-                        if let Some(repo_root) = self.git_remote.last_repo_root.clone() {
-                            use ui::dialog::{DialogAction, DialogType};
-                            self.dialog.dialog_type = DialogType::Confirm {
-                                title: "Git Pull".to_string(),
-                                message: format!(
-                                    "Branch '{}' is {} commit{} behind remote. Pull now?",
-                                    branch,
-                                    commits_ahead,
-                                    if commits_ahead == 1 { "" } else { "s" }
-                                ),
-                                action: DialogAction::GitPull { repo_root },
-                            };
-                        }
-                    }
-                    GitRemoteCheckResult::UpToDate => {
-                        // No action needed
-                    }
-                    GitRemoteCheckResult::Error(_err) => {
-                        // Silently ignore errors (no network, no remote, etc.)
-                    }
+        self.git_remote.checking = false;
+
+        match result {
+            GitRemoteCheckResult::RemoteAhead {
+                commits_ahead,
+                branch,
+            } => {
+                // Show pull confirmation dialog
+                if let Some(repo_root) = self.git_remote.last_repo_root.clone() {
+                    use ui::dialog::{DialogAction, DialogType};
+                    self.dialog.dialog_type = DialogType::Confirm {
+                        title: "Git Pull".to_string(),
+                        message: format!(
+                            "Branch '{}' is {} commit{} behind remote. Pull now?",
+                            branch,
+                            commits_ahead,
+                            if commits_ahead == 1 { "" } else { "s" }
+                        ),
+                        action: DialogAction::GitPull { repo_root },
+                    };
                 }
-
-                // Clear receiver
-                self.git_check_receiver = None;
+            }
+            GitRemoteCheckResult::UpToDate => {
+                // No action needed
+            }
+            GitRemoteCheckResult::Error(_err) => {
+                // Silently ignore errors (no network, no remote, etc.)
             }
         }
     }

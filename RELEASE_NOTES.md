@@ -1,5 +1,63 @@
 # Release Notes
 
+## Version 0.89.0 (11.05.2026)
+
+### Fixed
+- **Mouse focus on first click for borders and scrollbars** — Clicking a
+  pane border (resize handle, ±1 px tolerance) or scrollbar handle no
+  longer requires a second click inside the pane content to actually
+  focus that pane. New helper `pane_at_position()` resolves the click
+  to the underlying pane and updates `active_pane` eagerly, before the
+  resize/scrollbar special-cases short-circuit the event handler.
+
+### Changed
+- **Async job lifecycle modelled explicitly** — Replaced four
+  `Option<Receiver<T>>` fields on `App` (`git_check_receiver`,
+  `update_check_receiver`, `update_receiver`, `export_receiver`) with
+  a `JobState<T> { Idle, Running(Receiver<T>) }` enum and a new
+  `PollOutcome<T>` returned by `poll()`. Disconnected channels are now
+  surfaced separately from "no result yet" so worker-thread death is
+  no longer silently conflated with normal idle state.
+- **`src/app/keyboard.rs` split into per-context submodules** —
+  1421-line file decomposed into `keyboard/{mod, dialogs, global,
+  preview, terminal, file_browser}.rs`. The dispatcher (`mod.rs`)
+  shrinks to ~300 lines; each submodule owns a coherent slice of the
+  input surface. No behavior change.
+- **Dependency hardening based on audit 2026-05-11**:
+  - `shell-escape 0.1.5` (unmaintained since 2017) replaced with
+    `shlex 1.3` in `src/app/pty.rs` (4 call sites) and
+    `src/setup/dependency_checker.rs`.
+  - `pulldown-cmark 0.10` bumped to `0.13` to deduplicate with the
+    transitive version pulled by `tui-markdown`. API migration in
+    `src/browser/typst_pdf.rs`: `TagEnd::BlockQuote` is now a tuple
+    variant; `Event::InlineMath` / `DisplayMath` are handled as raw
+    text; new `Event::Start(Tag::DefinitionList…)` variants
+    pass through via wildcard arm.
+  - `self_update`'s `signatures` feature flag enabled in `Cargo.toml`
+    (capability only; full signing rollout tracked in `SECURITY-NOTES.md`).
+
+### Added
+- **`SECURITY-NOTES.md`** — Operational security playbook for
+  claude-workbench. Tracks the open audit findings (HIGH: self-update
+  has no checksum/signature verification; tar-slip protection
+  delegated; MEDIUM: browser-injection latent risk, shell `-i -c`
+  fragility, predictable temp-file path) and lays out a two-half
+  rollout plan for ed25519 signing via `zipsign`: CI workflow signs
+  release archives with a key from GitHub Secrets first, then a
+  later client release enables `verifying_keys()` once releases
+  reliably ship `.sig` sidecars.
+
+### Notes
+- `crossterm 0.28 → 0.29` was attempted and reverted: the
+  `tui-textarea` fork on `update-ratatui` is built against
+  crossterm 0.28's `Event` types and its `From<Event> for Input`
+  impl. Bumping breaks `editor.input(Event::Key(key))` call sites in
+  the preview-edit handler. Fork must be rebased on crossterm 0.29
+  (or upstream `tui-textarea` must support ratatui 0.30) before this
+  dedupe can land.
+
+---
+
 ## Version 0.88.0 (05.05.2026)
 
 ### Added

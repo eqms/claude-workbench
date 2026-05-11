@@ -2,11 +2,14 @@ mod clipboard;
 mod drawing;
 mod file_ops;
 mod git_ops;
+mod job_state;
 mod keyboard;
 mod mouse;
 mod pty;
 mod ssh_paste;
 mod update;
+
+pub(crate) use job_state::{JobState, PollOutcome};
 
 use anyhow::Result;
 use crossterm::event::{self, Event};
@@ -111,14 +114,14 @@ pub struct App {
     pub mouse_selection: MouseSelection,
     // Git remote change detection state
     pub git_remote: GitRemoteState,
-    // Receiver for async git remote check results
-    pub git_check_receiver: Option<std::sync::mpsc::Receiver<GitRemoteCheckResult>>,
+    // Async job: git remote-ahead check
+    pub git_check_job: JobState<GitRemoteCheckResult>,
     // Self-update state
     pub update_state: UpdateState,
-    // Receiver for async update check results
-    pub update_check_receiver: Option<std::sync::mpsc::Receiver<UpdateCheckResult>>,
-    // Receiver for async update results
-    pub update_receiver: Option<std::sync::mpsc::Receiver<UpdateResult>>,
+    // Async job: update availability check
+    pub update_check_job: JobState<UpdateCheckResult>,
+    // Async job: actual binary download + replace
+    pub update_job: JobState<UpdateResult>,
     // Update dialog button selection
     pub update_dialog_button: UpdateDialogButton,
     // Cached update dialog areas for mouse clicks
@@ -158,8 +161,8 @@ pub struct App {
     pub temp_preview_files: Vec<std::path::PathBuf>,
     // Export format chooser (Ctrl+X on Markdown files)
     pub export_chooser: crate::types::ExportChooserState,
-    // Async PDF export result channel
-    pub export_receiver: Option<std::sync::mpsc::Receiver<Result<std::path::PathBuf, String>>>,
+    // Async job: PDF export
+    pub export_job: JobState<Result<std::path::PathBuf, String>>,
     pub export_browser: Option<String>,
 }
 
@@ -320,10 +323,10 @@ impl App {
             drag_state: DragState::default(),
             mouse_selection: MouseSelection::default(),
             git_remote: GitRemoteState::default(),
-            git_check_receiver: None,
+            git_check_job: JobState::default(),
             update_state: UpdateState::new(),
-            update_check_receiver: None,
-            update_receiver: None,
+            update_check_job: JobState::default(),
+            update_job: JobState::default(),
             update_dialog_button: UpdateDialogButton::default(),
             update_dialog_areas: UpdateDialogAreas::default(),
             fake_version,
@@ -343,7 +346,7 @@ impl App {
             dependency_report: crate::setup::DependencyReport::default(),
             temp_preview_files: Vec::new(),
             export_chooser: crate::types::ExportChooserState::default(),
-            export_receiver: None,
+            export_job: JobState::default(),
             export_browser: None,
         };
 

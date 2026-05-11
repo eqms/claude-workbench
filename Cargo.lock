@@ -440,7 +440,7 @@ checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
 name = "claude-workbench"
-version = "0.88.0"
+version = "0.89.0"
 dependencies = [
  "anyhow",
  "arboard",
@@ -451,13 +451,13 @@ dependencies = [
  "ecow",
  "libc",
  "portable-pty",
- "pulldown-cmark 0.10.3",
+ "pulldown-cmark",
  "ratatui",
  "regex",
  "self_update",
  "serde",
  "serde_yaml_ng",
- "shell-escape",
+ "shlex",
  "syntect",
  "tempfile",
  "tokio",
@@ -3029,19 +3029,6 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76979bea66e7875e7509c4ec5300112b316af87fa7a252ca91c448b32dfe3993"
-dependencies = [
- "bitflags 2.10.0",
- "getopts",
- "memchr",
- "pulldown-cmark-escape 0.10.1",
- "unicase",
-]
-
-[[package]]
-name = "pulldown-cmark"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e8bbe1a966bd2f362681a44f6edce3c2310ac21e4d5067a6e7ec396297a6ea0"
@@ -3049,15 +3036,9 @@ dependencies = [
  "bitflags 2.10.0",
  "getopts",
  "memchr",
- "pulldown-cmark-escape 0.11.0",
+ "pulldown-cmark-escape",
  "unicase",
 ]
-
-[[package]]
-name = "pulldown-cmark-escape"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd348ff538bc9caeda7ee8cad2d1d48236a1f443c1fa3913c6a02fe0043b1dd3"
 
 [[package]]
 name = "pulldown-cmark-escape"
@@ -3859,12 +3840,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shell-escape"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45bb67a18fa91266cc7807181f62f9178a6873bfad7dc788c42e6430db40184f"
-
-[[package]]
 name = "shell-words"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4627,7 +4602,7 @@ dependencies = [
  "ansi-to-tui",
  "itertools 0.14.0",
  "pretty_assertions",
- "pulldown-cmark 0.13.0",
+ "pulldown-cmark",
  "ratatui-core",
  "rstest",
  "syntect",

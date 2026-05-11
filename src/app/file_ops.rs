@@ -433,7 +433,7 @@ impl App {
                                 );
                                 let _ = tx.send(result.map_err(|e| format!("{}", e)));
                             });
-                            self.export_receiver = Some(rx);
+                            self.export_job = super::JobState::running(rx);
                             self.export_browser = Some(self.config.ui.browser.clone());
                             // Show progress flash
                             self.copy_flash_message = Some("Generating PDF...".to_string());
@@ -473,10 +473,13 @@ impl App {
 
     /// Poll for async PDF export completion
     pub(crate) fn poll_export_result(&mut self) {
-        if let Some(ref rx) = self.export_receiver {
-            if let Ok(result) = rx.try_recv() {
+        use super::PollOutcome;
+        if !self.export_job.is_running() {
+            return;
+        }
+        match self.export_job.poll() {
+            PollOutcome::Ready(result) => {
                 let browser = self.export_browser.take().unwrap_or_default();
-                self.export_receiver = None;
                 match result {
                     Ok(path) => {
                         self.copy_flash_message = Some("PDF exported".to_string());
@@ -494,7 +497,19 @@ impl App {
                         };
                     }
                 }
-            } else {
+            }
+            PollOutcome::Disconnected => {
+                // Worker thread died — clean up state and surface a generic error.
+                self.export_browser.take();
+                self.copy_flash_message = None;
+                self.last_copy_time = None;
+                self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
+                    title: "Export Failed".to_string(),
+                    message: "Export worker terminated unexpectedly.".to_string(),
+                    action: ui::dialog::DialogAction::DiscardEditorChanges,
+                };
+            }
+            PollOutcome::Pending => {
                 // Keep the flash alive while exporting
                 self.last_copy_time = Some(std::time::Instant::now());
             }

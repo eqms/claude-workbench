@@ -1,7 +1,4 @@
-use std::borrow::Cow;
 use std::path::Path;
-
-use shell_escape::escape;
 
 use crate::config::Config;
 use crate::terminal::PseudoTerminal;
@@ -151,7 +148,9 @@ impl App {
     #[allow(dead_code)]
     pub(super) fn sync_terminals_initial(&mut self) {
         let path_str = self.file_browser.current_dir.to_string_lossy();
-        let escaped = escape(Cow::Borrowed(&path_str));
+        let escaped = shlex::try_quote(&path_str)
+            .map(|c| c.into_owned())
+            .unwrap_or_else(|_| path_str.to_string());
         let cmd = format!("cd {}\r", escaped);
 
         // Only sync to Terminal, NOT Claude (Claude needs time to start)
@@ -163,7 +162,9 @@ impl App {
     /// Sync directory to Terminal pane only (not Claude - Claude only gets cd at startup)
     pub(super) fn sync_terminals(&mut self) {
         let path_str = self.file_browser.current_dir.to_string_lossy();
-        let escaped = escape(Cow::Borrowed(&path_str));
+        let escaped = shlex::try_quote(&path_str)
+            .map(|c| c.into_owned())
+            .unwrap_or_else(|_| path_str.to_string());
         let cmd = format!("cd {}\r", escaped);
 
         // Only sync to Terminal, not Claude (Claude should keep its initial directory)
@@ -175,7 +176,9 @@ impl App {
     /// Send cd command to a specific terminal pane
     pub(super) fn sync_terminal_to_current_dir(&mut self, pane: PaneId) {
         let path_str = self.file_browser.current_dir.to_string_lossy();
-        let escaped = escape(Cow::Borrowed(&path_str));
+        let escaped = shlex::try_quote(&path_str)
+            .map(|c| c.into_owned())
+            .unwrap_or_else(|_| path_str.to_string());
         let cmd = format!("cd {}\r", escaped);
 
         if let Some(pty) = self.terminals.get_mut(&pane) {
@@ -394,8 +397,11 @@ impl App {
     pub(super) fn insert_path_at_cursor(&mut self, target: PaneId, path: &Path) {
         if let Some(pty) = self.terminals.get_mut(&target) {
             let path_str = path.to_string_lossy();
-            // Use shell-escape crate for proper escaping of special characters
-            let escaped = escape(Cow::Borrowed(&path_str));
+            // shlex::try_quote escapes shell metacharacters; only fails on NUL bytes,
+            // which cannot occur in a valid filesystem path on Unix or Windows.
+            let escaped = shlex::try_quote(&path_str)
+                .map(|c| c.into_owned())
+                .unwrap_or_else(|_| path_str.into_owned());
 
             // Write to PTY (no newline - just insert the path)
             let _ = pty.write_input(escaped.as_bytes());
