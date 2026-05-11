@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use self_update::backends::github::ReleaseList;
+use semver::Version;
 
 use super::release_notes::filter_release_notes_for_platform;
 use super::state::UpdateCheckResult;
@@ -33,13 +34,27 @@ pub fn check_for_update_with_version(current_version: &str) -> UpdateCheckResult
     {
         Ok(release_list) => match release_list.fetch() {
             Ok(releases) => {
-                if releases.is_empty() {
+                // Select the release with the highest semantic version.
+                // Trusting `releases[0]` (API creation order) is unsafe: a maintainer
+                // could post a backdated old-branch patch release that would suppress
+                // legitimate updates. max_by(semver) is immune to creation order.
+                // The `is_empty()` guard is subsumed: max_by returns None on empty input,
+                // handled by the `let Some` below.
+                let latest = releases
+                    .iter()
+                    .filter_map(|r| {
+                        let tag = r.version.strip_prefix('v').unwrap_or(&r.version);
+                        Version::parse(tag).ok().map(|v| (v, r))
+                    })
+                    .max_by(|(va, _), (vb, _)| va.cmp(vb))
+                    .map(|(_, r)| r);
+
+                let Some(latest) = latest else {
                     #[cfg(debug_assertions)]
                     eprintln!("[Update] No releases found");
                     return UpdateCheckResult::NoReleasesFound;
-                }
+                };
 
-                let latest = &releases[0];
                 let target_version = &latest.version;
 
                 #[cfg(debug_assertions)]
@@ -113,6 +128,39 @@ pub fn check_for_update_async_with_version(
         let _ = tx.send(result);
     });
     rx
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_max_semver_selection_ignores_creation_order() {
+        use semver::Version;
+        let tags = vec!["v0.85.1", "v0.89.0", "v0.88.3", "v0.85.2"];
+        let best = tags
+            .iter()
+            .filter_map(|t| {
+                let s = t.strip_prefix('v').unwrap_or(t);
+                Version::parse(s).ok().map(|v| (v, t))
+            })
+            .max_by(|(va, _), (vb, _)| va.cmp(vb))
+            .map(|(_, t)| *t);
+        assert_eq!(best, Some("v0.89.0"), "must select highest semver, not first in list");
+    }
+
+    #[test]
+    fn test_max_semver_skips_unparseable_tags() {
+        use semver::Version;
+        let tags = vec!["nightly-abc", "v0.89.0", "v0.88.0"];
+        let best = tags
+            .iter()
+            .filter_map(|t| {
+                let s = t.strip_prefix('v').unwrap_or(t);
+                Version::parse(s).ok().map(|v| (v, t))
+            })
+            .max_by(|(va, _), (vb, _)| va.cmp(vb))
+            .map(|(_, t)| *t);
+        assert_eq!(best, Some("v0.89.0"), "unparseable nightly tag must be skipped");
+    }
 }
 
 /// Get the target triple for the current platform

@@ -31,6 +31,7 @@ self_update = { version = "0.42", default-features = false, features = [
     "signatures"
 ] }
 tempfile = "3"
+semver = "1"
 
 # Typst PDF generation (pure Rust, no external binaries)
 # Gated behind `pdf-export` feature (enabled by default).
