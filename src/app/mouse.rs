@@ -35,7 +35,75 @@ fn pane_at_position(rects: &super::LayoutRects, x: u16, y: u16) -> Option<PaneId
     }
 }
 
+/// Direction of a mouse-wheel scroll over the file-browser pane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ScrollDirection {
+    Down,
+    Up,
+}
+
+/// Compute the new file-browser scroll offset for a mouse-wheel tick.
+///
+/// Pure (no `self`, no side effects) so the clamping logic is unit-testable.
+/// `visible_height` is the number of rendered item rows (files.height - 3).
+/// Scrolling down is clamped to `item_count - visible_height` so the last row
+/// can reach the bottom but never scrolls past it; scrolling up floors at 0.
+/// When the list is shorter than the pane, the ceiling is 0 (no scroll).
+pub(crate) fn scroll_files_pane(
+    offset: usize,
+    item_count: usize,
+    visible_height: usize,
+    delta: usize,
+    direction: ScrollDirection,
+) -> usize {
+    let max = item_count.saturating_sub(visible_height);
+    match direction {
+        ScrollDirection::Down => (offset + delta).min(max),
+        ScrollDirection::Up => offset.saturating_sub(delta),
+    }
+}
+
+/// Clamp the selected index into the visible window `[offset, offset + visible_height - 1]`.
+///
+/// ratatui couples a `ListState`'s offset to its selection: on render it snaps
+/// the offset back so the selected item stays visible. Keeping `selected`
+/// inside the window after a wheel scroll prevents that snap-back, so the
+/// viewport scroll we just applied survives the next frame.
+pub(crate) fn clamp_selected_to_window(
+    selected: usize,
+    offset: usize,
+    visible_height: usize,
+) -> usize {
+    let window_last = offset.saturating_add(visible_height).saturating_sub(1);
+    selected.max(offset).min(window_last)
+}
+
 impl App {
+    /// Scroll the file-browser viewport by one mouse-wheel tick (3 rows).
+    ///
+    /// Moves the list offset (the viewport), NOT the selection — the previous
+    /// behavior moved the selection via `down()`/`up()`, which made the
+    /// highlight wander and broke the click→item mapping after scrolling.
+    /// The selection is then clamped into the new visible window so ratatui
+    /// does not snap the offset back on the next render. The preview is
+    /// refreshed only when that clamp actually changed the selection.
+    fn scroll_file_browser(&mut self, direction: ScrollDirection) {
+        const WHEEL_DELTA: usize = 3;
+        let item_count = self.file_browser.entries.len();
+        let visible_h = self.files_pane_height as usize;
+        let current_offset = self.file_browser.list_state.offset();
+        let new_offset =
+            scroll_files_pane(current_offset, item_count, visible_h, WHEEL_DELTA, direction);
+        *self.file_browser.list_state.offset_mut() = new_offset;
+        if let Some(sel) = self.file_browser.list_state.selected() {
+            let clamped = clamp_selected_to_window(sel, new_offset, visible_h);
+            if clamped != sel {
+                self.file_browser.list_state.select(Some(clamped));
+                self.update_preview();
+            }
+        }
+    }
+
     /// Handle scrollbar drag: convert mouse Y position to scroll position for a pane
     pub(super) fn handle_scrollbar_position(&mut self, pane: PaneId, y: u16, sb: Rect) {
         let clamped = y.clamp(sb.y, sb.y + sb.height.saturating_sub(1));
@@ -916,8 +984,7 @@ impl App {
                 }
 
                 if is_inside(files, x, y) {
-                    self.file_browser.down();
-                    self.update_preview();
+                    self.scroll_file_browser(ScrollDirection::Down);
                 } else if is_inside(preview, x, y) {
                     // Shift+Scroll = horizontal scroll
                     if mouse
@@ -987,8 +1054,7 @@ impl App {
                 }
 
                 if is_inside(files, x, y) {
-                    self.file_browser.up();
-                    self.update_preview();
+                    self.scroll_file_browser(ScrollDirection::Up);
                 } else if is_inside(preview, x, y) {
                     // Shift+Scroll = horizontal scroll
                     if mouse
@@ -1068,5 +1134,86 @@ impl App {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clamp_selected_to_window, scroll_files_pane, ScrollDirection};
+
+    // --- scroll_files_pane — ScrollDown ---
+
+    #[test]
+    fn scroll_down_basic() {
+        // offset=0, 20 items, 10 visible, delta=3 -> new offset 3
+        let got = scroll_files_pane(0, 20, 10, 3, ScrollDirection::Down);
+        assert_eq!(got, 3, "scroll down by 3 from top: {got}");
+    }
+
+    #[test]
+    fn scroll_down_clamps_to_max() {
+        // offset=8 + delta=3 = 11, but max = 20 - 10 = 10 -> clamped to 10
+        let got = scroll_files_pane(8, 20, 10, 3, ScrollDirection::Down);
+        assert_eq!(got, 10, "scroll down must clamp to item_count - visible: {got}");
+    }
+
+    #[test]
+    fn scroll_down_already_at_max() {
+        // offset=10 equals max (20-10); adding delta stays at 10
+        let got = scroll_files_pane(10, 20, 10, 3, ScrollDirection::Down);
+        assert_eq!(got, 10, "scroll down at max must not move: {got}");
+    }
+
+    #[test]
+    fn scroll_down_list_shorter_than_pane() {
+        // item_count=5 < visible_height=10 -> max = 0; no scroll
+        let got = scroll_files_pane(0, 5, 10, 1, ScrollDirection::Down);
+        assert_eq!(got, 0, "list shorter than pane must not scroll: {got}");
+    }
+
+    // --- scroll_files_pane — ScrollUp ---
+
+    #[test]
+    fn scroll_up_basic() {
+        // offset=5, delta=3 -> new offset 2
+        let got = scroll_files_pane(5, 20, 10, 3, ScrollDirection::Up);
+        assert_eq!(got, 2, "scroll up by 3 from offset 5: {got}");
+    }
+
+    #[test]
+    fn scroll_up_floors_at_zero() {
+        // offset=2, delta=3 -> would underflow; saturating_sub gives 0
+        let got = scroll_files_pane(2, 20, 10, 3, ScrollDirection::Up);
+        assert_eq!(got, 0, "scroll up must floor at 0: {got}");
+    }
+
+    #[test]
+    fn scroll_up_already_at_top() {
+        // offset=0, delta=3 -> saturating_sub(3) = 0
+        let got = scroll_files_pane(0, 20, 10, 3, ScrollDirection::Up);
+        assert_eq!(got, 0, "scroll up at top must not move: {got}");
+    }
+
+    // --- clamp_selected_to_window ---
+
+    #[test]
+    fn clamp_selected_above_window() {
+        // selected=15, offset=5, visible=10 -> window [5..=14]; 15 -> 14
+        let got = clamp_selected_to_window(15, 5, 10);
+        assert_eq!(got, 14, "selected above window clamps to window_last: {got}");
+    }
+
+    #[test]
+    fn clamp_selected_below_window() {
+        // selected=3, offset=5, visible=10 -> window [5..=14]; 3 -> 5
+        let got = clamp_selected_to_window(3, 5, 10);
+        assert_eq!(got, 5, "selected below window clamps to offset: {got}");
+    }
+
+    #[test]
+    fn clamp_selected_inside_window() {
+        // selected=8, offset=5, visible=10 -> window [5..=14]; 8 unchanged
+        let got = clamp_selected_to_window(8, 5, 10);
+        assert_eq!(got, 8, "selected inside window must not change: {got}");
     }
 }

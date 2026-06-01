@@ -133,6 +133,10 @@ pub struct App {
     pub scrollbar_areas: ScrollbarAreas,
     // Cached preview pane width for horizontal scroll calculations
     pub preview_width: u16,
+    // Cached file-browser visible item-row count (inner list height), updated
+    // each frame from the files layout rect: files.height - 3 (top border +
+    // bottom border + 1-line info bar). Used by the mouse-wheel scroll handler.
+    pub files_pane_height: u16,
     // Interactive pane resizing state
     pub resize_state: ResizeState,
     pub border_areas: BorderAreas,
@@ -333,6 +337,7 @@ impl App {
             scrollbar_drag: ScrollbarDragState::default(),
             scrollbar_areas: ScrollbarAreas::default(),
             preview_width: 80,
+            files_pane_height: 0,
             resize_state: ResizeState::default(),
             border_areas: BorderAreas::default(),
             last_autosave_time: None,
