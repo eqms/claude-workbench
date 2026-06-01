@@ -408,6 +408,12 @@ impl FileBrowserState {
             .selected()
             .and_then(|i| self.entries.get(i))
             .map(|e| e.path.clone());
+        // Preserve the scroll position across the rebuild. load_tree() calls
+        // list_state.select(None), and ratatui's ListState::select(None) hard-
+        // resets offset to 0. Without restoring it, the periodic auto-refresh
+        // (default 2s) would snap the viewport back to the top while the user
+        // is scrolling.
+        let saved_offset = self.list_state.offset();
 
         // Preserve expanded_dirs across refresh
         self.load_tree();
@@ -418,6 +424,11 @@ impl FileBrowserState {
                 self.list_state.select(Some(idx));
             }
         }
+
+        // Restore the scroll offset (load_tree reset it via select(None)),
+        // clamped against the possibly-changed entry count.
+        let max_offset = self.entries.len().saturating_sub(1);
+        *self.list_state.offset_mut() = saved_offset.min(max_offset);
     }
 
     /// Legacy compatibility: load_directory calls load_tree
@@ -584,4 +595,81 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut FileBrowserState, is_focuse
 
     let info = Paragraph::new(info_text).style(Style::default().fg(Color::DarkGray));
     f.render_widget(info, info_area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    /// Build a FileBrowserState rooted at `dir` containing `n` flat files.
+    fn browser_with_files(dir: &std::path::Path, n: usize) -> FileBrowserState {
+        for i in 0..n {
+            fs::write(dir.join(format!("file_{i:03}.txt")), "x").unwrap();
+        }
+        let mut s = FileBrowserState::new(false);
+        s.root_dir = dir.to_path_buf();
+        s.current_dir = dir.to_path_buf();
+        s.expanded_dirs.clear();
+        s.expanded_dirs.insert(dir.to_path_buf());
+        s.load_tree();
+        s
+    }
+
+    #[test]
+    fn refresh_preserves_scroll_offset_and_selection() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut fb = browser_with_files(tmp.path(), 50);
+        assert!(
+            fb.entries.len() >= 50,
+            "expected >=50 entries, got {}",
+            fb.entries.len()
+        );
+
+        // Simulate a scrolled + selected viewport. select(Some(_)) does not
+        // touch offset, so setting offset afterwards is safe either way.
+        fb.list_state.select(Some(25));
+        *fb.list_state.offset_mut() = 20;
+        let selected_path = fb.entries[25].path.clone();
+
+        fb.refresh();
+
+        assert_eq!(
+            fb.list_state.offset(),
+            20,
+            "refresh must preserve the scroll offset (auto-refresh regression)"
+        );
+        let restored = fb
+            .list_state
+            .selected()
+            .and_then(|i| fb.entries.get(i))
+            .map(|e| e.path.clone());
+        assert_eq!(
+            restored,
+            Some(selected_path),
+            "refresh must preserve selection by path"
+        );
+    }
+
+    #[test]
+    fn refresh_clamps_offset_when_entries_shrink() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut fb = browser_with_files(tmp.path(), 30);
+        fb.list_state.select(Some(0));
+        *fb.list_state.offset_mut() = 25;
+
+        // Remove most files so the entry count drops well below saved offset.
+        for i in 5..30 {
+            let _ = fs::remove_file(tmp.path().join(format!("file_{i:03}.txt")));
+        }
+        fb.refresh();
+
+        let max_offset = fb.entries.len().saturating_sub(1);
+        assert!(
+            fb.list_state.offset() <= max_offset,
+            "offset {} must be clamped to <= {}",
+            fb.list_state.offset(),
+            max_offset
+        );
+    }
 }
