@@ -1,5 +1,20 @@
 # Release Notes
 
+## Version 0.90.2 (01.06.2026)
+
+### Fixed
+
+- **File-browser scroll position no longer snaps back during auto-refresh** —
+  The v0.90.1 mouse-wheel fix exposed a pre-existing bug: the periodic
+  file-browser auto-refresh (default every 2 s, `auto_refresh_ms`) called
+  `refresh()` → `load_tree()` → `ListState::select(None)`, and ratatui resets
+  a list's `offset` to 0 on `select(None)`. `refresh()` restored the selection
+  by path but not the scroll offset, so the viewport jumped back to the top a
+  couple of seconds after scrolling stopped. `refresh()` now saves the scroll
+  offset before the tree rebuild and restores it afterward (clamped to the new
+  entry count), so the scroll position survives auto-refresh. Covered by two
+  new unit tests in `src/ui/file_browser.rs`.
+
 ## Version 0.90.1 (01.06.2026)
 
 ### Fixed
