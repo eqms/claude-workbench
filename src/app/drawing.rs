@@ -82,6 +82,7 @@ impl App {
         self.scrollbar_areas.preview_horizontal = self.preview.cached_h_scrollbar_area;
         // Cache preview width for horizontal scroll auto-adjust
         self.preview_width = preview.width.saturating_sub(10); // Account for gutter+borders
+
         // Cache file-browser visible item-row count for the mouse-wheel scroll
         // handler. Must match the click hit-test geometry: the files pane is a
         // bordered List (top + bottom border) plus a 1-line info bar, so the

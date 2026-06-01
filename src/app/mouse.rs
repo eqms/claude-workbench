@@ -92,8 +92,13 @@ impl App {
         let item_count = self.file_browser.entries.len();
         let visible_h = self.files_pane_height as usize;
         let current_offset = self.file_browser.list_state.offset();
-        let new_offset =
-            scroll_files_pane(current_offset, item_count, visible_h, WHEEL_DELTA, direction);
+        let new_offset = scroll_files_pane(
+            current_offset,
+            item_count,
+            visible_h,
+            WHEEL_DELTA,
+            direction,
+        );
         *self.file_browser.list_state.offset_mut() = new_offset;
         if let Some(sel) = self.file_browser.list_state.selected() {
             let clamped = clamp_selected_to_window(sel, new_offset, visible_h);
@@ -1154,7 +1159,10 @@ mod tests {
     fn scroll_down_clamps_to_max() {
         // offset=8 + delta=3 = 11, but max = 20 - 10 = 10 -> clamped to 10
         let got = scroll_files_pane(8, 20, 10, 3, ScrollDirection::Down);
-        assert_eq!(got, 10, "scroll down must clamp to item_count - visible: {got}");
+        assert_eq!(
+            got, 10,
+            "scroll down must clamp to item_count - visible: {got}"
+        );
     }
 
     #[test]
@@ -1200,7 +1208,10 @@ mod tests {
     fn clamp_selected_above_window() {
         // selected=15, offset=5, visible=10 -> window [5..=14]; 15 -> 14
         let got = clamp_selected_to_window(15, 5, 10);
-        assert_eq!(got, 14, "selected above window clamps to window_last: {got}");
+        assert_eq!(
+            got, 14,
+            "selected above window clamps to window_last: {got}"
+        );
     }
 
     #[test]
