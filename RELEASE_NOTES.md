@@ -1,5 +1,24 @@
 # Release Notes
 
+## Version 0.90.1 (01.06.2026)
+
+### Fixed
+
+- **File-browser mouse-wheel now scrolls the viewport, not the selection** —
+  Scrolling the wheel over the file-browser pane previously called
+  `FileBrowserState::down()`/`up()`, which moved the *selection* instead of
+  the viewport. Because ratatui couples a `ListState`'s `offset` to its
+  `selected`, the highlight wandered while scrolling and the click hit-test
+  (`idx = list_state.offset() + relative_y`) landed on the wrong row after a
+  scroll. The wheel now adjusts the viewport offset directly (±3 rows, clamped
+  to `[0, item_count - visible_height]`) and clamps the selection into the new
+  visible window so ratatui does not snap the offset back on the next render.
+  Visible height is cached each frame as `files.height - 3` (top border +
+  bottom border + 1-line info bar), matching the click hit-test geometry. New
+  pure helpers `scroll_files_pane()` and `clamp_selected_to_window()` in
+  `src/app/mouse.rs`, covered by 10 co-located unit tests. The click hit-test
+  itself is unchanged.
+
 ## Version 0.90.0 (11.05.2026)
 
 ### Fixed
