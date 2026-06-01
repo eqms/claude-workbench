@@ -61,12 +61,13 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260601-iwi | Fix file-browser mouse-wheel scroll (viewport, not selection) | 2026-06-01 | affd62c | [260601-iwi-...](./quick/260601-iwi-fix-file-browser-mouse-wheel-scroll-whee/) |
+| v0.90.2 | Fix file-browser scroll snapback — true root cause: auto-refresh reset list offset every 2s (refresh() now preserves offset) | 2026-06-01 | ab9da43 | — |
 
 ## Session Continuity
 
 Last session: 2026-06-01
-Last activity: 2026-06-01 — Completed quick task 260601-iwi: file-browser mouse-wheel scroll fix (commit affd62c, 140 tests pass)
-Stopped at: Quick task 260601-iwi shipped. Phase 2 discussion was paused mid-way (no CONTEXT.md written). Phase 1 accepted as delivered at 4/6 (operator decision). SEC-01 (HIGH) carried to v0.91 backlog.
+Last activity: 2026-06-01 — Shipped v0.90.2: file-browser scroll snapback root-cause fix (auto-refresh was resetting list offset every 2s; refresh() now preserves offset). 139 tests pass.
+Stopped at: v0.90.2 tagged + pushed. The v0.90.1 wheel-to-viewport change was correct but exposed a pre-existing auto-refresh reset — that is the actual root cause, now fixed. Phase 2 discussion still paused (no CONTEXT.md). Phase 1 accepted at 4/6; SEC-01 (HIGH) carried to v0.91 backlog.
 Resume file: None
 Next actions:
 1. Plan Phase 2 (`/gsd-plan-phase`) — clipboard fallback tests + mutex-poison observability (QUAL-01, QUAL-02)
