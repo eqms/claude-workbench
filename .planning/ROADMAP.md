@@ -6,7 +6,7 @@ v0.89.0 audit surfaced 4 security findings, zero clipboard test coverage, a 47-f
 
 ## Phases
 
-- [ ] **Phase 1: Security Hardening** - Close 1 HIGH + 3 MEDIUM findings from the v0.89.0 security audit
+- [x] **Phase 1: Security Hardening** - Wave 1 shipped (3 MEDIUM closed). SEC-01 (HIGH, signing/verification) DEFERRED to v0.91 — plans 01-05/01-06 remain open.
 - [ ] **Phase 2: Test Coverage + Reliability** - Automated clipboard tests + observable mutex-poison error surfacing
 - [ ] **Phase 3: Refactor + Dependency Strategy** - App god-struct decomposition + crossterm 0.29 upgrade path decision
 - [ ] **Phase 4: Session Persistence** - Replace no-op session stub with working cwd save/restore
@@ -29,8 +29,8 @@ Plans:
 - [ ] 01-02-PLAN.md — Gate --update-to to debug builds + strip one-shot restart flags (CR-02/IN-02)
 - [ ] 01-03-PLAN.md — Browser allow-list validate_program + remove $SHELL fallback (WR-01/SEC-02, WR-02/SEC-03)
 - [ ] 01-04-PLAN.md — Executable-bit in which(), shlex error propagation, semver release selection (WR-03/WR-04/WR-05)
-- [ ] 01-05-PLAN.md — CI release signing with zipsign ed25519 — Phase A (CR-01/SEC-01)
-- [ ] 01-06-PLAN.md — Enable signature verification in client — Phase B (CR-01/SEC-01) [depends on 01-05, requires 2+ signed releases]
+- [~] 01-05-PLAN.md — CI release signing with zipsign ed25519 — Phase A (CR-01/SEC-01) **[DEFERRED → v0.91: blocks on operator zipsign keypair + GitHub Actions secret]**
+- [~] 01-06-PLAN.md — Enable signature verification in client — Phase B (CR-01/SEC-01) **[DEFERRED → v0.91: depends on 01-05 + 2+ signed releases shipped]**
 
 ### Phase 2: Test Coverage + Reliability
 **Goal**: Clipboard fallback chain is covered by automated tests and mutex-poison events are observable in production
@@ -68,7 +68,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security Hardening | 0/6 | Not started | - |
+| 1. Security Hardening | 4/6 | Accepted (Wave 1) — SEC-01 deferred to v0.91 | 2026-05-11 |
 | 2. Test Coverage + Reliability | 0/TBD | Not started | - |
 | 3. Refactor + Dependency Strategy | 0/TBD | Not started | - |
 | 4. Session Persistence | 0/TBD | Not started | - |
