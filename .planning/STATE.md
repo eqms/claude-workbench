@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-05-11)
 
 **Core value:** Stay in one terminal: file navigation, Claude Code, LazyGit, and a shell side-by-side, panes always pointing at the same working directory.
-**Current focus:** Phase 1 — Security Hardening
+**Current focus:** Phase 2 — Test Coverage + Reliability
 
 ## Current Position
 
-Phase: 1 of 4 (Security Hardening)
-Plan: 4 of 6 complete (Wave 1 shipped)
-Status: Wave 2 pending operator action (zipsign keypair generation)
-Last activity: 2026-05-11 — Wave 1 plans 01-01..04 merged to main, 130 tests pass
+Phase: 2 of 4 (Test Coverage + Reliability) — entering planning
+Plan: 0 of TBD
+Status: Phase 1 ACCEPTED as delivered (Wave 1). SEC-01 (HIGH) explicitly deferred to v0.91 — plans 01-05/01-06 remain open in backlog.
+Last activity: 2026-06-01 — Phase 1 accepted at 4/6; routing to Phase 2 planning
 
-Progress: [██████░░░░] 67% (4/6 plans complete; 2 remaining gated on operator + signed releases)
+Progress: [██████░░░░] 67% Phase 1 (accepted at 4/6; SEC-01 carried to v0.91)
 
 ## Performance Metrics
 
@@ -52,16 +52,22 @@ None yet.
 
 ### Blockers/Concerns
 
-- SEC-01 (HIGH): self-update signature path — Wave 1 closed everything EXCEPT signing/verification. Plan 01-05 (CI signing) blocks on operator generating zipsign ed25519 keypair + adding GitHub Actions secret. Plan 01-06 (client verification) blocks on 2+ signed releases having shipped.
+- **SEC-01 (HIGH) — CARRIED TO v0.91 BACKLOG:** self-update signature path remains unverified. Phase 1 was accepted at 4/6 by operator decision (2026-06-01); Phase 1 success criteria 1+2 (signature reject/accept) are NOT met, deferred not closed. Plan 01-05 (CI signing) blocks on operator generating zipsign ed25519 keypair + adding GitHub Actions secret. Plan 01-06 (client verification) blocks on 2+ signed releases shipped. **Must be reopened in v0.91.**
 - DEP-01: crossterm 0.29 blocked on tui-textarea fork — out of scope for Phase 1 (Phase 3)
+- **Clippy baseline red (toolchain drift):** `cargo clippy -- -D warnings` reports 16 pre-existing errors on Rust 1.95.0 (`collapsible_if`/`collapsible_match`, `useless_vec`) in file_ops.rs, typst_pdf.rs, dialogs.rs, mouse.rs (resize block), update/check.rs. Not introduced by any current work. Recommend a dedicated `clippy --fix` + toolchain-pin quick task.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260601-iwi | Fix file-browser mouse-wheel scroll (viewport, not selection) | 2026-06-01 | affd62c | [260601-iwi-...](./quick/260601-iwi-fix-file-browser-mouse-wheel-scroll-whee/) |
 
 ## Session Continuity
 
-Last session: 2026-05-11
-Stopped at: Wave 1 of Phase 1 shipped (4/6 plans). Pushed to origin (GitLab) and upstream (GitHub) at commit 45ecd68. Wave 2 (01-05) requires operator keypair action. Wave 3 (01-06) gated on signed releases shipping. Verification marked `pass (wave_1_partial)`.
+Last session: 2026-06-01
+Last activity: 2026-06-01 — Completed quick task 260601-iwi: file-browser mouse-wheel scroll fix (commit affd62c, 140 tests pass)
+Stopped at: Quick task 260601-iwi shipped. Phase 2 discussion was paused mid-way (no CONTEXT.md written). Phase 1 accepted as delivered at 4/6 (operator decision). SEC-01 (HIGH) carried to v0.91 backlog.
 Resume file: None
 Next actions:
-1. Operator: run `zipsign generate-keys` and add `CLAUDE_WORKBENCH_SIGNING_KEY` to GitHub Actions secrets
-2. Execute Plan 01-05 (`/gsd-execute-plan 01-05`)
-3. Ship 2+ signed releases (v0.90.x cycle)
-4. Execute Plan 01-06 (deferred to a future release)
+1. Plan Phase 2 (`/gsd-plan-phase`) — clipboard fallback tests + mutex-poison observability (QUAL-01, QUAL-02)
+2. v0.91 backlog (carried): operator `zipsign generate-keys` + GitHub secret → execute 01-05 → ship 2+ signed releases → execute 01-06 (closes SEC-01 HIGH)
