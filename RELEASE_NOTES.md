@@ -1,5 +1,36 @@
 # Release Notes
 
+## Version 0.91.0 (02.06.2026)
+
+### Fixed
+
+- **PDF export no longer fails on Markdown with braces/underscores in tables** —
+  `typst_escape()` previously escaped only `\ # @ < >`, leaving Typst-significant
+  characters untouched. A table cell such as `search_partners_by_{name,email,vat}`
+  emitted an unescaped `{`, which Typst interprets as the start of code mode,
+  aborting compilation. `typst_escape()` now also escapes `{ } _ * [ ] ~ $ \``.
+  Structural markup (emphasis `*`/`_`, link `[`/`]`, heading labels `#`) is emitted
+  separately via `push_to_active()` and inline/block code bypasses `typst_escape`,
+  so the wider escaping affects only literal text — no rendering regression.
+
+### Changed
+
+- **Inline code in PDF export is now legible** — Added a
+  `#show raw.where(block: false)` rule to the Typst template. Inline code
+  (e.g. `geag_plm_addon`) now renders in the configured code font at a readable
+  size (`0.92em`) inside a light-grey rounded "chip" instead of Typst's tiny
+  default monospace.
+- **No more stretched spaces inside inline code** — Inline code is wrapped in an
+  atomic `#box`, so paragraph justification (`par(justify: true)`) can no longer
+  stretch the spaces within a code span (previously visible as
+  `![Blanket   Sale   Order …]`).
+- **Table cells no longer overflow into neighbouring columns** — A new
+  `insert_break_opportunities()` helper inserts zero-width spaces (U+200B) after
+  `_`, `,` and `/` in table-cell text, so long `snake_case` identifiers
+  (`get_product_template_by_ref`) and comma-joined lists without spaces wrap
+  inside the column. The table block also sets `par(justify: false)` for clean
+  ragged-right cells. Three new regression tests added (142 unit tests total).
+
 ## Version 0.90.2 (01.06.2026)
 
 ### Fixed

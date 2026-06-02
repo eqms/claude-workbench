@@ -94,6 +94,14 @@ const TYPST_TEMPLATE: &str = r##"
   )
 ]
 
+#show raw.where(block: false): it => box(
+  fill: rgb("{code_bg}"),
+  inset: (x: 3pt, y: 0pt),
+  outset: (y: 3pt),
+  radius: 2pt,
+  text(font: ({code_font_list}), size: 0.92em)[#it],
+)
+
 {body}
 "##;
 
@@ -427,7 +435,7 @@ impl TypstRenderer {
                     r.table_cells.clear();
                     r.table_header_done = false;
                     r.out.push_str(&format!(
-                        "\n#block[\n#set text(font: ({}), size: {})\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: {},\n",
+                        "\n#block[\n#set text(font: ({}), size: {})\n#set par(justify: false)\n#table(\n  columns: {},\n  fill: (_, row) => if row == 0 {{ rgb(\"{}\") }} else {{ white }},\n  stroke: rgb(\"{}\"),\n  inset: {},\n",
                         r.code_font_list, r.table_size, r.table_columns, r.table_header_bg, r.table_border, r.table_cell_inset,
                     ));
                 }
@@ -485,7 +493,10 @@ impl TypstRenderer {
                     if r.in_code_block {
                         r.code_buf.push_str(&text);
                     } else if r.in_table {
-                        r.cell_buf.push_str(&typst_escape(&text));
+                        // Add break opportunities so long identifiers wrap inside
+                        // narrow table columns instead of overflowing.
+                        r.cell_buf
+                            .push_str(&typst_escape(&insert_break_opportunities(&text)));
                     } else {
                         if r.in_heading {
                             r.heading_buf.push_str(&text);
@@ -572,7 +583,43 @@ fn typst_escape(s: &str) -> String {
             '@' => result.push_str("\\@"),
             '<' => result.push_str("\\<"),
             '>' => result.push_str("\\>"),
+            // Typst-significant characters that appear literally in prose/tables.
+            // Curly braces enter Typst code mode and are the most common hard
+            // compile error (e.g. `search_x_by_{a,b}` in a table cell).
+            '{' => result.push_str("\\{"),
+            '}' => result.push_str("\\}"),
+            // Emphasis / strong markers — structural emphasis is emitted separately
+            // via push_to_active(), so escaping these here only affects literal text.
+            '_' => result.push_str("\\_"),
+            '*' => result.push_str("\\*"),
+            // Content-block brackets — link/strike markup is emitted separately,
+            // so these only guard literal brackets inside text.
+            '[' => result.push_str("\\["),
+            ']' => result.push_str("\\]"),
+            '~' => result.push_str("\\~"),
+            '$' => result.push_str("\\$"),
+            '`' => result.push_str("\\`"),
             _ => result.push(c),
+        }
+    }
+    result
+}
+
+/// Insert zero-width-space break opportunities (U+200B) into table-cell text.
+///
+/// Typst does not break a "word" without a break opportunity, so long
+/// `snake_case` identifiers (e.g. `get_product_template_by_ref`) and
+/// comma-joined lists without spaces (e.g. `{name,email,city,vat}`) overflow a
+/// narrow table column and overlap the neighbouring cell. Inserting a ZWSP after
+/// `_`, `,` and `/` lets Typst wrap such tokens inside the cell. ZWSP is invisible
+/// and survives `typst_escape` unchanged, so this is applied to the raw text
+/// before escaping.
+fn insert_break_opportunities(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    for c in s.chars() {
+        result.push(c);
+        if matches!(c, '_' | ',' | '/') {
+            result.push('\u{200B}');
         }
     }
     result
@@ -722,6 +769,36 @@ mod tests {
     }
 
     #[test]
+    fn test_typst_escape_code_mode_chars() {
+        // Curly braces are the most common hard compile error: in Typst content
+        // mode `{` enters code mode. Literal text containing them must be escaped.
+        assert_eq!(
+            typst_escape("search_x_by_{a,b}"),
+            "search\\_x\\_by\\_\\{a,b\\}"
+        );
+        assert_eq!(typst_escape("a*b_c"), "a\\*b\\_c");
+        assert_eq!(typst_escape("[x]"), "\\[x\\]");
+        assert_eq!(typst_escape("~$`"), "\\~\\$\\`");
+    }
+
+    #[test]
+    fn test_table_cell_with_braces_does_not_emit_raw_brace() {
+        // Regression: a table cell like `search_x_by_{a,b}` previously emitted an
+        // unescaped `{` into the Typst output, which broke compilation.
+        let doc = DocumentConfig::default();
+        let md = "| Tool | Rolle |\n|---|---|\n| search_x_by_{a,b}, **create_partner** | Lesen |\n";
+        let result = TypstRenderer::render(md, &doc);
+        // Inside the rendered cell content, every literal brace must be escaped
+        // (no unescaped `{` reaches Typst). Note table cells also receive ZWSP
+        // break opportunities after `_` and `,`, so braces are not adjacent to
+        // their content verbatim.
+        assert!(!result.contains("by_{a,b}"));
+        assert!(result.contains("\\{"));
+        assert!(result.contains("\\}"));
+        assert!(result.contains("\\_"));
+    }
+
+    #[test]
     fn test_markdown_to_typst_heading() {
         let doc = DocumentConfig::default();
         let result = TypstRenderer::render("# Hello World", &doc);
@@ -801,5 +878,21 @@ mod tests {
         assert!(result.contains("26.03.2026"));
         assert!(result.contains("Hello world"));
         assert!(result.contains("Carlito"));
+    }
+
+    #[test]
+    fn test_table_cell_long_identifier_gets_break_opportunities() {
+        // Long snake_case identifiers and comma-joined lists in a narrow table
+        // column must receive zero-width-space break opportunities so they wrap
+        // instead of overflowing into the neighbouring cell.
+        let doc = DocumentConfig::default();
+        let md = "| Tools |\n|---|\n| get_product_template_by_ref |\n";
+        let result = TypstRenderer::render(md, &doc);
+        assert!(
+            result.contains('\u{200B}'),
+            "expected ZWSP break opportunities"
+        );
+        // ZWSP must follow each underscore separator.
+        assert!(result.contains("get\\_\u{200B}product"));
     }
 }

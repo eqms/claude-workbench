@@ -107,6 +107,11 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.91.0
+
+- **PDF export renders source code correctly.** Inline code (e.g. `module_name`) is no longer rendered in tiny default monospace — it now uses the configured code font at a readable size inside a light-grey rounded chip, set as an atomic box so paragraph justification can no longer stretch the spaces within a code span. Long `snake_case` identifiers and comma-joined lists in table cells now wrap inside their column (zero-width-space break opportunities) instead of overflowing into the neighbouring column.
+- **Fixed a hard PDF export failure.** Markdown containing braces or other Typst-significant characters in table cells (e.g. `search_partners_by_{name,email,vat}`) previously aborted Typst compilation because `{` enters code mode. `typst_escape()` now escapes `{ } _ * [ ] ~ $ \`` in literal text, so such documents export cleanly.
+
 ### What's New in v0.90.0
 
 - **Phase 1 Security Hardening — Wave 1 of 3 shipped.** Eight audit findings closed in this release: predictable temp-path symlink-redirect vector (`tempfile::Builder` with `O_EXCL` in `src/browser/pdf_export.rs`); `--update-to <version>` flag debug-only via `#[cfg(debug_assertions)]` plus `filter_restart_args()` so the restart loop can't be wedged into an infinite downgrade; allow-list validation of the browser/editor config (`validate_program()` in `src/browser/opener.rs`); removal of the `$SHELL -i -c` fallback in `src/setup/dependency_checker.rs`; executable-bit check in `clipboard::which()`; `shlex::try_quote` error propagation from `sync_terminals*`; `semver::Version::max_by` release selection instead of GitHub creation-order `releases[0]`. Self-update signature verification (SEC-01) remains the only Phase 1 item still open — Wave 2 needs an operator-generated `zipsign` ed25519 keypair, Wave 3 needs at least two signed releases shipped before it can be enabled. Tests: 111 → 130.
