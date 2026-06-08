@@ -123,6 +123,37 @@ impl App {
         }
     }
 
+    /// Copy the output of the most recent shell command from the active
+    /// terminal pane to the system clipboard.
+    ///
+    /// Reads the *full* scrollback buffer (not just the visible screen) and
+    /// uses prompt-line heuristics to isolate the last command block. If no
+    /// usable prompt boundary is found, falls back to the last
+    /// `config.pty.copy_lines_count` lines of the full buffer.
+    pub(super) fn copy_last_command_output(&mut self) {
+        let pane = self.active_pane;
+        if let Some(pty) = self.terminals.get(&pane) {
+            let mut all = pty.extract_all_lines();
+            while all.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+                all.pop();
+            }
+            if all.is_empty() {
+                return;
+            }
+
+            let lines = select_last_command_block(&all, self.config.pty.copy_lines_count);
+            if !lines.is_empty() {
+                let text = lines.join("\n");
+                let outcome = crate::clipboard::copy_to_clipboard(&text);
+                if outcome.is_success() {
+                    self.last_copy_time = Some(std::time::Instant::now());
+                    self.copy_flash_lines = lines.len();
+                }
+                self.handle_copy_outcome(outcome);
+            }
+        }
+    }
+
     /// Copy character-level mouse selection to system clipboard
     pub(super) fn copy_mouse_selection_to_clipboard(&mut self) {
         let Some(((start_row, start_col), (end_row, end_col))) = self.mouse_selection.char_range()
@@ -269,5 +300,79 @@ impl App {
     /// Set the clipboard error flash (visible in the footer for ~3 s).
     pub(super) fn set_clipboard_error_flash(&mut self, message: String) {
         self.clipboard_error_flash = Some((message, std::time::Instant::now()));
+    }
+}
+
+/// A trimmed line that is nothing but a bare prompt glyph (e.g. the fish `❯`
+/// waiting prompt left at the bottom of the buffer).
+fn is_bare_prompt(line: &str) -> bool {
+    matches!(line.trim(), "❯" | "➜" | "→" | "$" | "%" | "#" | ">")
+}
+
+/// Select the most recent command's output from the full buffer.
+///
+/// `all` must already have trailing blank lines removed. Heuristic: copy from
+/// the last detected shell-prompt line to the end of the buffer (this captures
+/// the command echo plus its output for prompts that embed the command on the
+/// prompt line, such as fish `❯ cmd`). If no prompt is detected, or the only
+/// detected prompt is the final line (e.g. classic bash prompts where the
+/// command is not on a matchable line), fall back to the last `fallback_n`
+/// lines of the full buffer — still strictly more than the visible screen.
+fn select_last_command_block(all: &[String], fallback_n: usize) -> Vec<String> {
+    let last_prompt = all.iter().rposition(|l| crate::filter::is_prompt_line(l));
+
+    let block: &[String] = match last_prompt {
+        // A detected prompt with content after it → that content is the output.
+        Some(i) if i + 1 < all.len() => &all[i..],
+        // No prompt, or it is the very last line → fall back to last N.
+        _ => {
+            let start = all.len().saturating_sub(fallback_n);
+            &all[start..]
+        }
+    };
+
+    // Drop a trailing bare prompt glyph (the waiting prompt at the bottom).
+    let mut end = block.len();
+    while end > 0 && is_bare_prompt(&block[end - 1]) {
+        end -= 1;
+    }
+
+    block[..end]
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .cloned()
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn s(v: &[&str]) -> Vec<String> {
+        v.iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn block_two_fish_prompts_takes_last_command() {
+        let all = s(&["❯ ls", "file1", "❯ cat x", "hello", "❯"]);
+        assert_eq!(
+            select_last_command_block(&all, 50),
+            s(&["❯ cat x", "hello"])
+        );
+    }
+
+    #[test]
+    fn block_single_prompt_keeps_command_and_output() {
+        let all = s(&["❯ badcmd", "error: boom", "❯"]);
+        assert_eq!(
+            select_last_command_block(&all, 50),
+            s(&["❯ badcmd", "error: boom"])
+        );
+    }
+
+    #[test]
+    fn block_no_prompt_falls_back_to_last_n() {
+        let all = s(&["aaa", "bbb", "ccc"]);
+        assert_eq!(select_last_command_block(&all, 2), s(&["bbb", "ccc"]));
     }
 }

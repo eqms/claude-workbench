@@ -285,6 +285,65 @@ impl PseudoTerminal {
         lines
     }
 
+    /// Extract the entire buffer (scrollback history + visible screen) as
+    /// trimmed lines, oldest first. Unlike `extract_last_n_lines`, this reaches
+    /// beyond the visible pane height into the full scrollback buffer.
+    pub fn extract_all_lines(&self) -> Vec<String> {
+        let mut parser = lock_or_recover(&self.parser);
+        Self::collect_buffer_lines(parser.screen_mut())
+    }
+
+    /// Collect the whole grid (history then live screen) as trimmed lines.
+    ///
+    /// vt100's `cell(row, col)` is relative to the current scrollback offset,
+    /// so the history is read in non-overlapping windows of `rows` lines: at
+    /// offset `history - start`, visible row 0 == history line `start`.
+    fn collect_buffer_lines(screen: &mut vt100::Screen) -> Vec<String> {
+        let saved = screen.scrollback();
+        let (rows, cols) = screen.size();
+        let rows = rows as usize;
+        if rows == 0 {
+            return Vec::new();
+        }
+
+        // set_scrollback clamps to the real fill level, so reading it back
+        // after requesting the max yields the true history depth.
+        screen.set_scrollback(usize::MAX);
+        let history = screen.scrollback();
+
+        let mut lines = Vec::with_capacity(history + rows);
+        let mut start = 0;
+        while start < history {
+            screen.set_scrollback(history - start);
+            let take = (history - start).min(rows);
+            for row in 0..take {
+                lines.push(Self::read_screen_row(screen, row, cols));
+            }
+            start += rows;
+        }
+
+        // Live visible screen sits at offset 0.
+        screen.set_scrollback(0);
+        for row in 0..rows {
+            lines.push(Self::read_screen_row(screen, row, cols));
+        }
+
+        screen.set_scrollback(saved);
+        lines
+    }
+
+    /// Read a single visible row (at the current scrollback offset) as a
+    /// trailing-trimmed string.
+    fn read_screen_row(screen: &vt100::Screen, row: usize, cols: u16) -> String {
+        let mut line = String::new();
+        for col in 0..cols {
+            if let Some(cell) = screen.cell(row as u16, col) {
+                Self::push_cell_content(&mut line, cell);
+            }
+        }
+        line.trim_end().to_string()
+    }
+
     /// Extract text content from character-level selection range
     /// (start_row, start_col) to (end_row, end_col) - all 0-based
     /// For multi-line selections:
@@ -363,5 +422,28 @@ impl PseudoTerminal {
     /// Check if the PTY process has exited
     pub fn has_exited(&self) -> bool {
         self.exited.load(Ordering::SeqCst)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collect_buffer_lines_reads_full_scrollback() {
+        // 4 visible rows, 20 cols, 100 lines of scrollback capacity.
+        let mut parser = vt100::Parser::new(4, 20, 100);
+        // Write 10 lines: 6 scroll into history, 4 stay on the visible screen.
+        for i in 0..10 {
+            parser.process(format!("line{i}\r\n").as_bytes());
+        }
+
+        let lines = PseudoTerminal::collect_buffer_lines(parser.screen_mut());
+
+        // All ten lines must be recovered in order, even those scrolled out of
+        // the visible 4-row window.
+        let got: Vec<String> = lines.into_iter().filter(|l| !l.is_empty()).collect();
+        let expected: Vec<String> = (0..10).map(|i| format!("line{i}")).collect();
+        assert_eq!(got, expected);
     }
 }

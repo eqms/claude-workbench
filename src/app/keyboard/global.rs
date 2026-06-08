@@ -80,13 +80,14 @@ impl App {
             && !key.modifiers.contains(KeyModifiers::SHIFT)
             && !key.modifiers.contains(KeyModifiers::CONTROL)
         {
-            if matches!(
-                self.active_pane,
-                PaneId::Claude | PaneId::LazyGit | PaneId::Terminal
-            ) {
-                self.copy_last_lines_to_clipboard();
-            } else {
-                self.menu.toggle();
+            match self.active_pane {
+                // Real shell pane: copy the whole last-command block from the
+                // full scrollback (prompt-to-prompt), not just the visible rows.
+                PaneId::Terminal => self.copy_last_command_output(),
+                // Claude/LazyGit are TUI apps; their scrollback is not populated
+                // the same way, so keep the visible last-N behaviour.
+                PaneId::Claude | PaneId::LazyGit => self.copy_last_lines_to_clipboard(),
+                _ => self.menu.toggle(),
             }
             return true;
         }

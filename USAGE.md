@@ -27,7 +27,7 @@
 | F6 | Toggle User Terminal (syncs to current directory) |
 | F7 | Claude Settings (~/.claude) |
 | F8 | Settings |
-| F9 | File Menu (File Browser) / Copy last N lines to clipboard (Terminal panes) |
+| F9 | File Menu (File Browser) / Copy last command block (Terminal) or last N lines (Claude, LazyGit) |
 | Shift+F9 | Copy last N lines with interactive count input (Terminal panes) |
 | F10 | About |
 | F12 | Help |
@@ -117,7 +117,7 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 |-----|--------|
 | \\ + Enter | Insert newline in Claude Code (F4) |
 | Ctrl+S | Start selection |
-| F9 | Copy last N lines to clipboard (N = `pty.copy_lines_count`, default 50) |
+| F9 | Copy last command block (Terminal, full scrollback) or last N visible lines (Claude/LazyGit, N = `pty.copy_lines_count`, default 50) |
 | Shift+F9 | Copy last N lines with interactive count input |
 | Shift+PgUp/PgDn | Scroll 10 lines |
 | Shift+Up/Down | Scroll 1 line |
@@ -135,11 +135,14 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 | Ctrl+C | Copy to System Clipboard |
 | Esc | Cancel |
 
-#### F9 Copy Last N Lines (Terminal Panes)
+#### F9 Copy Output (Terminal Panes)
 
-Press **F9** in Claude Code (F4), LazyGit (F5), or Terminal (F6) to copy the last N lines of terminal output directly to the system clipboard. A green **„✓ N lines"** flash appears in the footer for 2 seconds.
+Press **F9** to copy terminal output directly to the system clipboard. A green **„✓ N lines"** flash appears in the footer for 2 seconds.
 
-Configure the number of lines in `config.yaml`:
+- **Terminal pane (F6):** copies the **whole last command block** — from the last shell prompt to the bottom — read from the *full scrollback*, so older lines that scrolled off-screen are included. When no prompt boundary can be detected, it falls back to the last N lines of the full buffer.
+- **Claude Code (F4) / LazyGit (F5):** copies the last **N visible lines** (these panes are TUI apps without a regular scrollback).
+
+Configure the fallback/visible line count in `config.yaml`:
 ```yaml
 pty:
   copy_lines_count: 50  # Default: 50. Increase for longer outputs (e.g. 100, 200)
@@ -330,7 +333,7 @@ image paste to work.
 | F6 | Benutzer-Terminal umschalten (wechselt ins aktuelle Verzeichnis) |
 | F7 | Claude Einstellungen (~/.claude) |
 | F8 | Einstellungen |
-| F9 | Datei-Menü (Dateibrowser) / Letzte N Zeilen ins Clipboard kopieren (Terminal-Bereiche) |
+| F9 | Datei-Menü (Dateibrowser) / Letzten Kommando-Block (Terminal) bzw. letzte N Zeilen (Claude, LazyGit) kopieren |
 | Shift+F9 | Letzte N Zeilen mit interaktiver Eingabe kopieren (Terminal-Bereiche) |
 | F10 | Über |
 | F12 | Hilfe |
@@ -420,7 +423,7 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 |-------|--------|
 | \\ + Enter | Zeilenumbruch im Claude Code (F4) |
 | Ctrl+S | Auswahl starten |
-| F9 | Letzte N Zeilen ins Clipboard kopieren (N = `pty.copy_lines_count`, Standard 50) |
+| F9 | Letzten Kommando-Block (Terminal, voller Scrollback) bzw. letzte N sichtbare Zeilen (Claude/LazyGit, N = `pty.copy_lines_count`, Standard 50) kopieren |
 | Shift+F9 | Letzte N Zeilen mit interaktiver Eingabe kopieren |
 | Shift+PgUp/PgDn | 10 Zeilen scrollen |
 | Shift+Up/Down | 1 Zeile scrollen |
@@ -438,11 +441,14 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | Ctrl+C | Ins System-Clipboard kopieren |
 | Esc | Abbrechen |
 
-#### F9 Letzte N Zeilen kopieren (Terminal-Bereiche)
+#### F9 Ausgabe kopieren (Terminal-Bereiche)
 
-**F9** in Claude Code (F4), LazyGit (F5) oder Terminal (F6) drücken, um die letzten N Zeilen der Terminal-Ausgabe direkt in die Zwischenablage zu kopieren. Im Footer erscheint 2 Sekunden lang ein grüner **„✓ N Zeilen"**-Flash.
+**F9** drücken, um Terminal-Ausgabe direkt in die Zwischenablage zu kopieren. Im Footer erscheint 2 Sekunden lang ein grüner **„✓ N Zeilen"**-Flash.
 
-Anzahl der Zeilen in `config.yaml` konfigurieren:
+- **Terminal-Bereich (F6):** kopiert den **ganzen letzten Kommando-Block** — vom letzten Shell-Prompt bis zum Ende — aus dem *vollen Scrollback*, sodass auch ältere, weggescrollte Zeilen enthalten sind. Wird keine Prompt-Grenze erkannt, greift ein Fallback auf die letzten N Zeilen des vollen Puffers.
+- **Claude Code (F4) / LazyGit (F5):** kopiert die letzten **N sichtbaren Zeilen** (diese Bereiche sind TUI-Apps ohne regulären Scrollback).
+
+Fallback-/Sichtbar-Zeilenanzahl in `config.yaml` konfigurieren:
 ```yaml
 pty:
   copy_lines_count: 50  # Standard: 50. Für längere Ausgaben erhöhen (z.B. 100, 200)

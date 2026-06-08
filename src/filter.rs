@@ -160,7 +160,7 @@ static XML_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 });
 
 /// Check if a line matches any shell prompt pattern
-fn is_prompt_line(line: &str) -> bool {
+pub(crate) fn is_prompt_line(line: &str) -> bool {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return false;

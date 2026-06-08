@@ -64,7 +64,7 @@ No overhead. Maximum performance. Built by a developer, for developers.
 - Claude fullscreen mode when all panes hidden (F1/F2/F5/F6 toggles)
 - **Interactive pane resizing** - drag pane borders with mouse
 - **Horizontal scrolling** - in Preview and Edit mode for long lines
-- **F9 Copy Last N Lines** - copy last N terminal lines to clipboard (configurable, default 50)
+- **F9 Copy Output** - in the Terminal pane copies the whole last command block from the full scrollback; in Claude/LazyGit copies the last N visible lines (configurable, default 50)
 - **Self-update** - automatic update check from GitHub Releases
 - **App Dropdown** - auto-detect installed browsers/editors in Settings (macOS + Linux)
 - **Ctrl+X Markdown Export** - export as Markdown copy or PDF (native Typst engine, no external tools needed)
@@ -93,7 +93,7 @@ cd claude-workbench && cargo build --release
 | Key | Action |
 |-----|--------|
 | F1-F6 | Switch between panes |
-| F9 | File menu in File Browser / **Copy last N lines** to clipboard in Terminal panes |
+| F9 | File menu in File Browser / **Copy last command block** (Terminal) or **last N lines** (Claude, LazyGit) to clipboard |
 | F12 | Help (full shortcut reference) |
 | Ctrl+P | Fuzzy file finder |
 | Ctrl+Q | Quit |
@@ -106,6 +106,10 @@ cd claude-workbench && cargo build --release
 | Right-click | Paste from system clipboard into pane under cursor (mirrors Kitty's `mouse_map right press paste`) |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
+
+### What's New in v0.92.0
+
+- **F9 in the shell pane now copies the whole last command block.** In the Terminal pane, F9 reads the *full scrollback buffer* (no longer capped at the visible pane height) and copies everything from the last shell prompt to the bottom — so older error messages that scrolled off-screen are included. It uses prompt-line heuristics to find the boundary; if none is found it falls back to the last N lines of the full buffer (still more than what was visible before). The Claude and LazyGit panes keep the previous last-N-visible-lines behaviour, and `Shift+F9`/`Ctrl+F9` (interactive line count) is unchanged.
 
 ### What's New in v0.91.0
 
@@ -363,7 +367,7 @@ Kein Overhead. Maximale Performance. Von einem Entwickler, für Entwickler.
 - Claude Vollbildmodus wenn alle Bereiche ausgeblendet (F1/F2/F5/F6 Umschaltung)
 - **Interaktives Pane-Resizing** - Bereichsgrenzen per Maus ziehen
 - **Horizontales Scrollen** - in Vorschau und Editor für lange Zeilen
-- **F9 Letzte N Zeilen kopieren** - letzten N Terminal-Zeilen ins Clipboard kopieren (konfigurierbar, Standard 50)
+- **F9 Ausgabe kopieren** - im Terminal-Bereich kopiert den ganzen letzten Kommando-Block aus dem vollen Scrollback; in Claude/LazyGit die letzten N sichtbaren Zeilen (konfigurierbar, Standard 50)
 - **Selbst-Update** - automatische Update-Prüfung von GitHub Releases
 - **App-Dropdown** - automatische Erkennung installierter Browser/Editoren in Settings (macOS + Linux)
 - **Ctrl+X Markdown-Export** - Export als Markdown-Kopie oder PDF (native Typst-Engine, keine externen Tools nötig)
@@ -392,7 +396,7 @@ cd claude-workbench && cargo build --release
 | Taste | Aktion |
 |-------|--------|
 | F1-F6 | Zwischen Bereichen wechseln |
-| F9 | Datei-Menü im Dateibrowser / **Letzte N Zeilen kopieren** in Terminal-Bereichen |
+| F9 | Datei-Menü im Dateibrowser / **Letzten Kommando-Block kopieren** (Terminal) bzw. **letzte N Zeilen** (Claude, LazyGit) ins Clipboard |
 | F12 | Hilfe (vollständige Shortcut-Referenz) |
 | Ctrl+P | Fuzzy-Dateisuche |
 | Ctrl+Q | Beenden |
@@ -405,6 +409,10 @@ cd claude-workbench && cargo build --release
 | Rechtsklick | Paste aus System-Clipboard in Pane unter dem Cursor (entspricht Kittys `mouse_map right press paste`) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.92.0
+
+- **F9 im Shell-Bereich kopiert jetzt den ganzen letzten Kommando-Block.** Im Terminal-Bereich liest F9 den *kompletten Scrollback-Puffer* (nicht mehr auf die sichtbare Bereichshöhe begrenzt) und kopiert alles vom letzten Shell-Prompt bis zum Ende — auch ältere Fehlermeldungen, die nach oben weggescrollt sind. Die Prompt-Grenze wird per Heuristik bestimmt; wird keine erkannt, greift ein Fallback auf die letzten N Zeilen des vollen Puffers (immer noch mehr als vorher sichtbar). Claude- und LazyGit-Bereich behalten das bisherige Verhalten (letzte N sichtbare Zeilen), `Shift+F9`/`Ctrl+F9` (interaktive Zeilenzahl) bleibt unverändert.
 
 ### Neu in v0.87.0
 
