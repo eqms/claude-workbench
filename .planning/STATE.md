@@ -64,11 +64,12 @@ None yet.
 | v0.90.2 | Fix file-browser scroll snapback — true root cause: auto-refresh reset list offset every 2s (refresh() now preserves offset) | 2026-06-01 | ab9da43 | — |
 | 260611-g0k | Security audit fixes from /project-audit: PTY path quoting, CR filtering, dependency pinning, update-log fallback | 2026-06-11 | 6b9875a | [260611-g0k-...](./quick/260611-g0k-security-audit-fixes-from-project-audit-/) |
 | 260611-ghu | Audit follow-ups P1+P2: self_update 0.44, dirs 6, MSRV 1.85, deny.toml, CI hardening (audit-check action, cargo-deny job, Node24 actions) | 2026-06-11 | 555657e | [260611-ghu-...](./quick/260611-ghu-audit-follow-ups-p1-p2-self-update-0-44-/) |
+| 260611-m4v | v0.95.0: PDF font fallback (DejaVu Sans, fixes tofu for ☐ ⟨⟩ ✓ ✗), folder batch export via Ctrl+X, scroll-jump fix on folder expand/collapse | 2026-06-11 | fe0473c | [260611-m4v-...](./quick/260611-m4v-v0-95-0-pdf-font-fallback-dejavu-folder-/) |
 
 ## Session Continuity
 
 Last session: 2026-06-11
-Last activity: 2026-06-11 - Completed quick task 260611-ghu: Audit follow-ups P1+P2 (self_update 0.44, dirs 6, MSRV 1.85, deny.toml, CI hardening) — v0.94.0
+Last activity: 2026-06-11 - Completed quick task 260611-m4v: v0.95.0 (PDF DejaVu font fallback, folder batch export Ctrl+X, scroll-jump fix on expand)
 Stopped at: v0.90.2 tagged + pushed. The v0.90.1 wheel-to-viewport change was correct but exposed a pre-existing auto-refresh reset — that is the actual root cause, now fixed. Phase 2 discussion still paused (no CONTEXT.md). Phase 1 accepted at 4/6; SEC-01 (HIGH) carried to v0.91 backlog.
 Resume file: None
 Next actions:
