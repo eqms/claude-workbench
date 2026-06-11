@@ -49,6 +49,13 @@ impl App {
             (filtered.lines, filtered.syntax_hint)
         };
 
+        // Strip carriage returns from PTY screen buffer rows (CRLF in PTY output would
+        // otherwise inject premature Enter keypresses into the Claude PTY).
+        let formatted_lines: Vec<String> = formatted_lines
+            .into_iter()
+            .map(|l| l.replace('\r', ""))
+            .collect();
+
         // Format for Claude - wrap in markdown code block with syntax hint
         let syntax = syntax_hint.as_deref().unwrap_or("");
         let formatted = format!("```{}\n{}\n```\n", syntax, formatted_lines.join("\n"));

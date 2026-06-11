@@ -5,7 +5,7 @@ use std::io::Write;
 /// Get the log file path using platform-appropriate cache directory
 pub fn log_file_path() -> std::path::PathBuf {
     dirs::cache_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .unwrap_or_else(std::env::temp_dir)
         .join("claude-workbench")
         .join("update.log")
 }
