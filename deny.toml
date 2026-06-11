@@ -1,0 +1,66 @@
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "warn"
+notice = "warn"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+
+skip = [
+    # crossterm: 0.28.1 pinned for tui-textarea compatibility (DEP-01); 0.29 pulled by other deps
+    { name = "crossterm", version = "=0.29.0" },
+
+    # comemo 0.4 (required by typst 0.14 World trait) vs 0.5 (pulled by other typst internals)
+    { name = "comemo", version = "=0.5.1" },
+    { name = "comemo-macros", version = "=0.5.1" },
+
+    # bitflags 1.x (legacy transitive dep) vs 2.x (modern)
+    { name = "bitflags", version = "=1.3.2" },
+
+    # windows-sys: multiple versions pulled by different transitive deps (nix, rustix, tokio, etc.)
+    { name = "windows-sys", version = "=0.48.0" },
+    { name = "windows-sys", version = "=0.52.0" },
+    { name = "windows-sys", version = "=0.59.0" },
+    { name = "windows-sys", version = "=0.60.2" },
+    { name = "windows-targets", version = "=0.48.5" },
+    { name = "windows-targets", version = "=0.52.6" },
+    { name = "windows_aarch64_gnullvm", version = "=0.48.5" },
+    { name = "windows_aarch64_gnullvm", version = "=0.52.6" },
+    { name = "windows_aarch64_msvc", version = "=0.48.5" },
+    { name = "windows_aarch64_msvc", version = "=0.52.6" },
+    { name = "windows_i686_gnu", version = "=0.48.5" },
+    { name = "windows_i686_gnu", version = "=0.52.6" },
+    { name = "windows_i686_gnullvm", version = "=0.52.6" },
+    { name = "windows_i686_msvc", version = "=0.48.5" },
+    { name = "windows_i686_msvc", version = "=0.52.6" },
+    { name = "windows_x86_64_gnu", version = "=0.48.5" },
+    { name = "windows_x86_64_gnu", version = "=0.52.6" },
+    { name = "windows_x86_64_gnullvm", version = "=0.48.5" },
+    { name = "windows_x86_64_gnullvm", version = "=0.52.6" },
+    { name = "windows_x86_64_msvc", version = "=0.48.5" },
+    { name = "windows_x86_64_msvc", version = "=0.52.6" },
+
+    # Remaining ecosystem churn — typst + ICU + syntect + various transitive deps
+    # all at "warn" level (multiple-versions = "warn"), not hard "deny"
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Zlib",
+    "OpenSSL",
+]
