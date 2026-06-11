@@ -502,10 +502,10 @@ impl App {
                     crate::types::ExportJobResult::Batch(b) => {
                         if b.failed.is_empty() {
                             self.copy_flash_message =
-                                Some(format!("{} Datei(en) exportiert", b.exported));
+                                Some(format!("{} file(s) exported", b.exported));
                         } else {
                             self.copy_flash_message = Some(format!(
-                                "{} exportiert, {} fehlgeschlagen",
+                                "{} exported, {} failed",
                                 b.exported,
                                 b.failed.len()
                             ));
@@ -567,14 +567,14 @@ impl App {
             .collect();
 
         if md_files.is_empty() {
-            self.copy_flash_message = Some("Keine .md-Dateien im Ordner".to_string());
+            self.copy_flash_message = Some("No .md files in folder".to_string());
             self.copy_flash_lines = 0;
             self.last_copy_time = Some(std::time::Instant::now());
             return;
         }
 
         let count = md_files.len();
-        self.copy_flash_message = Some(format!("Exportiere {} Datei(en)\u{2026}", count));
+        self.copy_flash_message = Some(format!("Exporting {} file(s)\u{2026}", count));
         self.copy_flash_lines = 0;
         self.last_copy_time = Some(std::time::Instant::now());
 
@@ -712,10 +712,8 @@ impl App {
                         self.wizard.selected_shell_idx -= 1;
                     }
                 }
-                WizardStep::ClaudeConfig => {
-                    if self.wizard.focused_field > 0 {
-                        self.wizard.focused_field -= 1;
-                    }
+                WizardStep::ClaudeConfig if self.wizard.focused_field > 0 => {
+                    self.wizard.focused_field -= 1;
                 }
                 _ => {}
             },
@@ -727,10 +725,8 @@ impl App {
                         self.wizard.selected_shell_idx += 1;
                     }
                 }
-                WizardStep::ClaudeConfig => {
-                    if self.wizard.focused_field < 1 {
-                        self.wizard.focused_field += 1;
-                    }
+                WizardStep::ClaudeConfig if self.wizard.focused_field < 1 => {
+                    self.wizard.focused_field += 1;
                 }
                 _ => {}
             },
@@ -746,15 +742,15 @@ impl App {
                     self.wizard.start_editing(field);
                 }
             }
-            KeyCode::Char('m') | KeyCode::Char('M') => {
+            KeyCode::Char('m') | KeyCode::Char('M')
+                if self.wizard.step == WizardStep::SshImagePaste =>
+            {
                 // Toggle "mark as configured" on the SSH image-paste step.
                 // Persisted by `generate_config()` as
                 // `config.ssh.notification_dismissed = true` so the runtime
                 // hint stays silent.
-                if self.wizard.step == WizardStep::SshImagePaste {
-                    self.wizard.ssh_image_paste_marked_configured =
-                        !self.wizard.ssh_image_paste_marked_configured;
-                }
+                self.wizard.ssh_image_paste_marked_configured =
+                    !self.wizard.ssh_image_paste_marked_configured;
             }
             _ => {}
         }
@@ -904,15 +900,11 @@ mod batch_export_tests {
             target_dir: PathBuf::from("/tmp/test"),
         };
         let flash = if b.failed.is_empty() {
-            format!("{} Datei(en) exportiert", b.exported)
+            format!("{} file(s) exported", b.exported)
         } else {
-            format!(
-                "{} exportiert, {} fehlgeschlagen",
-                b.exported,
-                b.failed.len()
-            )
+            format!("{} exported, {} failed", b.exported, b.failed.len())
         };
-        assert_eq!(flash, "9 Datei(en) exportiert");
+        assert_eq!(flash, "9 file(s) exported");
     }
 
     #[test]
@@ -926,15 +918,11 @@ mod batch_export_tests {
             target_dir: PathBuf::from("/tmp/test"),
         };
         let flash = if b.failed.is_empty() {
-            format!("{} Datei(en) exportiert", b.exported)
+            format!("{} file(s) exported", b.exported)
         } else {
-            format!(
-                "{} exportiert, {} fehlgeschlagen",
-                b.exported,
-                b.failed.len()
-            )
+            format!("{} exported, {} failed", b.exported, b.failed.len())
         };
-        assert_eq!(flash, "7 exportiert, 2 fehlgeschlagen");
+        assert_eq!(flash, "7 exported, 2 failed");
     }
 
     #[test]
