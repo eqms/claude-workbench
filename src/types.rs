@@ -1028,6 +1028,9 @@ pub struct ExportChooserState {
     pub visible: bool,
     pub source_path: std::path::PathBuf,
     pub selected: usize, // 0 = Markdown, 1 = PDF
+    /// When true, source_path is a directory — triggers batch export instead of
+    /// the filename input dialog.
+    pub is_batch: bool,
 }
 
 impl Default for ExportChooserState {
@@ -1036,8 +1039,26 @@ impl Default for ExportChooserState {
             visible: false,
             source_path: std::path::PathBuf::new(),
             selected: 0,
+            is_batch: false,
         }
     }
+}
+
+/// Result of a batch (folder) export operation
+#[derive(Debug)]
+pub struct BatchExportResult {
+    pub exported: usize,
+    pub failed: Vec<(std::path::PathBuf, String)>,
+    pub target_dir: std::path::PathBuf,
+}
+
+/// Unified result type for the export_job channel.
+/// Single preserves the existing single-file export path;
+/// Batch carries aggregate results from a folder export.
+#[derive(Debug)]
+pub enum ExportJobResult {
+    Single(Result<std::path::PathBuf, String>),
+    Batch(BatchExportResult),
 }
 
 #[cfg(test)]

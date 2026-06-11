@@ -353,6 +353,11 @@ impl FileBrowserState {
         }
     }
 
+    /// Return a reference to the currently selected entry, if any.
+    pub fn selected_entry(&self) -> Option<&FileEntry> {
+        self.list_state.selected().and_then(|i| self.entries.get(i))
+    }
+
     /// Rebuild the flat list while preserving selection
     fn rebuild_tree(&mut self) {
         let selected_path = self
@@ -360,6 +365,11 @@ impl FileBrowserState {
             .selected()
             .and_then(|i| self.entries.get(i))
             .map(|e| (e.path.clone(), e.name.clone()));
+
+        // Preserve scroll offset across rebuild — ratatui's ListState::select(None)
+        // hard-resets offset to 0, which causes a jarring viewport jump on every
+        // expand/collapse.  We restore it (clamped) after the tree is rebuilt.
+        let saved_offset = self.list_state.offset();
 
         self.entries.clear();
         self.list_state.select(None);
@@ -394,6 +404,11 @@ impl FileBrowserState {
         } else if !self.entries.is_empty() {
             self.list_state.select(Some(0));
         }
+
+        // Restore scroll offset, clamped to the new entry count.
+        // Collapse shrinks the list — without the clamp the offset would point
+        // past the end and the viewport would appear blank.
+        *self.list_state.offset_mut() = saved_offset.min(self.entries.len().saturating_sub(1));
     }
 
     pub fn selected_file(&self) -> Option<PathBuf> {
@@ -670,6 +685,153 @@ mod tests {
             "offset {} must be clamped to <= {}",
             fb.list_state.offset(),
             max_offset
+        );
+    }
+
+    // --- rebuild_tree scroll-offset tests ---
+
+    /// Helper: create a temp dir with `n` subdirectories and `m` files.
+    fn browser_with_subdirs(
+        dir: &std::path::Path,
+        n_dirs: usize,
+        n_files: usize,
+    ) -> FileBrowserState {
+        for i in 0..n_dirs {
+            fs::create_dir_all(dir.join(format!("subdir_{i:03}"))).unwrap();
+        }
+        for i in 0..n_files {
+            fs::write(dir.join(format!("file_{i:03}.txt")), "x").unwrap();
+        }
+        let mut s = FileBrowserState::new(false);
+        s.root_dir = dir.to_path_buf();
+        s.current_dir = dir.to_path_buf();
+        s.expanded_dirs.clear();
+        s.expanded_dirs.insert(dir.to_path_buf());
+        s.load_tree();
+        s
+    }
+
+    #[test]
+    fn rebuild_tree_preserves_scroll_offset_on_expand() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Create 10 subdirs + 20 files so the list is long enough to scroll.
+        let mut fb = browser_with_subdirs(tmp.path(), 10, 20);
+        assert!(
+            fb.entries.len() >= 30,
+            "need >=30 entries for this test, got {}",
+            fb.entries.len()
+        );
+
+        // Scroll viewport to offset 10, select entry 15.
+        fb.list_state.select(Some(15));
+        *fb.list_state.offset_mut() = 10;
+
+        // Expand subdir_000 (first directory entry after "..")
+        let dir_entry = fb
+            .entries
+            .iter()
+            .find(|e| e.is_dir && e.name != "..")
+            .cloned()
+            .expect("need at least one subdirectory");
+        // Expand via toggle_expand (private) — drive it through enter_selected after
+        // selecting the dir entry index.
+        let dir_idx = fb
+            .entries
+            .iter()
+            .position(|e| e.path == dir_entry.path)
+            .unwrap();
+        fb.list_state.select(Some(dir_idx));
+        *fb.list_state.offset_mut() = 10; // re-set offset after select
+        fb.enter_selected(); // triggers toggle_expand → rebuild_tree
+
+        assert_eq!(
+            fb.list_state.offset(),
+            10,
+            "scroll offset must be preserved after expand (got {})",
+            fb.list_state.offset()
+        );
+    }
+
+    #[test]
+    fn rebuild_tree_clamps_scroll_offset_on_collapse() {
+        let tmp = tempfile::tempdir().unwrap();
+        // One subdir with several files inside, plus some root-level files.
+        let sub = tmp.path().join("subdir_000");
+        fs::create_dir_all(&sub).unwrap();
+        for i in 0..30 {
+            fs::write(sub.join(format!("inner_{i:03}.txt")), "x").unwrap();
+        }
+        for i in 0..5 {
+            fs::write(tmp.path().join(format!("root_{i:03}.txt")), "x").unwrap();
+        }
+
+        let mut fb = FileBrowserState::new(false);
+        fb.root_dir = tmp.path().to_path_buf();
+        fb.current_dir = tmp.path().to_path_buf();
+        fb.expanded_dirs.clear();
+        fb.expanded_dirs.insert(tmp.path().to_path_buf());
+        fb.expanded_dirs.insert(sub.clone());
+        fb.load_tree();
+
+        // List should now be long (30 inner files visible).
+        assert!(
+            fb.entries.len() > 10,
+            "need >10 entries after expand, got {}",
+            fb.entries.len()
+        );
+
+        // Set offset to near the end of the expanded list.
+        let high_offset = fb.entries.len() - 2;
+        *fb.list_state.offset_mut() = high_offset;
+
+        // Collapse subdir_000 — this makes the list much shorter.
+        let dir_idx = fb
+            .entries
+            .iter()
+            .position(|e| e.path == sub && e.is_dir)
+            .unwrap();
+        fb.list_state.select(Some(dir_idx));
+        fb.enter_selected(); // collapse triggers rebuild_tree
+
+        let max_offset = fb.entries.len().saturating_sub(1);
+        assert!(
+            fb.list_state.offset() <= max_offset,
+            "offset {} must be clamped to <= {} after collapse",
+            fb.list_state.offset(),
+            max_offset
+        );
+    }
+
+    #[test]
+    fn rebuild_tree_preserves_scroll_offset_middle_of_list() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Enough entries so offset=5 is in the "middle".
+        let mut fb = browser_with_subdirs(tmp.path(), 3, 20);
+        assert!(
+            fb.entries.len() >= 10,
+            "need >=10 entries, got {}",
+            fb.entries.len()
+        );
+
+        *fb.list_state.offset_mut() = 5;
+        fb.list_state.select(Some(7));
+
+        // Expand first dir to trigger rebuild_tree.
+        let dir_idx = fb
+            .entries
+            .iter()
+            .position(|e| e.is_dir && e.name != "..")
+            .unwrap();
+        fb.list_state.select(Some(dir_idx));
+        *fb.list_state.offset_mut() = 5; // restore after select
+        fb.enter_selected();
+
+        // Offset 5 is within any reasonable list of 10+ entries.
+        assert_eq!(
+            fb.list_state.offset(),
+            5,
+            "offset must stay at 5 after expand in middle of list (got {})",
+            fb.list_state.offset()
         );
     }
 }

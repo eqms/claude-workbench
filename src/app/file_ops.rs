@@ -154,6 +154,7 @@ impl App {
                             visible: true,
                             source_path: path.clone(),
                             selected: 0,
+                            is_batch: false,
                         };
                     }
                 }
@@ -431,7 +432,9 @@ impl App {
                                     &options,
                                     &doc_config,
                                 );
-                                let _ = tx.send(result.map_err(|e| format!("{}", e)));
+                                let _ = tx.send(crate::types::ExportJobResult::Single(
+                                    result.map_err(|e| format!("{}", e)),
+                                ));
                             });
                             self.export_job = super::JobState::running(rx);
                             self.export_browser = Some(self.config.ui.browser.clone());
@@ -471,7 +474,7 @@ impl App {
         }
     }
 
-    /// Poll for async PDF export completion
+    /// Poll for async PDF export completion (single file or batch folder)
     pub(crate) fn poll_export_result(&mut self) {
         use super::PollOutcome;
         if !self.export_job.is_running() {
@@ -481,13 +484,13 @@ impl App {
             PollOutcome::Ready(result) => {
                 let browser = self.export_browser.take().unwrap_or_default();
                 match result {
-                    Ok(path) => {
+                    crate::types::ExportJobResult::Single(Ok(path)) => {
                         self.copy_flash_message = Some("PDF exported".to_string());
                         self.copy_flash_lines = 0;
                         self.last_copy_time = Some(std::time::Instant::now());
                         let _ = crate::browser::opener::open_file_with_browser(&path, &browser);
                     }
-                    Err(e) => {
+                    crate::types::ExportJobResult::Single(Err(e)) => {
                         self.copy_flash_message = None;
                         self.last_copy_time = None;
                         self.dialog.dialog_type = ui::dialog::DialogType::Confirm {
@@ -495,6 +498,22 @@ impl App {
                             message: e,
                             action: ui::dialog::DialogAction::DiscardEditorChanges,
                         };
+                    }
+                    crate::types::ExportJobResult::Batch(b) => {
+                        if b.failed.is_empty() {
+                            self.copy_flash_message =
+                                Some(format!("{} Datei(en) exportiert", b.exported));
+                        } else {
+                            self.copy_flash_message = Some(format!(
+                                "{} exportiert, {} fehlgeschlagen",
+                                b.exported,
+                                b.failed.len()
+                            ));
+                        }
+                        self.copy_flash_lines = 0;
+                        self.last_copy_time = Some(std::time::Instant::now());
+                        // Open target directory in Finder/file manager
+                        let _ = crate::browser::opener::open_in_file_manager(&b.target_dir);
                     }
                 }
             }
@@ -514,6 +533,94 @@ impl App {
                 self.last_copy_time = Some(std::time::Instant::now());
             }
         }
+    }
+
+    /// Start an async batch export of all .md files in `source` directory.
+    pub(crate) fn start_batch_export(
+        &mut self,
+        source: std::path::PathBuf,
+        format: crate::browser::pdf_export::ExportFormat,
+    ) {
+        // Guard: if already running, ignore
+        if self.export_job.is_running() {
+            return;
+        }
+
+        // Collect top-level .md files (case-insensitive extension)
+        let md_files: Vec<std::path::PathBuf> = std::fs::read_dir(&source)
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| {
+                p.is_file()
+                    && p.extension()
+                        .and_then(|x| x.to_str())
+                        .map(|x| {
+                            matches!(
+                                x.to_lowercase().as_str(),
+                                "md" | "markdown" | "mdown" | "mkd"
+                            )
+                        })
+                        .unwrap_or(false)
+            })
+            .collect();
+
+        if md_files.is_empty() {
+            self.copy_flash_message = Some("Keine .md-Dateien im Ordner".to_string());
+            self.copy_flash_lines = 0;
+            self.last_copy_time = Some(std::time::Instant::now());
+            return;
+        }
+
+        let count = md_files.len();
+        self.copy_flash_message = Some(format!("Exportiere {} Datei(en)\u{2026}", count));
+        self.copy_flash_lines = 0;
+        self.last_copy_time = Some(std::time::Instant::now());
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let doc_config = self.config.document.clone();
+        let target_dir = source.clone();
+        let project_name = self
+            .file_browser
+            .root_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        std::thread::spawn(move || {
+            let mut exported = 0usize;
+            let mut failed: Vec<(std::path::PathBuf, String)> = Vec::new();
+            for src in &md_files {
+                let filename =
+                    crate::browser::pdf_export::default_export_filename(src, format, &project_name);
+                let out = target_dir.join(&filename);
+                let options = crate::browser::pdf_export::ExportOptions {
+                    title: src
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("Export")
+                        .to_string(),
+                    author: doc_config.resolved_author(),
+                    date: crate::browser::pdf_export::date_now_dmy(),
+                    format,
+                };
+                match crate::browser::pdf_export::export_markdown(src, &out, &options, &doc_config)
+                {
+                    Ok(_) => exported += 1,
+                    Err(e) => failed.push((src.clone(), format!("{}", e))),
+                }
+            }
+            let _ = tx.send(crate::types::ExportJobResult::Batch(
+                crate::types::BatchExportResult {
+                    exported,
+                    failed,
+                    target_dir,
+                },
+            ));
+        });
+        self.export_job = super::JobState::running(rx);
     }
 
     /// Open a file in the configured browser (with Markdown→HTML conversion)
@@ -741,5 +848,115 @@ impl App {
             }
             _ => {}
         }
+    }
+}
+
+// --- Unit tests for batch export helpers ---
+
+#[cfg(test)]
+mod batch_export_tests {
+    use std::path::{Path, PathBuf};
+
+    /// The same filter predicate used in start_batch_export — extracted as a testable fn.
+    fn is_md_file(p: &Path) -> bool {
+        p.is_file()
+            && p.extension()
+                .and_then(|x| x.to_str())
+                .map(|x| {
+                    matches!(
+                        x.to_lowercase().as_str(),
+                        "md" | "markdown" | "mdown" | "mkd"
+                    )
+                })
+                .unwrap_or(false)
+    }
+
+    #[test]
+    fn test_filter_md_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        // Create test files
+        let a = dir.join("a.md");
+        let b = dir.join("b.txt");
+        let c = dir.join("c.MD"); // uppercase extension
+        let d = dir.join("d.markdown");
+        let e = dir.join("e.rs");
+        for p in &[&a, &b, &c, &d, &e] {
+            std::fs::write(p, "x").unwrap();
+        }
+
+        let paths: Vec<PathBuf> = vec![a.clone(), b.clone(), c.clone(), d.clone(), e.clone()];
+        let filtered: Vec<&PathBuf> = paths.iter().filter(|p| is_md_file(p)).collect();
+
+        assert!(filtered.contains(&&a), "a.md must be included");
+        assert!(!filtered.contains(&&b), "b.txt must be excluded");
+        assert!(filtered.contains(&&c), "c.MD (uppercase) must be included");
+        assert!(filtered.contains(&&d), "d.markdown must be included");
+        assert!(!filtered.contains(&&e), "e.rs must be excluded");
+        assert_eq!(filtered.len(), 3, "exactly 3 md files expected");
+    }
+
+    #[test]
+    fn test_batch_result_flash_format_success() {
+        let b = crate::types::BatchExportResult {
+            exported: 9,
+            failed: vec![],
+            target_dir: PathBuf::from("/tmp/test"),
+        };
+        let flash = if b.failed.is_empty() {
+            format!("{} Datei(en) exportiert", b.exported)
+        } else {
+            format!(
+                "{} exportiert, {} fehlgeschlagen",
+                b.exported,
+                b.failed.len()
+            )
+        };
+        assert_eq!(flash, "9 Datei(en) exportiert");
+    }
+
+    #[test]
+    fn test_batch_result_flash_format_partial_failure() {
+        let b = crate::types::BatchExportResult {
+            exported: 7,
+            failed: vec![
+                (PathBuf::from("/tmp/a.md"), "err1".to_string()),
+                (PathBuf::from("/tmp/b.md"), "err2".to_string()),
+            ],
+            target_dir: PathBuf::from("/tmp/test"),
+        };
+        let flash = if b.failed.is_empty() {
+            format!("{} Datei(en) exportiert", b.exported)
+        } else {
+            format!(
+                "{} exportiert, {} fehlgeschlagen",
+                b.exported,
+                b.failed.len()
+            )
+        };
+        assert_eq!(flash, "7 exportiert, 2 fehlgeschlagen");
+    }
+
+    #[test]
+    fn test_empty_folder_no_md_files() {
+        // Verify the filter returns empty for a dir with no .md files
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        std::fs::write(dir.join("readme.txt"), "x").unwrap();
+        std::fs::write(dir.join("main.rs"), "x").unwrap();
+
+        let md_files: Vec<PathBuf> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| is_md_file(p))
+            .collect();
+
+        assert!(
+            md_files.is_empty(),
+            "expected no md files, found: {:?}",
+            md_files
+        );
     }
 }

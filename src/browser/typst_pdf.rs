@@ -31,13 +31,17 @@ static CARLITO_BOLD: &[u8] = include_bytes!("../../assets/fonts/Carlito-Bold.ttf
 static CARLITO_ITALIC: &[u8] = include_bytes!("../../assets/fonts/Carlito-Italic.ttf");
 static CARLITO_BOLD_ITALIC: &[u8] = include_bytes!("../../assets/fonts/Carlito-BoldItalic.ttf");
 
+// --- Bundled DejaVu Sans font (DejaVu Fonts License) — Unicode symbol fallback ---
+// Covers ☐ ⟨ ⟩ ✓ ✗ → and other symbols absent from Carlito/Liberation Sans.
+static DEJAVU_SANS_REGULAR: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
+
 /// The Typst page template with placeholders for config values.
 const TYPST_TEMPLATE: &str = r##"
 #set page(
   paper: "{page_size}",
   margin: (left: {margin}, right: {margin}, top: {margin}, bottom: {margin}),
   header: [
-    #set text(font: ("{font_family}", "Carlito", "Liberation Sans"), size: {header_size}, fill: rgb("{header_border}"))
+    #set text(font: ("{font_family}", "Carlito", "Liberation Sans", "DejaVu Sans"), size: {header_size}, fill: rgb("{header_border}"))
     {title}
     #v(2pt)
     #line(length: 100%, stroke: 0.5pt + rgb("{header_border}"))
@@ -45,7 +49,7 @@ const TYPST_TEMPLATE: &str = r##"
   footer: [
     #line(length: 100%, stroke: 0.5pt + rgb("{header_border}"))
     #v(2pt)
-    #set text(font: ("{font_family}", "Carlito", "Liberation Sans"), size: {footer_size}, fill: rgb("{footer_color}"))
+    #set text(font: ("{font_family}", "Carlito", "Liberation Sans", "DejaVu Sans"), size: {footer_size}, fill: rgb("{footer_color}"))
     #grid(
       columns: (1fr, 1fr, 1fr),
       align: (left, center, right),
@@ -56,7 +60,7 @@ const TYPST_TEMPLATE: &str = r##"
   ],
 )
 
-#set text(font: ("{font_family}", "Carlito", "Liberation Sans"), size: {body_size}, lang: "de")
+#set text(font: ("{font_family}", "Carlito", "Liberation Sans", "DejaVu Sans"), size: {body_size}, lang: "de")
 #set par(justify: true, leading: 0.65em)
 #set heading(numbering: none)
 
@@ -196,12 +200,13 @@ fn build_fonts(_doc: &DocumentConfig) -> (LazyHash<FontBook>, Vec<FontSlot>) {
     let mut book = FontBook::new();
     let mut fonts = Vec::new();
 
-    // 1. Load bundled Carlito fonts (highest priority for fallback)
+    // 1. Load bundled fonts: Carlito (Latin/Calibri-compatible) + DejaVu Sans (Unicode symbols)
     let bundled: &[&[u8]] = &[
         CARLITO_REGULAR,
         CARLITO_BOLD,
         CARLITO_ITALIC,
         CARLITO_BOLD_ITALIC,
+        DEJAVU_SANS_REGULAR,
     ];
     for font_data in bundled {
         let buffer = Bytes::new(font_data.to_vec());
@@ -639,7 +644,7 @@ fn build_code_font_list(css_fonts: &str) -> String {
         .collect();
 
     // Append reliable fallbacks if not already present
-    for fallback in &["DejaVu Sans Mono", "Liberation Mono"] {
+    for fallback in &["DejaVu Sans Mono", "DejaVu Sans", "Liberation Mono"] {
         let quoted = format!("\"{}\"", fallback);
         if !fonts.iter().any(|f| f == &quoted) {
             fonts.push(quoted);
@@ -894,5 +899,79 @@ mod tests {
         );
         // ZWSP must follow each underscore separator.
         assert!(result.contains("get\\_\u{200B}product"));
+    }
+
+    /// Verify that every character in the required Unicode symbol set is covered
+    /// by at least one of the 5 bundled font byte slices.
+    ///
+    /// This test fails if DejaVuSans.ttf is absent, corrupt, or missing expected glyphs,
+    /// and also acts as the T-m4v-01 threat-model mitigating integrity check.
+    #[test]
+    fn bundled_fonts_cover_all_required_codepoints() {
+        use ttf_parser::Face;
+
+        let required: &[char] = &[
+            '☐', '⟨', '⟩', '✓', '✗', '→', 'ü', 'ä', 'ö', 'ß', 'Ü', 'Ä', 'Ö', '–', '„', '…', '·',
+            '≤', '≈',
+        ];
+
+        let font_slices: &[&[u8]] = &[
+            CARLITO_REGULAR,
+            CARLITO_BOLD,
+            CARLITO_ITALIC,
+            CARLITO_BOLD_ITALIC,
+            DEJAVU_SANS_REGULAR,
+        ];
+
+        for &c in required {
+            let any_has_glyph = font_slices.iter().any(|data| {
+                Face::parse(data, 0)
+                    .map(|face| face.glyph_index(c).is_some())
+                    .unwrap_or(false)
+            });
+            assert!(
+                any_has_glyph,
+                "no bundled font covers codepoint U+{:04X} ('{}')",
+                c as u32, c
+            );
+        }
+    }
+
+    /// Integration test: export a Markdown snippet containing Unicode symbols to PDF
+    /// and verify that DejaVu Sans is embedded in the resulting PDF byte stream.
+    ///
+    /// Typst only embeds a font if it actually uses glyphs from it — if DejaVu is
+    /// absent or unused, the string b"DejaVuSans" would not appear in the PDF.
+    #[test]
+    #[cfg(feature = "pdf-export")]
+    fn integration_export_produces_dejavu_embedded() {
+        use crate::browser::pdf_export::{ExportFormat, ExportOptions};
+        use std::path::Path;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("test.md");
+        std::fs::write(&src, "☐ ⟨test⟩ ✓ ✗ → normal text\n").unwrap();
+        let pdf_path = tmp.path().join("test.pdf");
+
+        let options = ExportOptions {
+            title: "DejaVu test".to_string(),
+            author: "test".to_string(),
+            date: "11.06.2026".to_string(),
+            format: ExportFormat::Pdf,
+        };
+        let doc = crate::config::DocumentConfig::default();
+
+        export_markdown_to_pdf(Path::new(&src), Path::new(&pdf_path), &options, &doc)
+            .expect("PDF export must succeed for integration test");
+
+        let pdf_bytes = std::fs::read(&pdf_path).expect("PDF file must exist after export");
+
+        // Typst embeds fonts with a 6-char subset prefix (e.g. "AUBSHA+DejaVuSans").
+        // We search for the invariant "DejaVu" prefix — present in any subset variant.
+        let has_dejavu = pdf_bytes.windows(6).any(|w| w == b"DejaVu");
+        assert!(
+            has_dejavu,
+            "DejaVu must be embedded in the PDF — font not found in output bytes"
+        );
     }
 }

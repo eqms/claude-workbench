@@ -123,18 +123,35 @@ impl App {
             return true;
         }
 
-        // Ctrl+X: Export current Markdown file (show format chooser)
+        // Ctrl+X: Export current Markdown file or batch-export a folder
         if key.code == KeyCode::Char('x') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            // Priority 1: FileBrowser pane has focus AND selected entry is a directory (not "..")
+            if self.active_pane == PaneId::FileBrowser {
+                if let Some(entry) = self.file_browser.selected_entry() {
+                    if entry.is_dir && entry.name != ".." {
+                        self.export_chooser = crate::types::ExportChooserState {
+                            visible: true,
+                            source_path: entry.path.clone(),
+                            selected: 0,
+                            is_batch: true,
+                        };
+                        return true;
+                    }
+                }
+            }
+            // Priority 2: Preview has a Markdown file open (existing single-file behavior)
             if let Some(path) = &self.preview.current_file {
                 if self.preview.is_markdown {
                     self.export_chooser = crate::types::ExportChooserState {
                         visible: true,
                         source_path: path.clone(),
                         selected: 0,
+                        is_batch: false,
                     };
                     return true;
                 }
             }
+            // Priority 3: no-op
         }
 
         // Ctrl+E: Open selected file in external GUI editor
