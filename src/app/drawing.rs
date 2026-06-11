@@ -263,8 +263,18 @@ fn render_export_chooser(frame: &mut Frame, area: Rect, state: &crate::types::Ex
 
     frame.render_widget(Clear, popup_area);
 
+    let title = if state.is_batch {
+        let folder_name = state
+            .source_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Ordner");
+        format!(" Export Ordner: {} ", folder_name)
+    } else {
+        " Export Format ".to_string()
+    };
     let block = Block::default()
-        .title(" Export Format ")
+        .title(title)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
     let inner = block.inner(popup_area);

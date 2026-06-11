@@ -163,10 +163,10 @@ pub struct App {
     pub dependency_report: crate::setup::DependencyReport,
     // Temp files created for browser previews (auto-deleted on drop via NamedTempFile)
     pub temp_preview_files: Vec<tempfile::NamedTempFile>,
-    // Export format chooser (Ctrl+X on Markdown files)
+    // Export format chooser (Ctrl+X on Markdown files or directories)
     pub export_chooser: crate::types::ExportChooserState,
-    // Async job: PDF export
-    pub export_job: JobState<Result<std::path::PathBuf, String>>,
+    // Async job: PDF export (single file or batch folder)
+    pub export_job: JobState<crate::types::ExportJobResult>,
     pub export_browser: Option<String>,
 }
 

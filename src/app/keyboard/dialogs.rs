@@ -126,37 +126,43 @@ impl App {
                     crate::browser::pdf_export::ExportFormat::Pdf
                 };
                 let source = self.export_chooser.source_path.clone();
+                let is_batch = self.export_chooser.is_batch;
                 self.export_chooser.visible = false;
 
-                let export_dir =
-                    crate::browser::pdf_export::resolve_export_dir(&self.config.ui.export_dir);
-                let project_name = self
-                    .file_browser
-                    .root_dir
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("");
-                let filename = crate::browser::pdf_export::default_export_filename(
-                    &source,
-                    format,
-                    project_name,
-                );
-                let target = export_dir.join(&filename);
-                let target_str = target.to_string_lossy().to_string();
-                let cursor = target_str.len();
-                self.dialog.dialog_type = ui::dialog::DialogType::Input {
-                    title: format!(
-                        "Export as {}",
-                        if format == crate::browser::pdf_export::ExportFormat::Pdf {
-                            "PDF"
-                        } else {
-                            "Markdown"
-                        }
-                    ),
-                    value: target_str,
-                    cursor,
-                    action: ui::dialog::DialogAction::ExportMarkdown { source, format },
-                };
+                if is_batch {
+                    // Batch export: skip filename dialog, go directly to export
+                    self.start_batch_export(source, format);
+                } else {
+                    let export_dir =
+                        crate::browser::pdf_export::resolve_export_dir(&self.config.ui.export_dir);
+                    let project_name = self
+                        .file_browser
+                        .root_dir
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("");
+                    let filename = crate::browser::pdf_export::default_export_filename(
+                        &source,
+                        format,
+                        project_name,
+                    );
+                    let target = export_dir.join(&filename);
+                    let target_str = target.to_string_lossy().to_string();
+                    let cursor = target_str.len();
+                    self.dialog.dialog_type = ui::dialog::DialogType::Input {
+                        title: format!(
+                            "Export as {}",
+                            if format == crate::browser::pdf_export::ExportFormat::Pdf {
+                                "PDF"
+                            } else {
+                                "Markdown"
+                            }
+                        ),
+                        value: target_str,
+                        cursor,
+                        action: ui::dialog::DialogAction::ExportMarkdown { source, format },
+                    };
+                }
             }
             _ => {}
         }
