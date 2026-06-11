@@ -413,12 +413,16 @@ impl App {
     pub(super) fn insert_path_at_cursor(&mut self, target: PaneId, path: &Path) {
         if let Some(pty) = self.terminals.get_mut(&target) {
             let path_str = path.to_string_lossy();
-            // shlex::try_quote escapes shell metacharacters; only fails on NUL bytes,
-            // which cannot occur in a valid filesystem path on Unix or Windows.
-            let escaped = shlex::try_quote(&path_str)
-                .map(|c| c.into_owned())
-                .unwrap_or_else(|_| path_str.into_owned());
-
+            // shlex::try_quote fails only on NUL-byte paths (invalid on Unix/Windows).
+            // On failure, log a debug note and return without writing anything to the PTY.
+            // Never write a raw, unquoted path — it could execute shell metacharacters.
+            let escaped = match shlex::try_quote(&path_str) {
+                Ok(c) => c.into_owned(),
+                Err(_) => {
+                    // Path contains a NUL byte — reject silently (unreachable on sane FS).
+                    return;
+                }
+            };
             // Write to PTY (no newline - just insert the path)
             let _ = pty.write_input(escaped.as_bytes());
         }
