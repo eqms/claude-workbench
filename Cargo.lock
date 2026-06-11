@@ -492,6 +492,7 @@ dependencies = [
  "syntect",
  "tempfile",
  "tokio",
+ "ttf-parser",
  "tui-markdown",
  "tui-textarea",
  "typst",

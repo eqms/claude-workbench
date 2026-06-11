@@ -44,6 +44,9 @@ typst-kit = { version = "0.14.2", default-features = false, features = ["fonts"]
 comemo = { version = "0.4", optional = true }  # Memoization required by typst::World trait
 ecow = { version = "0.2", optional = true }    # EcoString/EcoVec used in typst API
 
+[dev-dependencies]
+ttf-parser = "0.25"  # Font codepoint coverage tests (transitive dep via typst already in Cargo.lock)
+
 [features]
 default = ["pdf-export"]
 pdf-export = ["dep:typst", "dep:typst-pdf", "dep:typst-library", "dep:typst-kit", "dep:comemo", "dep:ecow"]
