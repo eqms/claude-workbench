@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to update Homebrew formula for (e.g. v0.96.0)'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,6 +18,7 @@ jobs:
   build:
     name: Build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
@@ -119,6 +126,7 @@ jobs:
   release:
     name: Create Release
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -219,3 +227,124 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-homebrew-tap:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: always() && (needs.release.result == 'success' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download Homebrew assets and compute SHA256
+        id: hashes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          echo "Updating formula for $TAG (version $VERSION)"
+
+          # Four Homebrew targets (no Windows)
+          TARGETS=(
+            "aarch64-apple-darwin"
+            "x86_64-apple-darwin"
+            "aarch64-unknown-linux-gnu"
+            "x86_64-unknown-linux-gnu"
+          )
+
+          mkdir -p /tmp/assets
+
+          # Download each asset and compute sha256
+          for TARGET in "${TARGETS[@]}"; do
+            ASSET="claude-workbench-${TARGET}.tar.gz"
+            echo "Downloading $ASSET ..."
+            gh release download "$TAG" \
+              --repo eqms/claude-workbench \
+              --pattern "$ASSET" \
+              --dir /tmp/assets
+            if [ ! -f "/tmp/assets/$ASSET" ]; then
+              echo "ERROR: Asset $ASSET not found in release $TAG"
+              exit 1
+            fi
+            SHA=$(sha256sum /tmp/assets/$ASSET | awk '{print $1}')
+            echo "sha256_${TARGET//-/_}=$SHA" >> $GITHUB_OUTPUT
+            echo "$TARGET -> $SHA"
+          done
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: eqms/homebrew-claude-workbench
+          ssh-key: ${{ secrets.TAP_DEPLOY_KEY }}
+          path: tap
+
+      - name: Rewrite formula
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          FORMULA="tap/Formula/claude-workbench.rb"
+
+          # Verify all four sha256 values are non-empty and 64 hex chars
+          SHA_AARCH64_DARWIN="${{ steps.hashes.outputs.sha256_aarch64_apple_darwin }}"
+          SHA_X86_64_DARWIN="${{ steps.hashes.outputs.sha256_x86_64_apple_darwin }}"
+          SHA_AARCH64_LINUX="${{ steps.hashes.outputs.sha256_aarch64_unknown_linux_gnu }}"
+          SHA_X86_64_LINUX="${{ steps.hashes.outputs.sha256_x86_64_unknown_linux_gnu }}"
+
+          for SHA in "$SHA_AARCH64_DARWIN" "$SHA_X86_64_DARWIN" "$SHA_AARCH64_LINUX" "$SHA_X86_64_LINUX"; do
+            if [ -z "$SHA" ] || [ ${#SHA} -ne 64 ]; then
+              echo "ERROR: Invalid SHA256 value: '$SHA'"
+              exit 1
+            fi
+          done
+
+          # Replace version in all 4 download URLs
+          sed -i "s|/releases/download/v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/|/releases/download/${TAG}/|g" "$FORMULA"
+
+          # Replace sha256 values — formula has exactly 4 sha256 lines in this order:
+          # aarch64-apple-darwin, x86_64-apple-darwin, aarch64-unknown-linux-gnu, x86_64-unknown-linux-gnu
+          awk -v s1="$SHA_AARCH64_DARWIN" \
+              -v s2="$SHA_X86_64_DARWIN" \
+              -v s3="$SHA_AARCH64_LINUX" \
+              -v s4="$SHA_X86_64_LINUX" \
+              'BEGIN{n=0}
+               /^[[:space:]]*sha256 "/ {
+                 n++
+                 if(n==1) { sub(/"[a-f0-9]{64}"/, "\"" s1 "\"") }
+                 if(n==2) { sub(/"[a-f0-9]{64}"/, "\"" s2 "\"") }
+                 if(n==3) { sub(/"[a-f0-9]{64}"/, "\"" s3 "\"") }
+                 if(n==4) { sub(/"[a-f0-9]{64}"/, "\"" s4 "\"") }
+               }
+               { print }' "$FORMULA" > "$FORMULA.tmp" && mv "$FORMULA.tmp" "$FORMULA"
+
+          echo "Formula after update:"
+          cat "$FORMULA"
+
+          # Sanity check: exactly 4 sha256 lines present
+          SHA_COUNT=$(grep -c 'sha256 "' "$FORMULA")
+          if [ "$SHA_COUNT" -ne 4 ]; then
+            echo "ERROR: Expected 4 sha256 lines, found $SHA_COUNT"
+            exit 1
+          fi
+
+      - name: Commit and push formula
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/claude-workbench.rb
+          if git diff --cached --quiet; then
+            echo "No changes to formula — already up to date for $TAG"
+            exit 0
+          fi
+          git commit -m "[CHG] Update to ${TAG}"
+          git push
+          echo "Formula updated and pushed for $TAG"
