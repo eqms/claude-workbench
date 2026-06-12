@@ -107,6 +107,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.96.0
+
+- **Mouse-wheel scrolling works again in the Claude pane (tmux-like wheel forwarding).** Claude Code ≥2.1.89 renders in the alternate screen with mouse tracking enabled by default; the local scrollback buffer is empty there, so wheel events used to vanish. Workbench now inspects the inner application's terminal state per wheel tick: if the app has mouse tracking enabled (Claude Code fullscreen renderer, LazyGit), the wheel event is forwarded to the application as an SGR/X10 mouse sequence so it scrolls its own view; on the alternate screen without mouse tracking (`less`, `vim`) arrow keys are sent instead; otherwise (plain shell) the wheel scrolls the local scrollback exactly as before. `Shift+PgUp/PgDn` still always scrolls the local buffer. As a side effect, wheel scrolling in the LazyGit pane now drives LazyGit's own list scrolling natively.
+
 ### What's New in v0.92.0
 
 - **F9 in the shell pane now copies the whole last command block.** In the Terminal pane, F9 reads the *full scrollback buffer* (no longer capped at the visible pane height) and copies everything from the last shell prompt to the bottom — so older error messages that scrolled off-screen are included. It uses prompt-line heuristics to find the boundary; if none is found it falls back to the last N lines of the full buffer (still more than what was visible before). The Claude and LazyGit panes keep the previous last-N-visible-lines behaviour, and `Shift+F9`/`Ctrl+F9` (interactive line count) is unchanged.
@@ -409,6 +413,10 @@ cd claude-workbench && cargo build --release
 | Rechtsklick | Paste aus System-Clipboard in Pane unter dem Cursor (entspricht Kittys `mouse_map right press paste`) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v0.96.0
+
+- **Mausrad-Scrollen im Claude-Bereich funktioniert wieder (tmux-artiges Wheel-Forwarding).** Claude Code ≥2.1.89 rendert standardmäßig im Alternate Screen mit aktiviertem Mouse-Tracking; der lokale Scrollback-Puffer ist dort leer, Wheel-Events verpufften bisher. Workbench prüft jetzt pro Mausrad-Tick den Terminal-Zustand der inneren Anwendung: Hat die App Mouse-Tracking aktiviert (Claude Code Fullscreen-Renderer, LazyGit), wird das Wheel-Event als SGR/X10-Mouse-Sequenz an die Anwendung weitergeleitet, die dann selbst scrollt; im Alternate Screen ohne Mouse-Tracking (`less`, `vim`) werden stattdessen Pfeiltasten gesendet; andernfalls (normale Shell) scrollt das Mausrad wie bisher den lokalen Scrollback. `Shift+PgUp/PgDn` scrollt weiterhin immer den lokalen Puffer. Nebeneffekt: Im LazyGit-Bereich scrollt das Mausrad jetzt nativ LazyGits eigene Listen.
 
 ### Neu in v0.92.0
 

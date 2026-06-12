@@ -62,6 +62,45 @@ impl vt100::Callbacks for PtyCallbacks {
     }
 }
 
+/// Direction of a mouse-wheel event forwarded to the PTY.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WheelDirection {
+    Up,
+    Down,
+}
+
+/// Encode a wheel event in the requested xterm mouse protocol encoding.
+/// SGR: `ESC [ < btn ; col ; row M`. Otherwise X10: `ESC [ M` + three bytes
+/// offset by 32. Utf8 encoding is treated like X10 with saturation — Claude
+/// Code and lazygit both request SGR, so the legacy path only serves old
+/// tools whose coordinates fit the X10 byte limit anyway.
+pub(crate) fn encode_wheel_event(
+    direction: WheelDirection,
+    encoding: vt100::MouseProtocolEncoding,
+    col: u16,
+    row: u16,
+    count: u8,
+) -> Vec<u8> {
+    let btn: u8 = match direction {
+        WheelDirection::Up => 64,
+        WheelDirection::Down => 65,
+    };
+    let mut buf = Vec::with_capacity(16 * count as usize);
+    for _ in 0..count {
+        match encoding {
+            vt100::MouseProtocolEncoding::Sgr => {
+                buf.extend_from_slice(format!("\x1b[<{btn};{col};{row}M").as_bytes());
+            }
+            _ => {
+                let cx = (32u16 + col).min(255) as u8;
+                let cy = (32u16 + row).min(255) as u8;
+                buf.extend_from_slice(&[0x1b, b'[', b'M', 32 + btn, cx, cy]);
+            }
+        }
+    }
+    buf
+}
+
 pub struct PseudoTerminal {
     pub parser: Arc<Mutex<vt100::Parser<PtyCallbacks>>>,
     pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
@@ -215,6 +254,54 @@ impl PseudoTerminal {
         } else {
             screen.set_scrollback(0);
         }
+    }
+
+    /// Snapshot of the inner application's mouse-reporting state:
+    /// (mouse protocol mode, encoding, alternate-screen flag).
+    pub fn mouse_report_state(
+        &self,
+    ) -> (vt100::MouseProtocolMode, vt100::MouseProtocolEncoding, bool) {
+        let parser = lock_or_recover(&self.parser);
+        let screen = parser.screen();
+        (
+            screen.mouse_protocol_mode(),
+            screen.mouse_protocol_encoding(),
+            screen.alternate_screen(),
+        )
+    }
+
+    /// Forward a mouse-wheel event to the inner application.
+    /// Writes directly to the PTY writer — unlike `write_input`, this must
+    /// not reset the scrollback position. `col`/`row` are 1-based
+    /// coordinates relative to the pane content area.
+    pub fn send_mouse_wheel(
+        &self,
+        direction: WheelDirection,
+        encoding: vt100::MouseProtocolEncoding,
+        col: u16,
+        row: u16,
+        count: u8,
+    ) -> Result<()> {
+        let bytes = encode_wheel_event(direction, encoding, col, row, count);
+        let mut writer = lock_or_recover(&self.writer);
+        writer.write_all(&bytes)?;
+        writer.flush()?;
+        Ok(())
+    }
+
+    /// Send `count` arrow-key sequences to the PTY. Fallback for
+    /// alternate-screen apps without mouse tracking (e.g. less, vim).
+    pub fn send_arrow_keys(&self, direction: WheelDirection, count: u8) -> Result<()> {
+        let seq: &[u8] = match direction {
+            WheelDirection::Up => b"\x1b[A",
+            WheelDirection::Down => b"\x1b[B",
+        };
+        let mut writer = lock_or_recover(&self.writer);
+        for _ in 0..count {
+            writer.write_all(seq)?;
+        }
+        writer.flush()?;
+        Ok(())
     }
 
     /// Push cell content to line, treating empty cells as spaces.
@@ -445,5 +532,94 @@ mod tests {
         let got: Vec<String> = lines.into_iter().filter(|l| !l.is_empty()).collect();
         let expected: Vec<String> = (0..10).map(|i| format!("line{i}")).collect();
         assert_eq!(got, expected);
+    }
+
+    // --- mouse-wheel forwarding ---
+
+    #[test]
+    fn mouse_mode_default_is_none() {
+        let parser = vt100::Parser::new(24, 80, 0);
+        let screen = parser.screen();
+        assert_eq!(screen.mouse_protocol_mode(), vt100::MouseProtocolMode::None);
+        assert_eq!(
+            screen.mouse_protocol_encoding(),
+            vt100::MouseProtocolEncoding::Default
+        );
+        assert!(!screen.alternate_screen());
+    }
+
+    #[test]
+    fn mouse_mode_sgr_button_motion_detected() {
+        // DECSET 1002 + 1006 — exactly what Claude Code CLI and lazygit send.
+        let mut parser = vt100::Parser::new(24, 80, 0);
+        parser.process(b"\x1b[?1002h\x1b[?1006h");
+        assert_eq!(
+            parser.screen().mouse_protocol_mode(),
+            vt100::MouseProtocolMode::ButtonMotion
+        );
+        assert_eq!(
+            parser.screen().mouse_protocol_encoding(),
+            vt100::MouseProtocolEncoding::Sgr
+        );
+    }
+
+    #[test]
+    fn alternate_screen_detected_without_mouse_mode() {
+        let mut parser = vt100::Parser::new(24, 80, 0);
+        parser.process(b"\x1b[?1049h");
+        assert!(parser.screen().alternate_screen());
+        assert_eq!(
+            parser.screen().mouse_protocol_mode(),
+            vt100::MouseProtocolMode::None
+        );
+    }
+
+    #[test]
+    fn encode_sgr_wheel_up() {
+        let bytes = encode_wheel_event(
+            WheelDirection::Up,
+            vt100::MouseProtocolEncoding::Sgr,
+            5,
+            10,
+            1,
+        );
+        assert_eq!(bytes, b"\x1b[<64;5;10M".to_vec());
+    }
+
+    #[test]
+    fn encode_sgr_wheel_down_count3() {
+        let bytes = encode_wheel_event(
+            WheelDirection::Down,
+            vt100::MouseProtocolEncoding::Sgr,
+            1,
+            1,
+            3,
+        );
+        assert_eq!(bytes, b"\x1b[<65;1;1M".repeat(3));
+    }
+
+    #[test]
+    fn encode_x10_wheel_up() {
+        let bytes = encode_wheel_event(
+            WheelDirection::Up,
+            vt100::MouseProtocolEncoding::Default,
+            3,
+            2,
+            1,
+        );
+        // 32+64=0x60 button, 32+3=0x23 col, 32+2=0x22 row
+        assert_eq!(bytes, vec![0x1b, b'[', b'M', 0x60, 0x23, 0x22]);
+    }
+
+    #[test]
+    fn encode_x10_saturates_large_coordinates() {
+        let bytes = encode_wheel_event(
+            WheelDirection::Down,
+            vt100::MouseProtocolEncoding::Default,
+            500,
+            300,
+            1,
+        );
+        assert_eq!(bytes, vec![0x1b, b'[', b'M', 0x61, 0xff, 0xff]);
     }
 }

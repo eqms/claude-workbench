@@ -2,6 +2,7 @@ use crossterm::event::{MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
 use crate::browser;
+use crate::terminal::WheelDirection;
 use crate::types::{ClaudePermissionMode, EditorMode, PaneId, ResizeBorder, ScrollbarAxis};
 use crate::ui;
 
@@ -63,6 +64,19 @@ pub(crate) fn scroll_files_pane(
     }
 }
 
+/// Convert absolute terminal coordinates to 1-based xterm mouse coordinates
+/// relative to the pane content area inside the 1-px border: the first
+/// content cell at `rect.x + 1` maps to column 1. Clamped to the content
+/// size so events on the border still produce valid coordinates.
+pub(crate) fn wheel_coords_in_pane(rect: Rect, x: u16, y: u16) -> (u16, u16) {
+    let max_col = rect.width.saturating_sub(2).max(1);
+    let max_row = rect.height.saturating_sub(2).max(1);
+    (
+        x.saturating_sub(rect.x).clamp(1, max_col),
+        y.saturating_sub(rect.y).clamp(1, max_row),
+    )
+}
+
 /// Clamp the selected index into the visible window `[offset, offset + visible_height - 1]`.
 ///
 /// ratatui couples a `ListState`'s offset to its selection: on render it snaps
@@ -105,6 +119,43 @@ impl App {
             if clamped != sel {
                 self.file_browser.list_state.select(Some(clamped));
                 self.update_preview();
+            }
+        }
+    }
+
+    /// Route a mouse-wheel tick for a PTY pane (tmux-like behavior):
+    /// - inner app has mouse tracking enabled → forward the wheel event to
+    ///   the PTY so the app scrolls itself (Claude Code ≥2.1.89 fullscreen
+    ///   renderer, lazygit);
+    /// - alternate screen without mouse tracking → send arrow keys (less/vim);
+    /// - otherwise → local vt100 scrollback as before (plain shell).
+    fn handle_pty_scroll(
+        &mut self,
+        pane_id: PaneId,
+        rect: Rect,
+        x: u16,
+        y: u16,
+        direction: ScrollDirection,
+    ) {
+        const WHEEL_DELTA: u8 = 3;
+        let Some(pty) = self.terminals.get_mut(&pane_id) else {
+            return;
+        };
+        let wheel_dir = match direction {
+            ScrollDirection::Up => WheelDirection::Up,
+            ScrollDirection::Down => WheelDirection::Down,
+        };
+
+        let (mode, encoding, alt_screen) = pty.mouse_report_state();
+        if mode != vt100::MouseProtocolMode::None {
+            let (col, row) = wheel_coords_in_pane(rect, x, y);
+            let _ = pty.send_mouse_wheel(wheel_dir, encoding, col, row, WHEEL_DELTA);
+        } else if alt_screen {
+            let _ = pty.send_arrow_keys(wheel_dir, WHEEL_DELTA);
+        } else {
+            match direction {
+                ScrollDirection::Down => pty.scroll_down(WHEEL_DELTA as usize),
+                ScrollDirection::Up => pty.scroll_up(WHEEL_DELTA as usize),
             }
         }
     }
@@ -1019,17 +1070,11 @@ impl App {
                         self.preview.scroll_down();
                     }
                 } else if is_inside(claude, x, y) {
-                    if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
-                        pty.scroll_down(3);
-                    }
+                    self.handle_pty_scroll(PaneId::Claude, claude, x, y, ScrollDirection::Down);
                 } else if is_inside(lazygit, x, y) {
-                    if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) {
-                        pty.scroll_down(3);
-                    }
+                    self.handle_pty_scroll(PaneId::LazyGit, lazygit, x, y, ScrollDirection::Down);
                 } else if is_inside(term, x, y) {
-                    if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
-                        pty.scroll_down(3);
-                    }
+                    self.handle_pty_scroll(PaneId::Terminal, term, x, y, ScrollDirection::Down);
                 }
             }
             MouseEventKind::ScrollUp => {
@@ -1087,17 +1132,11 @@ impl App {
                         self.preview.scroll_up();
                     }
                 } else if is_inside(claude, x, y) {
-                    if let Some(pty) = self.terminals.get_mut(&PaneId::Claude) {
-                        pty.scroll_up(3);
-                    }
+                    self.handle_pty_scroll(PaneId::Claude, claude, x, y, ScrollDirection::Up);
                 } else if is_inside(lazygit, x, y) {
-                    if let Some(pty) = self.terminals.get_mut(&PaneId::LazyGit) {
-                        pty.scroll_up(3);
-                    }
+                    self.handle_pty_scroll(PaneId::LazyGit, lazygit, x, y, ScrollDirection::Up);
                 } else if is_inside(term, x, y) {
-                    if let Some(pty) = self.terminals.get_mut(&PaneId::Terminal) {
-                        pty.scroll_up(3);
-                    }
+                    self.handle_pty_scroll(PaneId::Terminal, term, x, y, ScrollDirection::Up);
                 }
             }
             MouseEventKind::Down(crossterm::event::MouseButton::Right) => {
@@ -1144,7 +1183,9 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use super::{clamp_selected_to_window, scroll_files_pane, ScrollDirection};
+    use super::{
+        clamp_selected_to_window, scroll_files_pane, wheel_coords_in_pane, Rect, ScrollDirection,
+    };
 
     // --- scroll_files_pane — ScrollDown ---
 
@@ -1226,5 +1267,34 @@ mod tests {
         // selected=8, offset=5, visible=10 -> window [5..=14]; 8 unchanged
         let got = clamp_selected_to_window(8, 5, 10);
         assert_eq!(got, 8, "selected inside window must not change: {got}");
+    }
+
+    // --- wheel_coords_in_pane ---
+
+    #[test]
+    fn wheel_coords_corners_clamped_to_content_area() {
+        let rect = Rect {
+            x: 5,
+            y: 3,
+            width: 40,
+            height: 20,
+        };
+        // Top-left border cell clamps up to the first content cell (1, 1)
+        assert_eq!(wheel_coords_in_pane(rect, 5, 3), (1, 1));
+        // First content cell maps to (1, 1)
+        assert_eq!(wheel_coords_in_pane(rect, 6, 4), (1, 1));
+        // Bottom-right border cell clamps to (width-2, height-2)
+        assert_eq!(wheel_coords_in_pane(rect, 44, 22), (38, 18));
+    }
+
+    #[test]
+    fn wheel_coords_degenerate_pane_stays_one_based() {
+        let tiny = Rect {
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+        };
+        assert_eq!(wheel_coords_in_pane(tiny, 0, 0), (1, 1));
     }
 }

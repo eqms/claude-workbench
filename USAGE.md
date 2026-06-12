@@ -125,6 +125,8 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 | PageUp | Jump to line start (Home) |
 | PageDown | Jump to line end (End) |
 
+**Mouse-wheel scrolling:** When the inner application has mouse tracking enabled (Claude Code fullscreen renderer, LazyGit), wheel events are forwarded to the application so it scrolls its own view. On the alternate screen without mouse tracking (e.g. `less`, `vim`), arrow keys are sent instead. Otherwise (plain shell) the wheel scrolls the local scrollback buffer as before. `Shift+PgUp/PgDn` always scrolls the local scrollback.
+
 #### Selection Mode (Ctrl+S in Terminal/Preview)
 | Key | Action |
 |-----|--------|
@@ -430,6 +432,8 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | Alt+Links/Rechts | Wort-Navigation |
 | PageUp | An Zeilenanfang springen (Home) |
 | PageDown | An Zeilenende springen (End) |
+
+**Mausrad-Scrollen:** Hat die innere Anwendung Mouse-Tracking aktiviert (Claude Code Fullscreen-Renderer, LazyGit), werden Wheel-Events an die Anwendung weitergeleitet, die dann selbst scrollt. Im Alternate Screen ohne Mouse-Tracking (z. B. `less`, `vim`) werden stattdessen Pfeiltasten gesendet. Andernfalls (normale Shell) scrollt das Mausrad wie bisher den lokalen Scrollback-Puffer. `Shift+PgUp/PgDn` scrollt immer den lokalen Scrollback.
 
 #### Auswahlmodus (Ctrl+S in Terminal/Vorschau)
 | Taste | Aktion |
