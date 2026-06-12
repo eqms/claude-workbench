@@ -280,7 +280,7 @@ jobs:
           done
 
       - name: Checkout tap repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: eqms/homebrew-claude-workbench
           ssh-key: ${{ secrets.TAP_DEPLOY_KEY }}
