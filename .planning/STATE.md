@@ -84,11 +84,12 @@ None yet.
 | 260611-ghu | Audit follow-ups P1+P2: self_update 0.44, dirs 6, MSRV 1.85, deny.toml, CI hardening (audit-check action, cargo-deny job, Node24 actions) | 2026-06-11 | 555657e | [260611-ghu-...](./quick/260611-ghu-audit-follow-ups-p1-p2-self-update-0-44-/) |
 | 260611-m4v | v0.95.0: PDF font fallback (DejaVu Sans, fixes tofu for ☐ ⟨⟩ ✓ ✗), folder batch export via Ctrl+X, scroll-jump fix on folder expand/collapse | 2026-06-11 | fe0473c | [260611-m4v-...](./quick/260611-m4v-v0-95-0-pdf-font-fallback-dejavu-folder-/) |
 | 260612-esh | v0.96.1: automate Homebrew formula bump in release pipeline (update-homebrew-tap job, TAP_DEPLOY_KEY, workflow_dispatch dry-run) | 2026-06-12 | 3880a66 | [260612-esh-...](./quick/260612-esh-automate-homebrew-formula-bump-in-github/) |
+| 260615-jwb | v0.97.0: Edit-mode shortcut fix — standard Ctrl+C/X/V/Z (current-line fallback), removed colliding MC-Edit Ctrl+F3/F5/F6/F8, Ctrl+X export guard, hardware cursor (set_cursor_position) for Terminus visibility | 2026-06-15 | 02b50db | [260615-jwb-...](./quick/260615-jwb-editor-copy-cut-paste-shortcuts-and-curs/) |
 
 ## Session Continuity
 
 Last session: 2026-06-15T12:33:58.838Z
-Last activity: 2026-06-12 - Completed quick task 260612-esh: automate Homebrew formula bump in release pipeline
+Last activity: 2026-06-15 - Completed quick task 260615-jwb: editor copy/cut/paste shortcuts and cursor visibility fix
 Stopped at: v0.90.2 tagged + pushed. The v0.90.1 wheel-to-viewport change was correct but exposed a pre-existing auto-refresh reset — that is the actual root cause, now fixed. Phase 2 discussion still paused (no CONTEXT.md). Phase 1 accepted at 4/6; SEC-01 (HIGH) carried to v0.91 backlog.
 Resume file: None
 Next actions:
