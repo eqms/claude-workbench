@@ -982,7 +982,7 @@ pub fn render(
             }
 
             // Render editor status bar
-            render_edit_shortcuts(f, shortcut_area, state.block_marking);
+            render_edit_shortcuts(f, shortcut_area);
         }
         EditorMode::ReadOnly => {
             let total_lines = state.highlighted_lines.len();
@@ -1559,32 +1559,18 @@ fn insert_cursor_into_line(line: &Line<'static>, col: usize, raw_text: &str) -> 
 }
 
 /// Render editor status bar with platform-aware shortcuts
-fn render_edit_shortcuts(f: &mut Frame, area: Rect, block_marking: bool) {
-    let shortcuts: Vec<(&str, &str)> = if block_marking {
-        vec![
-            ("Sh+←→↑↓", "Mark"),
-            ("^C", "Copy"),
-            ("^X", "Cut"),
-            ("^V", "Paste"),
-            ("^Z", "Undo"),
-            ("^Y", "DelLn"),
-            ("^H", "S&R"),
-            ("^S", "Save"),
-            ("Esc", "Exit"),
-        ]
-    } else {
-        vec![
-            ("Sh+←→↑↓", "Mark"),
-            ("^C", "Copy"),
-            ("^X", "Cut"),
-            ("^V", "Paste"),
-            ("^Z", "Undo"),
-            ("^Y", "DelLn"),
-            ("^H", "S&R"),
-            ("^S", "Save"),
-            ("Esc", "Exit"),
-        ]
-    };
+fn render_edit_shortcuts(f: &mut Frame, area: Rect) {
+    let shortcuts: Vec<(&str, &str)> = vec![
+        ("Sh+←→↑↓", "Mark"),
+        ("^C", "Copy"),
+        ("^X", "Cut"),
+        ("^V", "Paste"),
+        ("^Z", "Undo"),
+        ("^Y", "DelLn"),
+        ("^H", "S&R"),
+        ("^S", "Save"),
+        ("Esc", "Exit"),
+    ];
 
     let mut spans = Vec::new();
     for (key, desc) in shortcuts {
