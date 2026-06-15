@@ -601,6 +601,58 @@ impl PreviewState {
         }
     }
 
+    /// Copy selection to clipboard, or the current line when nothing is selected (Ctrl+C)
+    pub fn copy_selection_or_line(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            if editor.is_selecting() || self.block_marking {
+                // Selection active: copy it
+                editor.copy();
+                let yank = editor.yank_text();
+                if !yank.is_empty() {
+                    crate::clipboard::copy_to_clipboard(&yank.to_string());
+                }
+            } else {
+                // No selection: copy current line (with trailing newline)
+                let (row, _) = editor.cursor();
+                let lines = editor.lines();
+                let line_text = lines.get(row).cloned().unwrap_or_default();
+                let to_copy = format!("{}\n", line_text);
+                crate::clipboard::copy_to_clipboard(&to_copy);
+            }
+        }
+    }
+
+    /// Cut selection to clipboard, or the current line when nothing is selected (Ctrl+X)
+    pub fn cut_selection_or_line(&mut self) {
+        if let Some(editor) = &mut self.editor {
+            if editor.is_selecting() || self.block_marking {
+                // Selection active: cut it
+                let yank_before = editor.yank_text().to_string();
+                editor.cut();
+                let yank_after = editor.yank_text().to_string();
+                let text = if !yank_after.is_empty() {
+                    yank_after
+                } else {
+                    yank_before
+                };
+                if !text.is_empty() {
+                    crate::clipboard::copy_to_clipboard(&text);
+                }
+                self.block_marking = false;
+                self.selection_start = None;
+            } else {
+                // No selection: copy + delete current line
+                let to_copy = {
+                    let lines = self.editor.as_ref().unwrap().lines();
+                    let (row, _) = self.editor.as_ref().unwrap().cursor();
+                    format!("{}\n", lines.get(row).cloned().unwrap_or_default())
+                };
+                crate::clipboard::copy_to_clipboard(&to_copy);
+                self.delete_line();
+            }
+        }
+    }
+
     /// Paste text from system clipboard at cursor position
     pub fn paste_from_clipboard(&mut self) {
         if let Some(editor) = &mut self.editor {
@@ -860,8 +912,9 @@ pub fn render(
                             base_line
                         };
 
-                    if idx == cursor_row {
-                        // Insert cursor into this line
+                    if idx == cursor_row && !is_focused {
+                        // Insert software cursor only when pane is not focused;
+                        // when focused, the hardware cursor (set_cursor_position below) is used.
                         let line_with_cursor =
                             insert_cursor_into_line(&line_with_selection, cursor_col, line_content);
                         lines_with_cursor.push(line_with_cursor);
@@ -875,6 +928,16 @@ pub fn render(
                     .scroll((scroll_offset as u16, state.horizontal_scroll));
 
                 f.render_widget(paragraph, content_area);
+
+                // Hardware cursor: emit set_cursor_position when focused so terminals
+                // that ignore REVERSED/SLOW_BLINK spans (e.g. Terminus) still show a cursor.
+                if is_focused {
+                    let cy = cursor_row.saturating_sub(scroll_offset) as u16;
+                    let cx = (cursor_col as u16).saturating_sub(state.horizontal_scroll);
+                    if cy < content_area.height && cx < content_area.width {
+                        f.set_cursor_position((content_area.x + cx, content_area.y + cy));
+                    }
+                }
 
                 // Scrollbar styling: green when focused, gray when not
                 let sb_color = if is_focused {
