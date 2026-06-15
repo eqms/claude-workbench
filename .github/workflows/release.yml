@@ -267,7 +267,7 @@ jobs:
             ASSET="claude-workbench-${TARGET}.tar.gz"
             echo "Downloading $ASSET ..."
             gh release download "$TAG" \
-              --repo eqms/claude-workbench \
+              --repo "${{ github.repository }}" \
               --pattern "$ASSET" \
               --dir /tmp/assets
             if [ ! -f "/tmp/assets/$ASSET" ]; then
@@ -308,29 +308,60 @@ jobs:
           # Replace version in all 4 download URLs
           sed -i "s|/releases/download/v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/|/releases/download/${TAG}/|g" "$FORMULA"
 
-          # Replace sha256 values — formula has exactly 4 sha256 lines in this order:
-          # aarch64-apple-darwin, x86_64-apple-darwin, aarch64-unknown-linux-gnu, x86_64-unknown-linux-gnu
-          awk -v s1="$SHA_AARCH64_DARWIN" \
-              -v s2="$SHA_X86_64_DARWIN" \
-              -v s3="$SHA_AARCH64_LINUX" \
-              -v s4="$SHA_X86_64_LINUX" \
-              'BEGIN{n=0}
-               /^[[:space:]]*sha256 "/ {
-                 n++
-                 if(n==1) { sub(/"[a-f0-9]{64}"/, "\"" s1 "\"") }
-                 if(n==2) { sub(/"[a-f0-9]{64}"/, "\"" s2 "\"") }
-                 if(n==3) { sub(/"[a-f0-9]{64}"/, "\"" s3 "\"") }
-                 if(n==4) { sub(/"[a-f0-9]{64}"/, "\"" s4 "\"") }
+          # Replace each sha256 by binding it to the target named in the *preceding*
+          # url line, not by line position. This survives reordering of the formula
+          # blocks and refuses to corrupt the file if a target's url goes missing
+          # (the END block fails the job if any of the 4 targets was not matched).
+          # Uses only portable awk features (index/sub, no gawk match() captures or
+          # {n} interval expressions) so it runs identically on mawk/gawk/BSD awk.
+          awk -v s_ad="$SHA_AARCH64_DARWIN" \
+              -v s_xd="$SHA_X86_64_DARWIN" \
+              -v s_al="$SHA_AARCH64_LINUX" \
+              -v s_xl="$SHA_X86_64_LINUX" \
+              'BEGIN {
+                 sha["aarch64-apple-darwin"]      = s_ad
+                 sha["x86_64-apple-darwin"]       = s_xd
+                 sha["aarch64-unknown-linux-gnu"] = s_al
+                 sha["x86_64-unknown-linux-gnu"]  = s_xl
+                 pending = ""
                }
-               { print }' "$FORMULA" > "$FORMULA.tmp" && mv "$FORMULA.tmp" "$FORMULA"
+               {
+                 line = $0
+                 if (line ~ /url "/) {
+                   pending = ""
+                   for (t in sha) {
+                     if (index(line, "claude-workbench-" t ".tar.gz") > 0) { pending = t; break }
+                   }
+                 } else if (line ~ /sha256 "/ && pending != "") {
+                   if (pending in sha) {
+                     sub(/"[a-f0-9]+"/, "\"" sha[pending] "\"", line)
+                     seen[pending] = 1
+                   }
+                   pending = ""
+                 }
+                 print line
+               }
+               END {
+                 missing = 0
+                 for (t in sha) if (!(t in seen)) {
+                   print "ERROR: SHA for target " t " not found/replaced in formula" > "/dev/stderr"
+                   missing = 1
+                 }
+                 if (missing) exit 1
+               }' "$FORMULA" > "$FORMULA.tmp" && mv "$FORMULA.tmp" "$FORMULA"
 
           echo "Formula after update:"
           cat "$FORMULA"
 
-          # Sanity check: exactly 4 sha256 lines present
+          # Sanity check: exactly 4 sha256 lines and 4 url lines on the new tag
           SHA_COUNT=$(grep -c 'sha256 "' "$FORMULA")
           if [ "$SHA_COUNT" -ne 4 ]; then
             echo "ERROR: Expected 4 sha256 lines, found $SHA_COUNT"
+            exit 1
+          fi
+          URL_COUNT=$(grep -c "releases/download/${TAG}/" "$FORMULA")
+          if [ "$URL_COUNT" -ne 4 ]; then
+            echo "ERROR: Expected 4 download URLs on ${TAG}, found $URL_COUNT"
             exit 1
           fi
 
