@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v0.91
+milestone_name: milestone
+status: Phase 1 ACCEPTED as delivered (Wave 1). SEC-01 (HIGH) explicitly deferred to v0.91 — plans 01-05/01-06 remain open in backlog.
+stopped_at: v0.90.2 tagged + pushed. The v0.90.1 wheel-to-viewport change was correct but exposed a pre-existing auto-refresh reset — that is the actual root cause, now fixed. Phase 2 discussion still paused (no CONTEXT.md). Phase 1 accepted at 4/6; SEC-01 (HIGH) carried to v0.91 backlog.
+last_updated: "2026-06-15T12:33:58.846Z"
+last_activity: 2026-06-01 — Phase 1 accepted at 4/6; routing to Phase 2 planning
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 6
+  completed_plans: 4
+  percent: 0
+---
+
 # Project State
 
 ## Project Reference
@@ -19,6 +35,7 @@ Progress: [██████░░░░] 67% Phase 1 (accepted at 4/6; SEC-01 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 4 (Wave 1 of Phase 1)
 - Average duration: ~21 min/plan (parallel execution, worktree-isolated)
 - Total execution time: ~1.4 hours wall-clock (4 parallel ≈ 21 min)
@@ -30,6 +47,7 @@ Progress: [██████░░░░] 67% Phase 1 (accepted at 4/6; SEC-01 
 | 1 (Wave 1) | 4 | ~1.4h wall | 21 min |
 
 **Recent Trend:**
+
 - Last 4 plans: 01-01 (35m), 01-02 (12m), 01-03 (18m), 01-04 (18m)
 - Trend: Stable — all S-complexity Wave 1 plans completed on first pass
 
@@ -69,10 +87,11 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-12
+Last session: 2026-06-15T12:33:58.838Z
 Last activity: 2026-06-12 - Completed quick task 260612-esh: automate Homebrew formula bump in release pipeline
 Stopped at: v0.90.2 tagged + pushed. The v0.90.1 wheel-to-viewport change was correct but exposed a pre-existing auto-refresh reset — that is the actual root cause, now fixed. Phase 2 discussion still paused (no CONTEXT.md). Phase 1 accepted at 4/6; SEC-01 (HIGH) carried to v0.91 backlog.
 Resume file: None
 Next actions:
+
 1. Plan Phase 2 (`/gsd-plan-phase`) — clipboard fallback tests + mutex-poison observability (QUAL-01, QUAL-02)
 2. v0.91 backlog (carried): operator `zipsign generate-keys` + GitHub secret → execute 01-05 → ship 2+ signed releases → execute 01-06 (closes SEC-01 HIGH)
