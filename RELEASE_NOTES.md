@@ -18,6 +18,83 @@
   interval expressions) so it behaves identically under mawk, gawk and BSD awk.
   No user-facing behavior change — `brew install` / `brew upgrade` are unaffected.
 
+## Version 0.97.0 (15.06.2026)
+
+### Changed
+
+- **Edit-mode shortcuts rewired to platform conventions** — Copy/cut/undo/redo
+  in Edit mode now use `Ctrl+C` / `Ctrl+X` / `Ctrl+Z` / `Ctrl+Shift+Z`, and the
+  caret is drawn with the terminal's hardware cursor for reliable visibility.
+- Refreshed in-app docs, footer labels and the version bump.
+
+### Fixed
+
+- **Homebrew tap checkout uses `actions/checkout@v5`** in the release workflow,
+  for GitHub Actions Node 24 compatibility.
+
+## Version 0.96.1 (12.06.2026)
+
+### Added
+
+- **Automated Homebrew formula bump** — The release pipeline now updates the
+  `eqms/homebrew-claude-workbench` tap formula (download URLs + SHA256 checksums)
+  automatically after a release, instead of requiring a manual edit.
+
+## Version 0.96.0 (12.06.2026)
+
+### Fixed
+
+- **Mouse wheel reaches PTY apps that enable mouse tracking** — Wheel events are
+  now forwarded to embedded programs (e.g. less, vim, Claude Code's fullscreen UI)
+  when they request mouse tracking, instead of being swallowed by the pane.
+
+### Changed
+
+- Batch-export flash messages are now in English; resolved clippy 1.96
+  `collapsible_match` warnings.
+
+## Version 0.95.0 (11.06.2026)
+
+### Added
+
+- **Folder batch export** — `Ctrl+X` on a directory in the file browser exports
+  its contents in one step.
+
+### Fixed
+
+- **File-browser scroll offset preserved on folder expand/collapse**, so the
+  viewport no longer jumps when toggling a directory.
+- **PDF export bundles a DejaVu Sans fallback font** so symbol glyphs that the
+  primary font lacks render correctly instead of as tofu boxes.
+
+### Changed
+
+- CI security tooling: `rustsec/audit-check` action, a dedicated `cargo-deny`
+  job, and `softprops/action-gh-release@v3`.
+
+## Version 0.94.0 (11.06.2026)
+
+### Changed
+
+- **Dependency and toolchain updates** — `self_update` 0.44, `dirs` 6, MSRV
+  raised to 1.85, and a `deny.toml` added for `cargo-deny` license/advisory
+  gating.
+
+## Version 0.93.0 (11.06.2026)
+
+### Fixed
+
+- **Security audit hardening** — Quote PTY shell paths to prevent word-splitting,
+  filter stray carriage returns from PTY input, pin dependencies, and write
+  update logs to a proper temp directory.
+
+## Version 0.92.0 (08.06.2026)
+
+### Added
+
+- **`F9` in the shell pane copies the whole last command block** (command +
+  output) to the clipboard in one keystroke.
+
 ## Version 0.91.0 (02.06.2026)
 
 ### Fixed
