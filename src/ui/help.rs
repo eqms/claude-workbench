@@ -479,28 +479,32 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "  MC Edit Style Selection:",
+            "  Edit Mode Shortcuts:",
             Style::default().fg(Color::DarkGray),
         )),
         Line::from(vec![
             Span::styled("  Shift+↑/↓/←/→", Style::default().fg(Color::Green)),
-            Span::raw("Select text with cursor"),
+            Span::raw("Extend selection"),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+F3      ", Style::default().fg(Color::Green)),
-            Span::raw("Toggle block marking mode"),
+            Span::styled("  Ctrl+C       ", Style::default().fg(Color::Green)),
+            Span::raw("Copy selection, or current line if nothing selected"),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+F5      ", Style::default().fg(Color::Green)),
-            Span::raw("Copy selected block"),
+            Span::styled("  Ctrl+X       ", Style::default().fg(Color::Green)),
+            Span::raw("Cut selection, or current line if nothing selected"),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+F6      ", Style::default().fg(Color::Green)),
-            Span::raw("Move (cut) selected block"),
+            Span::styled("  Ctrl+V       ", Style::default().fg(Color::Green)),
+            Span::raw("Paste from clipboard"),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+F8      ", Style::default().fg(Color::Green)),
-            Span::raw("Delete selected block"),
+            Span::styled("  Ctrl+Z       ", Style::default().fg(Color::Green)),
+            Span::raw("Undo last change"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+Shift+Z ", Style::default().fg(Color::Green)),
+            Span::raw("Redo"),
         ]),
         Line::from(vec![
             Span::styled("  Ctrl+Y       ", Style::default().fg(Color::Green)),

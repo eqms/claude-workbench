@@ -1566,9 +1566,11 @@ fn render_edit_shortcuts(f: &mut Frame, area: Rect, block_marking: bool) {
             ("^C", "Copy"),
             ("^X", "Cut"),
             ("^V", "Paste"),
-            ("^F3", "EndBlk"),
-            ("^F8", "Del"),
             ("^Z", "Undo"),
+            ("^Y", "DelLn"),
+            ("^H", "S&R"),
+            ("^S", "Save"),
+            ("Esc", "Exit"),
         ]
     } else {
         vec![

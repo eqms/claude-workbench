@@ -84,12 +84,16 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 |-----|--------|
 | Ctrl+S | Save |
 | Ctrl+A | Toggle Autosave on/off |
-| Ctrl+Z | Undo |
-| Ctrl+C / Cmd+C | Copy selection to clipboard |
-| Ctrl+X / Cmd+X | Cut selection to clipboard |
+| Ctrl+Z | Undo last change |
+| Ctrl+Shift+Z | Redo |
+| Ctrl+C / Cmd+C | Copy selection, or current line if nothing selected |
+| Ctrl+X / Cmd+X | Cut selection, or current line if nothing selected |
 | Ctrl+V / Cmd+V | Paste from clipboard |
 | Ctrl+Y | Delete current line |
+| Shift+Arrow | Extend selection |
 | Esc | Exit (autosave if enabled, otherwise confirm) |
+
+Note: `Ctrl+C` and `Ctrl+X` without an active selection operate on the current line. `Ctrl+X` only triggers the export dialog in ReadOnly mode or FileBrowser — not in Edit mode.
 
 **Autosave Behavior:**
 - When autosave is ON, changes are saved automatically on: Esc (exit edit), file switch, directory change
@@ -98,15 +102,6 @@ Drag pane borders to resize interactively. Changes are saved automatically.
 - Footer right side shows `AUTO:ON` (green) or `AUTO:OFF` (dim) permanently
 - After autosave triggers, footer briefly shows `✓ SAVED` (green flash, 2s)
 - Toggle via Ctrl+A in edit mode or F8 Settings
-
-**Block Selection & MC Edit Legacy:**
-| Key | Action |
-|-----|--------|
-| Shift+Arrow | Select text |
-| Ctrl+F3 | Toggle block marking |
-| Ctrl+F5 | Copy block (legacy) |
-| Ctrl+F6 | Move (cut) block (legacy) |
-| Ctrl+F8 | Delete block |
 
 **Horizontal Scrolling:** Use `h`/`l` keys or `Shift+Scroll` for horizontal scrolling in Edit mode.
 
