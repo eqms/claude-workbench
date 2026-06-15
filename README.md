@@ -107,6 +107,10 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v0.97.0
+
+- **Standard copy/cut/paste/undo in Edit mode.** Replaced the MC-Edit Ctrl+F3/F5/F6/F8 block shortcuts (broken due to global F-key collision) with standard Ctrl+C / Ctrl+X / Ctrl+Z / Ctrl+Shift+Z. `Ctrl+C` and `Ctrl+X` without a selection act on the current line. `Ctrl+X` no longer opens the export dialog when the Preview pane is in Edit mode — that shortcut is reserved for ReadOnly Preview and FileBrowser. Hardware cursor via `f.set_cursor_position()` fixes the invisible cursor in Terminus and certain iTerm2 configurations.
+
 ### What's New in v0.96.0
 
 - **Mouse-wheel scrolling works again in the Claude pane (tmux-like wheel forwarding).** Claude Code ≥2.1.89 renders in the alternate screen with mouse tracking enabled by default; the local scrollback buffer is empty there, so wheel events used to vanish. Workbench now inspects the inner application's terminal state per wheel tick: if the app has mouse tracking enabled (Claude Code fullscreen renderer, LazyGit), the wheel event is forwarded to the application as an SGR/X10 mouse sequence so it scrolls its own view; on the alternate screen without mouse tracking (`less`, `vim`) arrow keys are sent instead; otherwise (plain shell) the wheel scrolls the local scrollback exactly as before. `Shift+PgUp/PgDn` still always scrolls the local buffer. As a side effect, wheel scrolling in the LazyGit pane now drives LazyGit's own list scrolling natively.

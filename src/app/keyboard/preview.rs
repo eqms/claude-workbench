@@ -186,12 +186,13 @@ impl App {
             && (key.modifiers.contains(KeyModifiers::SUPER)
                 || key.modifiers.contains(KeyModifiers::CONTROL))
         {
-            self.preview.copy_block();
+            self.preview.copy_selection_or_line();
         } else if key.code == KeyCode::Char('x')
             && (key.modifiers.contains(KeyModifiers::SUPER)
                 || key.modifiers.contains(KeyModifiers::CONTROL))
+            && !key.modifiers.contains(KeyModifiers::SHIFT)
         {
-            self.preview.move_block();
+            self.preview.cut_selection_or_line();
             self.preview.update_modified();
             self.preview.update_edit_highlighting(&self.syntax_manager);
         } else if key.code == KeyCode::Char('v')
@@ -201,18 +202,24 @@ impl App {
             self.preview.paste_from_clipboard();
             self.preview.update_modified();
             self.preview.update_edit_highlighting(&self.syntax_manager);
-        } else if key.code == KeyCode::F(3) && key.modifiers.contains(KeyModifiers::CONTROL) {
-            self.preview.toggle_block_marking();
-        } else if key.code == KeyCode::F(5) && key.modifiers.contains(KeyModifiers::CONTROL) {
-            self.preview.copy_block();
+        } else if key.code == KeyCode::Char('z')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && !key.modifiers.contains(KeyModifiers::SHIFT)
+        {
+            // Ctrl+Z: undo
+            if let Some(editor) = &mut self.preview.editor {
+                editor.undo();
+            }
             self.preview.update_modified();
             self.preview.update_edit_highlighting(&self.syntax_manager);
-        } else if key.code == KeyCode::F(6) && key.modifiers.contains(KeyModifiers::CONTROL) {
-            self.preview.move_block();
-            self.preview.update_modified();
-            self.preview.update_edit_highlighting(&self.syntax_manager);
-        } else if key.code == KeyCode::F(8) && key.modifiers.contains(KeyModifiers::CONTROL) {
-            self.preview.delete_block();
+        } else if key.code == KeyCode::Char('z')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && key.modifiers.contains(KeyModifiers::SHIFT)
+        {
+            // Ctrl+Shift+Z: redo
+            if let Some(editor) = &mut self.preview.editor {
+                editor.redo();
+            }
             self.preview.update_modified();
             self.preview.update_edit_highlighting(&self.syntax_manager);
         } else if key.modifiers.contains(KeyModifiers::SHIFT) {

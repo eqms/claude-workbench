@@ -125,6 +125,10 @@ impl App {
 
         // Ctrl+X: Export current Markdown file or batch-export a folder
         if key.code == KeyCode::Char('x') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            // Guard: let the edit handler consume Ctrl+X as cut when in Edit mode
+            if self.active_pane == PaneId::Preview && self.preview.mode == EditorMode::Edit {
+                return false;
+            }
             // Priority 1: FileBrowser pane has focus AND selected entry is a directory (not "..")
             if self.active_pane == PaneId::FileBrowser {
                 if let Some(entry) = self.file_browser.selected_entry() {
