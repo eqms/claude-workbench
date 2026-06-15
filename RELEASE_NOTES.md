@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased
+## Version 0.98.0 (15.06.2026)
 
 ### Changed
 
