@@ -1,5 +1,6 @@
 //! Binary installation and restart logic.
 
+use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 
@@ -10,6 +11,53 @@ use super::log::log_update;
 use super::state::UpdateResult;
 use super::version::CURRENT_VERSION;
 use super::{BIN_NAME, REPO_NAME, REPO_OWNER};
+
+/// Probe whether `dir` is writable by creating (and immediately removing) a
+/// temporary file in it.
+///
+/// This mirrors exactly what the atomic self-replace needs: it writes a temp file
+/// next to the binary and renames it over the current executable, so the *parent
+/// directory* must be writable. Checking permission bits alone is not enough
+/// (ownership, ACLs, read-only mounts), so we test the real capability.
+fn probe_dir_writable(dir: &Path) -> std::io::Result<()> {
+    let file = tempfile::Builder::new()
+        .prefix(".cw-update-probe")
+        .tempfile_in(dir)?;
+    drop(file); // removes the probe file immediately
+    Ok(())
+}
+
+/// Preflight check: verify the running binary can actually be replaced in place.
+///
+/// A common failure is a system-wide install under a root-owned directory
+/// (e.g. `/usr/local/bin`): the download succeeds but the in-place replace fails.
+/// Without this check the update appears to do nothing ("shown but not performed").
+/// Detect it up front and return a clear, actionable message.
+fn ensure_exe_writable() -> Result<(), String> {
+    let exe = std::env::current_exe()
+        .map_err(|e| format!("Cannot determine the executable path: {}", e))?;
+    let dir = exe
+        .parent()
+        .ok_or_else(|| format!("Executable {} has no parent directory", exe.display()))?;
+
+    match probe_dir_writable(dir) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Err(format!(
+            "Update blocked: the directory containing the program is not writable.\n\
+             Binary:    {}\n\
+             Directory: {}\n\n\
+             You are probably running a system-wide install owned by root. Reinstall into a \
+             user-writable location, or run the user copy (e.g. ~/.local/bin/claude-workbench).",
+            exe.display(),
+            dir.display()
+        )),
+        Err(e) => Err(format!(
+            "Update blocked: cannot write next to the program at {} ({}).",
+            dir.display(),
+            e
+        )),
+    }
+}
 
 /// Perform the actual update (blocking)
 ///
@@ -30,6 +78,14 @@ pub fn perform_update_sync() -> UpdateResult {
     log_update(&format!("Context: {}", context));
     log_update(&format!("Repo: {}/{}", REPO_OWNER, REPO_NAME));
     log_update(&format!("Binary name: {}", BIN_NAME));
+
+    // Preflight: fail loudly if the binary cannot be replaced in place, instead
+    // of letting the download succeed and the silent replace fail afterwards.
+    if let Err(msg) = ensure_exe_writable() {
+        let error_msg = format!("{}\n\n[{}]", msg, context);
+        log_update(&format!("PREFLIGHT FAILED (not writable): {}", error_msg));
+        return UpdateResult::Error(error_msg);
+    }
 
     log_update("Creating Update configuration...");
 
@@ -101,6 +157,13 @@ pub fn perform_update_to_version_sync(target_version: &str) -> UpdateResult {
     };
 
     log_update(&format!("Target tag: {}", target_tag));
+
+    // Preflight: same writability guard as perform_update_sync().
+    if let Err(msg) = ensure_exe_writable() {
+        let error_msg = format!("{}\n\n[{}]", msg, context);
+        log_update(&format!("PREFLIGHT FAILED (not writable): {}", error_msg));
+        return UpdateResult::Error(error_msg);
+    }
 
     match Update::configure()
         .repo_owner(REPO_OWNER)
@@ -276,6 +339,36 @@ pub fn restart_application() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn probe_dir_writable_ok_on_tempdir() {
+        let dir = tempfile::tempdir().expect("create tempdir");
+        assert!(probe_dir_writable(dir.path()).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn probe_dir_writable_errors_on_readonly_dir() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Root ignores permission bits, so a read-only dir would still be writable.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+
+        let dir = tempfile::tempdir().expect("create tempdir");
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o500))
+            .expect("set read-only perms");
+
+        let result = probe_dir_writable(dir.path());
+
+        // Restore writable perms so the tempdir can clean itself up on drop.
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))
+            .expect("restore perms");
+
+        let err = result.expect_err("read-only dir must not be writable");
+        assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    }
 
     #[test]
     fn test_filter_restart_args_removes_one_shot_flags() {

@@ -313,14 +313,17 @@ Tests update detection without actual download:
 
 ### Log File
 
-Update operations write detailed logs for debugging:
+Update operations write detailed logs for debugging. The log lives under the
+platform cache directory (`dirs::cache_dir()/claude-workbench/update.log`):
+- macOS: `~/Library/Caches/claude-workbench/update.log`
+- Linux: `~/.cache/claude-workbench/update.log`
 
 ```bash
-# View update log
-cat /tmp/claude-workbench-update.log
+# View update log (macOS)
+cat ~/Library/Caches/claude-workbench/update.log
 
-# Watch log in real-time
-tail -f /tmp/claude-workbench-update.log
+# Watch log in real-time (Linux)
+tail -f ~/.cache/claude-workbench/update.log
 ```
 
 ### Troubleshooting
@@ -467,7 +470,7 @@ A Rust-based TUI (Terminal User Interface) multiplexer that gives developers an 
 ## Logging
 - `println!` used only in CLI diagnostic modes (`--check-update`, `--clipboard-diag`) in `src/main.rs`
 - TUI operation: no stdout/stderr logging during normal operation (would corrupt terminal rendering)
-- Update operations write to `/tmp/claude-workbench-update.log` via `src/update/log.rs`
+- Update operations write to `dirs::cache_dir()/claude-workbench/update.log` (macOS `~/Library/Caches/...`, Linux `~/.cache/...`) via `src/update/log.rs`
 - Errors that cannot be surfaced to the user are silently dropped (by design — TUI constraint)
 ## Comments
 ## Function Design

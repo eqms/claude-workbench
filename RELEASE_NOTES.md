@@ -1,5 +1,17 @@
 # Release Notes
 
+## Unreleased
+
+### Changed
+
+- **Self-update fails loudly when the binary can't be replaced** — A preflight
+  check now verifies the running binary's directory is writable before downloading.
+  If you are running a system-wide install under a root-owned directory
+  (e.g. `/usr/local/bin`), the update previously appeared to do nothing — the
+  download succeeded but the in-place replace failed silently. It now surfaces a
+  clear, actionable message naming the binary and directory instead. User-writable
+  installs (e.g. `~/.local/bin`) are unaffected.
+
 ## Version 0.98.0 (15.06.2026)
 
 ### Changed
