@@ -1,5 +1,23 @@
 # Release Notes
 
+## Unreleased
+
+### Changed
+
+- **Homebrew tap auto-update is now robust against formula drift** — The
+  `update-homebrew-tap` job in the release workflow previously rewrote the four
+  `sha256` checksums by line position (1st–4th `sha256` line). If the formula's
+  block order ever changed, that silently wrote the wrong checksum to the wrong
+  platform. The job now binds each checksum to the build target named in the
+  *preceding* `url` line and fails the run — instead of corrupting the formula —
+  if any of the four targets is not matched. The release-asset download no longer
+  hardcodes the repository slug (`${{ github.repository }}` replaces a literal
+  `owner/repo`), so a repo rename or transfer no longer breaks it. An added
+  assertion verifies all four download URLs point at the new tag, and the rewrite
+  uses only portable awk features (no `gawk`-specific `match()` captures or `{n}`
+  interval expressions) so it behaves identically under mawk, gawk and BSD awk.
+  No user-facing behavior change — `brew install` / `brew upgrade` are unaffected.
+
 ## Version 0.91.0 (02.06.2026)
 
 ### Fixed
