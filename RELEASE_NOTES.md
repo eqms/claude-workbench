@@ -1,5 +1,29 @@
 # Release Notes
 
+## Version 1.0.0 (19.06.2026) 🎉
+
+First stable release.
+
+### Fixed
+
+- **PDF export: table text no longer overlaps neighbouring columns** — In wide
+  tables, inline code (e.g. field names like `GesamtUEGruppen`, `KOSTENTRAEGER`)
+  was rendered as an atomic chip that never wrapped and spilled into the next
+  column. Inside tables, code is now emitted as breakable text and long
+  identifiers receive break opportunities (after separators, at camelCase
+  boundaries, and as a hard fallback for long lowercase runs). German hyphenation
+  is enabled so long compound words (`Kostenträgernummer`, `Veranstaltungsort`)
+  break with a hyphen instead of overflowing. Inline code in normal prose keeps
+  its styled chip — unchanged.
+
+### Added
+
+- **Per-side PDF page margins** — In addition to the uniform `Page Margin`, the
+  four sides (top/right/bottom/left) can now be set independently under
+  **F8 → Document**. Leave a side empty to inherit the uniform value. Narrower
+  left/right margins give wide tables more room. Existing `config.yaml` files load
+  unchanged (the new fields default to the uniform margin).
+
 ## Version 0.99.0 (15.06.2026)
 
 ### Changed

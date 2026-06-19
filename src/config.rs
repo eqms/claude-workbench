@@ -591,9 +591,20 @@ pub struct PdfPageConfig {
     /// Page size (e.g. "A4", "Letter")
     #[serde(default = "default_page_size")]
     pub page_size: String,
-    /// Page margin (e.g. "2.5cm", "1in")
+    /// Uniform page margin fallback (e.g. "2.5cm", "1in"). Used for any side
+    /// whose dedicated per-side value below is left empty.
     #[serde(default = "default_page_margin")]
     pub margin: String,
+    /// Per-side page margins. Empty string → fall back to `margin`.
+    /// Kept optional with empty default so older config.yaml files load unchanged.
+    #[serde(default)]
+    pub margin_top: String,
+    #[serde(default)]
+    pub margin_right: String,
+    #[serde(default)]
+    pub margin_bottom: String,
+    #[serde(default)]
+    pub margin_left: String,
 }
 
 fn default_page_size() -> String {
@@ -603,11 +614,38 @@ fn default_page_margin() -> String {
     "2.5cm".to_string()
 }
 
+impl PdfPageConfig {
+    /// Resolve the four page margins as `(top, right, bottom, left)`.
+    ///
+    /// Each side uses its dedicated per-side value when non-empty, otherwise
+    /// falls back to the uniform `margin`. With a default config this yields
+    /// `2.5cm` on all sides — identical to the previous single-margin behaviour.
+    pub fn resolved_margins(&self) -> (String, String, String, String) {
+        let pick = |side: &str| -> String {
+            if side.trim().is_empty() {
+                self.margin.clone()
+            } else {
+                side.trim().to_string()
+            }
+        };
+        (
+            pick(&self.margin_top),
+            pick(&self.margin_right),
+            pick(&self.margin_bottom),
+            pick(&self.margin_left),
+        )
+    }
+}
+
 impl Default for PdfPageConfig {
     fn default() -> Self {
         Self {
             page_size: default_page_size(),
             margin: default_page_margin(),
+            margin_top: String::new(),
+            margin_right: String::new(),
+            margin_bottom: String::new(),
+            margin_left: String::new(),
         }
     }
 }

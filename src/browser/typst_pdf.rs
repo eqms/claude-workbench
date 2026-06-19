@@ -39,7 +39,7 @@ static DEJAVU_SANS_REGULAR: &[u8] = include_bytes!("../../assets/fonts/DejaVuSan
 const TYPST_TEMPLATE: &str = r##"
 #set page(
   paper: "{page_size}",
-  margin: (left: {margin}, right: {margin}, top: {margin}, bottom: {margin}),
+  margin: (left: {margin_left}, right: {margin_right}, top: {margin_top}, bottom: {margin_bottom}),
   header: [
     #set text(font: ("{font_family}", "Carlito", "Liberation Sans", "DejaVu Sans"), size: {header_size}, fill: rgb("{header_border}"))
     {title}
@@ -61,6 +61,9 @@ const TYPST_TEMPLATE: &str = r##"
 )
 
 #set text(font: ("{font_family}", "Carlito", "Liberation Sans", "DejaVu Sans"), size: {body_size}, lang: "de")
+// Hyphenate long German compounds so they break inside narrow table columns
+// (lang "de" above provides the hyphenation patterns).
+#set text(hyphenate: true)
 #set par(justify: true, leading: 0.65em)
 #set heading(numbering: none)
 
@@ -373,7 +376,19 @@ impl TypstRenderer {
 
                 // --- Inline code ---
                 Event::Code(text) => {
-                    r.push_to_active(&format!("`{}`", text));
+                    if r.in_table {
+                        // Table blocks already render every cell in the code font,
+                        // so the atomic chip box adds no visual cue here — it only
+                        // overflows (a box never line-breaks). Emit the identifier
+                        // as breakable plain text with ZWSP break opportunities so
+                        // it wraps inside the column instead of overlapping the
+                        // neighbouring cell.
+                        r.cell_buf.push_str(&typst_escape(&break_code_token(&text)));
+                    } else {
+                        // Prose: keep the atomic chip box (v0.91.0) so inline code
+                        // does not get its spaces stretched by paragraph justify.
+                        r.push_to_active(&format!("`{}`", text));
+                    }
                 }
 
                 // --- Links ---
@@ -630,6 +645,45 @@ fn insert_break_opportunities(s: &str) -> String {
     result
 }
 
+/// Insert ZWSP break opportunities into a code identifier rendered in a table cell.
+///
+/// Stronger than [`insert_break_opportunities`] because code identifiers in narrow
+/// columns overflow in ways prose does not: `camelCase` names have no separator
+/// (`GesamtUEGruppen`), and reused lowercase identifiers can be long with no break
+/// point at all (`niederlassungsleitung`). Inserts U+200B:
+/// - after the separators `_ - / . ,`
+/// - before an uppercase letter that follows a lowercase one (camelCase boundary)
+/// - as a hard fallback, after every `MAX_RUN` characters without a break, so any
+///   unbroken run is guaranteed to wrap.
+///
+/// ZWSP is invisible and survives `typst_escape` unchanged, so this is applied to
+/// the raw text before escaping.
+fn break_code_token(s: &str) -> String {
+    const MAX_RUN: usize = 9;
+    let mut result = String::with_capacity(s.len());
+    let mut run: usize = 0;
+    let mut prev_lower = false;
+    for c in s.chars() {
+        // camelCase boundary: break *before* this uppercase char.
+        if prev_lower && c.is_uppercase() {
+            result.push('\u{200B}');
+            run = 0;
+        }
+        result.push(c);
+        run += 1;
+        if matches!(c, '_' | '-' | '/' | '.' | ',') {
+            result.push('\u{200B}');
+            run = 0;
+        } else if run >= MAX_RUN {
+            // Hard fallback for long separator-less runs (e.g. lowercase ids).
+            result.push('\u{200B}');
+            run = 0;
+        }
+        prev_lower = c.is_lowercase();
+    }
+    result
+}
+
 /// Build a Typst-compatible font list from a CSS font-family string.
 ///
 /// Parses entries like `'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace`
@@ -669,9 +723,14 @@ fn build_typst_document(body: &str, options: &ExportOptions, doc: &DocumentConfi
 
     let code_font_list = build_code_font_list(&doc.fonts.code);
 
+    let (margin_top, margin_right, margin_bottom, margin_left) = doc.pdf.resolved_margins();
+
     TYPST_TEMPLATE
         .replace("{page_size}", &doc.pdf.page_size.to_lowercase())
-        .replace("{margin}", &doc.pdf.margin)
+        .replace("{margin_top}", &margin_top)
+        .replace("{margin_right}", &margin_right)
+        .replace("{margin_bottom}", &margin_bottom)
+        .replace("{margin_left}", &margin_left)
         .replace("{header_border}", &doc.colors.header_border)
         .replace("{header_size}", &doc.sizes.header)
         .replace("{footer_color}", &doc.colors.footer)
@@ -899,6 +958,79 @@ mod tests {
         );
         // ZWSP must follow each underscore separator.
         assert!(result.contains("get\\_\u{200B}product"));
+    }
+
+    #[test]
+    fn test_break_code_token_camel_case() {
+        // camelCase identifiers get a ZWSP before each lowercase→uppercase boundary.
+        let out = break_code_token("GesamtUEGruppen");
+        assert!(out.contains("Gesamt\u{200B}UEGruppen"), "got {:?}", out);
+    }
+
+    #[test]
+    fn test_break_code_token_separators() {
+        // Separators _ - / . , each get a trailing ZWSP.
+        let out = break_code_token("ab_cd-ef/gh.ij,kl");
+        for sep in ["_", "-", "/", ".", ","] {
+            assert!(
+                out.contains(&format!("{sep}\u{200B}")),
+                "separator {sep} missing ZWSP in {out:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_break_code_token_long_lowercase_fallback() {
+        // A long separator-less lowercase identifier must still get break points.
+        let out = break_code_token("niederlassungsleitung");
+        assert!(
+            out.contains('\u{200B}'),
+            "expected fallback ZWSP in long lowercase id, got {out:?}"
+        );
+    }
+
+    #[test]
+    fn test_inline_code_in_table_is_breakable_plain_text() {
+        // Inline code inside a table must NOT be emitted as a raw chip (backticks);
+        // it is plain breakable text with ZWSP opportunities instead.
+        let doc = DocumentConfig::default();
+        let md = "| Feld |\n|---|\n| `GesamtUEGruppen` |\n";
+        let result = TypstRenderer::render(md, &doc);
+        assert!(
+            result.contains("Gesamt\u{200B}UEGruppen"),
+            "expected breakable code token, got {result:?}"
+        );
+        assert!(
+            !result.contains("`GesamtUEGruppen`"),
+            "inline code in table must not keep raw backticks"
+        );
+    }
+
+    #[test]
+    fn test_inline_code_in_prose_keeps_chip() {
+        // Outside tables, inline code keeps the atomic raw chip (v0.91.0 behaviour).
+        let doc = DocumentConfig::default();
+        let result = TypstRenderer::render("Use `cargo build` now", &doc);
+        assert!(result.contains("`cargo build`"));
+    }
+
+    #[test]
+    fn test_build_typst_document_per_side_margins() {
+        // resolved_margins() feeds all four sides; default config → uniform 2.5cm.
+        let doc = DocumentConfig::default();
+        let options = ExportOptions {
+            title: "T".to_string(),
+            author: "A".to_string(),
+            date: "01.01.2026".to_string(),
+            format: crate::browser::pdf_export::ExportFormat::Pdf,
+        };
+        let result = build_typst_document("x", &options, &doc);
+        assert!(result.contains("left: 2.5cm"));
+        assert!(result.contains("right: 2.5cm"));
+        assert!(result.contains("top: 2.5cm"));
+        assert!(result.contains("bottom: 2.5cm"));
+        // No unsubstituted placeholders left.
+        assert!(!result.contains("{margin"));
     }
 
     /// Verify that every character in the required Unicode symbol set is covered

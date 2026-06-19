@@ -301,8 +301,18 @@ document:
     table_header_bg: "#D5E8F0"
   pdf:
     page_size: "A4"
-    margin: "2.5cm"
+    margin: "2.5cm"          # uniform fallback for all sides
+    # Optional per-side overrides (empty → use `margin`):
+    margin_top: ""
+    margin_right: ""
+    margin_bottom: ""
+    margin_left: ""
 ```
+
+> **Page margins** are editable in the TUI under **F8 → Document**. `Page Margin
+> (all sides)` sets a uniform margin; the four `Margin Top/Right/Bottom/Left`
+> fields override individual sides (leave empty to inherit the uniform value).
+> Narrower left/right margins give wide tables more room.
 
 ### Tech Stack
 

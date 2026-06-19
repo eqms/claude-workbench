@@ -109,6 +109,10 @@ pub enum SettingsField {
     DocTableBorder,
     DocPageSize,
     DocPageMargin,
+    DocMarginTop,
+    DocMarginRight,
+    DocMarginBottom,
+    DocMarginLeft,
     // SSH
     SshEnabled,
     SshHelperPath,
@@ -204,6 +208,10 @@ pub struct SettingsState {
     pub doc_table_border: String,
     pub doc_page_size: String,
     pub doc_page_margin: String,
+    pub doc_margin_top: String,
+    pub doc_margin_right: String,
+    pub doc_margin_bottom: String,
+    pub doc_margin_left: String,
     // SSH settings (cached editable copies)
     pub ssh_enabled: bool,
     pub ssh_helper_path: String,
@@ -261,6 +269,10 @@ impl Default for SettingsState {
             doc_table_border: "#999999".to_string(),
             doc_page_size: "A4".to_string(),
             doc_page_margin: "2.5cm".to_string(),
+            doc_margin_top: String::new(),
+            doc_margin_right: String::new(),
+            doc_margin_bottom: String::new(),
+            doc_margin_left: String::new(),
             ssh_enabled: true,
             ssh_helper_path: String::new(),
             ssh_notification_dismissed: false,
@@ -324,6 +336,10 @@ impl SettingsState {
         self.doc_table_border = config.document.colors.table_border.clone();
         self.doc_page_size = config.document.pdf.page_size.clone();
         self.doc_page_margin = config.document.pdf.margin.clone();
+        self.doc_margin_top = config.document.pdf.margin_top.clone();
+        self.doc_margin_right = config.document.pdf.margin_right.clone();
+        self.doc_margin_bottom = config.document.pdf.margin_bottom.clone();
+        self.doc_margin_left = config.document.pdf.margin_left.clone();
         // SSH
         self.ssh_enabled = config.ssh.enabled;
         self.ssh_helper_path = config.ssh.image_paste_helper.clone().unwrap_or_default();
@@ -367,6 +383,10 @@ impl SettingsState {
         config.document.colors.table_border = self.doc_table_border.clone();
         config.document.pdf.page_size = self.doc_page_size.clone();
         config.document.pdf.margin = self.doc_page_margin.clone();
+        config.document.pdf.margin_top = self.doc_margin_top.clone();
+        config.document.pdf.margin_right = self.doc_margin_right.clone();
+        config.document.pdf.margin_bottom = self.doc_margin_bottom.clone();
+        config.document.pdf.margin_left = self.doc_margin_left.clone();
         // SSH
         config.ssh.enabled = self.ssh_enabled;
         config.ssh.image_paste_helper = if self.ssh_helper_path.is_empty() {
@@ -415,7 +435,7 @@ impl SettingsState {
             SettingsCategory::General => 6, // shell, scrollback, hidden, autosave, auto-refresh, check updates
             SettingsCategory::Layout => 4,  // file_browser, preview, right_panel, claude_height
             SettingsCategory::Paths => 5,   // claude, lazygit, browser, external_editor, export_dir
-            SettingsCategory::Document => 19,
+            SettingsCategory::Document => 23,
             SettingsCategory::Ssh => 3, // enabled, helper path, reset hint
             SettingsCategory::About => 0,
         }
@@ -485,6 +505,10 @@ impl SettingsState {
                 16 => Some(SettingsField::DocTableBorder),
                 17 => Some(SettingsField::DocPageSize),
                 18 => Some(SettingsField::DocPageMargin),
+                19 => Some(SettingsField::DocMarginTop),
+                20 => Some(SettingsField::DocMarginRight),
+                21 => Some(SettingsField::DocMarginBottom),
+                22 => Some(SettingsField::DocMarginLeft),
                 _ => None,
             },
             SettingsCategory::Ssh => match self.selected_idx {
@@ -554,6 +578,10 @@ impl SettingsState {
                 SettingsField::DocTableBorder => self.doc_table_border.clone(),
                 SettingsField::DocPageSize => self.doc_page_size.clone(),
                 SettingsField::DocPageMargin => self.doc_page_margin.clone(),
+                SettingsField::DocMarginTop => self.doc_margin_top.clone(),
+                SettingsField::DocMarginRight => self.doc_margin_right.clone(),
+                SettingsField::DocMarginBottom => self.doc_margin_bottom.clone(),
+                SettingsField::DocMarginLeft => self.doc_margin_left.clone(),
                 SettingsField::SshHelperPath => self.ssh_helper_path.clone(),
                 SettingsField::Browser | SettingsField::ExternalEditor => unreachable!(),
                 SettingsField::CheckForUpdates => {
@@ -772,6 +800,10 @@ impl SettingsState {
                 SettingsField::DocTableBorder => self.doc_table_border = value,
                 SettingsField::DocPageSize => self.doc_page_size = value,
                 SettingsField::DocPageMargin => self.doc_page_margin = value,
+                SettingsField::DocMarginTop => self.doc_margin_top = value,
+                SettingsField::DocMarginRight => self.doc_margin_right = value,
+                SettingsField::DocMarginBottom => self.doc_margin_bottom = value,
+                SettingsField::DocMarginLeft => self.doc_margin_left = value,
                 SettingsField::SshHelperPath => self.ssh_helper_path = value,
                 SettingsField::CheckForUpdates => {} // Action, not a field to edit
                 SettingsField::SshEnabled | SettingsField::ResetSshHint => {} // Toggled inline above
@@ -1218,10 +1250,38 @@ fn render_document(frame: &mut Frame, area: Rect, state: &SettingsState) {
             &state.input_buffer,
         ),
         format_setting(
-            "Page Margin",
+            "Page Margin (all sides)",
             &state.doc_page_margin,
             state.selected_idx == 18,
             state.editing.as_ref() == Some(&SettingsField::DocPageMargin),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Margin Top (empty=all)",
+            &state.doc_margin_top,
+            state.selected_idx == 19,
+            state.editing.as_ref() == Some(&SettingsField::DocMarginTop),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Margin Right (empty=all)",
+            &state.doc_margin_right,
+            state.selected_idx == 20,
+            state.editing.as_ref() == Some(&SettingsField::DocMarginRight),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Margin Bottom (empty=all)",
+            &state.doc_margin_bottom,
+            state.selected_idx == 21,
+            state.editing.as_ref() == Some(&SettingsField::DocMarginBottom),
+            &state.input_buffer,
+        ),
+        format_setting(
+            "Margin Left (empty=all)",
+            &state.doc_margin_left,
+            state.selected_idx == 22,
+            state.editing.as_ref() == Some(&SettingsField::DocMarginLeft),
             &state.input_buffer,
         ),
     ];
