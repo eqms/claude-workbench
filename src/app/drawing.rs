@@ -186,6 +186,7 @@ impl App {
                 clipboard_error,
                 clipboard_warning,
                 ssh_image_paste_hint,
+                terminal_prefix_armed: self.terminal_prefix_armed,
             };
             frame.render_widget(footer_widget, footer);
         }

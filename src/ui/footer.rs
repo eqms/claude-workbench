@@ -66,6 +66,9 @@ pub struct Footer {
     /// One-time hint shown after Ctrl+V in the Claude pane during an SSH
     /// session (10 s, yellow). Explains that image paste needs a helper.
     pub ssh_image_paste_hint: Option<String>,
+    /// True while the terminal-pane prefix (Ctrl+B) is armed — shows the
+    /// available prefix commands as a cyan banner.
+    pub terminal_prefix_armed: bool,
 }
 
 /// Format current date/time for footer display
@@ -130,6 +133,7 @@ impl Default for Footer {
             clipboard_error: None,
             clipboard_warning: None,
             ssh_image_paste_hint: None,
+            terminal_prefix_armed: false,
         }
     }
 }
@@ -333,7 +337,27 @@ impl Widget for Footer {
         let datetime_text = format_datetime();
         let version = env!("CARGO_PKG_VERSION");
 
-        let right_spans = if let Some(ref msg) = self.clipboard_warning {
+        let right_spans = if self.terminal_prefix_armed {
+            // Terminal prefix armed — cyan command cheat-sheet
+            use ratatui::style::Modifier;
+            vec![
+                Span::styled(
+                    format!(" {} │ ", datetime_text),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+                Span::styled(
+                    " ^B  1-6 Panes · ? Help · s Select · c Copy · ^B literal ",
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" │ v{} ", version),
+                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                ),
+            ]
+        } else if let Some(ref msg) = self.clipboard_warning {
             // Persistent banner for missing clipboard helpers — yellow ⚠
             use ratatui::style::Modifier;
             vec![

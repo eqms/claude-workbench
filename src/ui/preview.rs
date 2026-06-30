@@ -657,7 +657,7 @@ impl PreviewState {
     pub fn paste_from_clipboard(&mut self) {
         if let Some(editor) = &mut self.editor {
             if let Some(text) = crate::clipboard::paste_from_clipboard() {
-                editor.insert_str(&text);
+                editor.insert_str(crate::clipboard::sanitize_pasted_text(&text));
             }
         }
     }

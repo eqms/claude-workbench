@@ -559,6 +559,32 @@ fn help_content() -> Vec<Line<'static>> {
         ]),
         Line::from(""),
         Line::from(Span::styled(
+            "  User Terminal (F6) — Prefix Key (Ctrl+B):",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from("  Keys go straight to the shell/TUI app (nano, mc, vim)."),
+        Line::from(vec![
+            Span::styled("  Ctrl+B 1-6   ", Style::default().fg(Color::Cyan)),
+            Span::raw("Switch/toggle panes (same as F1-F6)"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+B ?     ", Style::default().fg(Color::Cyan)),
+            Span::raw("Help  ·  Ctrl+B s Select  ·  Ctrl+B c Copy"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+B Ctrl+B", Style::default().fg(Color::Cyan)),
+            Span::raw("Send a literal Ctrl+B to the terminal"),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+Q       ", Style::default().fg(Color::Cyan)),
+            Span::raw("Quit Workbench (always reserved)"),
+        ]),
+        Line::from(Span::styled(
+            "  (set pty.terminal_prefix: \"\" in config.yaml to disable)",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
             "  CLI Navigation:",
             Style::default().fg(Color::DarkGray),
         )),

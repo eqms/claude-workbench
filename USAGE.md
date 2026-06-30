@@ -122,6 +122,22 @@ Note: `Ctrl+C` and `Ctrl+X` without an active selection operate on the current l
 
 **Mouse-wheel scrolling:** When the inner application has mouse tracking enabled (Claude Code fullscreen renderer, LazyGit), wheel events are forwarded to the application so it scrolls its own view. On the alternate screen without mouse tracking (e.g. `less`, `vim`), arrow keys are sent instead. Otherwise (plain shell) the wheel scrolls the local scrollback buffer as before. `Shift+PgUp/PgDn` always scrolls the local scrollback.
 
+#### User Terminal Prefix Key (F6, Ctrl+B)
+
+In the **User Terminal pane (F6)** all keys — including **F1–F12** and **Ctrl+X / Ctrl+S / Ctrl+O / Ctrl+P / Ctrl+E** — are sent straight to the running program, so full-screen TUIs like **nano**, **mc** (Midnight Commander) and **vim** work correctly. Workbench commands are reached through a tmux-style prefix:
+
+| Key | Action |
+|-----|--------|
+| Ctrl+B 1 / 2 / 3 | Toggle File Browser / Preview / Maximize Preview |
+| Ctrl+B 4 / 5 / 6 | Focus Claude / Toggle LazyGit / Toggle Terminal |
+| Ctrl+B ? (or h) | Help |
+| Ctrl+B s | Start terminal selection |
+| Ctrl+B c | Copy last command output |
+| Ctrl+B Ctrl+B | Send a literal Ctrl+B to the terminal |
+| Ctrl+Q | Quit Workbench (always reserved, never passed through) |
+
+While the prefix is armed, the footer shows the available commands. This only affects the **User Terminal** — the **Claude** and **LazyGit** panes keep the regular shortcuts. Set `pty.terminal_prefix: ""` (or `"none"`) in `config.yaml` to disable passthrough and restore the legacy behavior; the default is `"ctrl+b"`.
+
 #### Selection Mode (Ctrl+S in Terminal/Preview)
 | Key | Action |
 |-----|--------|
@@ -429,6 +445,22 @@ Ziehen Sie Bereichsgrenzen zum interaktiven Ändern der Größe. Änderungen wer
 | PageDown | An Zeilenende springen (End) |
 
 **Mausrad-Scrollen:** Hat die innere Anwendung Mouse-Tracking aktiviert (Claude Code Fullscreen-Renderer, LazyGit), werden Wheel-Events an die Anwendung weitergeleitet, die dann selbst scrollt. Im Alternate Screen ohne Mouse-Tracking (z. B. `less`, `vim`) werden stattdessen Pfeiltasten gesendet. Andernfalls (normale Shell) scrollt das Mausrad wie bisher den lokalen Scrollback-Puffer. `Shift+PgUp/PgDn` scrollt immer den lokalen Scrollback.
+
+#### Benutzer-Terminal Prefix-Taste (F6, Ctrl+B)
+
+Im **Benutzer-Terminal-Bereich (F6)** gehen alle Tasten — inklusive **F1–F12** und **Ctrl+X / Ctrl+S / Ctrl+O / Ctrl+P / Ctrl+E** — direkt an das laufende Programm, sodass Vollbild-TUIs wie **nano**, **mc** (Midnight Commander) und **vim** korrekt funktionieren. Workbench-Befehle erreicht man über eine tmux-artige Prefix-Taste:
+
+| Taste | Aktion |
+|-------|--------|
+| Ctrl+B 1 / 2 / 3 | Dateibrowser / Vorschau / Vorschau maximieren umschalten |
+| Ctrl+B 4 / 5 / 6 | Claude fokussieren / LazyGit / Terminal umschalten |
+| Ctrl+B ? (oder h) | Hilfe |
+| Ctrl+B s | Terminal-Auswahl starten |
+| Ctrl+B c | Letzte Kommando-Ausgabe kopieren |
+| Ctrl+B Ctrl+B | Ein literales Ctrl+B an das Terminal senden |
+| Ctrl+Q | Workbench beenden (immer reserviert, wird nie durchgereicht) |
+
+Solange der Prefix „scharf" ist, zeigt die Fußzeile die verfügbaren Befehle. Dies betrifft nur das **Benutzer-Terminal** — die Bereiche **Claude** und **LazyGit** behalten die gewohnten Shortcuts. Mit `pty.terminal_prefix: ""` (oder `"none"`) in der `config.yaml` lässt sich das Durchreichen abschalten und das alte Verhalten wiederherstellen; Standard ist `"ctrl+b"`.
 
 #### Auswahlmodus (Ctrl+S in Terminal/Vorschau)
 | Taste | Aktion |

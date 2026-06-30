@@ -359,6 +359,52 @@ pub fn paste_from_clipboard() -> Option<String> {
     None
 }
 
+/// Strip invisible / control characters from text pasted into the in-app editor.
+///
+/// Zero-width and bidirectional-format codepoints (U+200B, U+FEFF, soft hyphen,
+/// …) render with zero width but still count as one character, so the editor's
+/// visible cursor drifts away from the real insertion point ("ghost cursor").
+/// We keep newlines and tabs, normalize CR / CRLF to a single LF, and drop
+/// every other control or invisible-format character.
+///
+/// Applied ONLY on the editor-insertion paths — text forwarded to a PTY
+/// (nano/vim/shell) is left byte-for-byte intact.
+pub(crate) fn sanitize_pasted_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\r' => {
+                // Normalize CRLF and a lone CR to a single LF.
+                if chars.peek() == Some(&'\n') {
+                    chars.next();
+                }
+                out.push('\n');
+            }
+            '\n' | '\t' => out.push(c),
+            _ if is_invisible_paste_char(c) => {} // drop zero-width / bidi marks
+            _ if c.is_control() => {}             // drop other control chars
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Zero-width, bidi-control and format characters that cause ghost-cursor drift.
+/// NBSP (U+00A0) is intentionally *not* listed — it renders with width 1.
+fn is_invisible_paste_char(c: char) -> bool {
+    matches!(c,
+        '\u{00AD}'                  // soft hyphen
+        | '\u{200B}'..='\u{200F}'   // ZWSP, ZWNJ, ZWJ, LRM, RLM
+        | '\u{202A}'..='\u{202E}'   // bidi embedding / override
+        | '\u{2060}'                // word joiner
+        | '\u{2066}'..='\u{2069}'   // bidi isolates
+        | '\u{FEFF}'                // BOM / zero-width no-break space
+        | '\u{FFF9}'..='\u{FFFB}'   // interlinear annotation anchors
+        | '\u{FFFE}' | '\u{FFFF}'   // noncharacters
+    )
+}
+
 fn try_xclip_copy(text: &str, errors: &mut Vec<String>) -> Option<ClipboardOutcome> {
     which("xclip")?;
     match run_with_stdin("xclip", &["-selection", "clipboard", "-i"], text) {
@@ -623,6 +669,36 @@ mod tests {
     fn test_detect_ssh_session_empty_strings() {
         let empty = std::ffi::OsString::from("");
         assert!(!detect_ssh_session(Some(&empty), Some(&empty)));
+    }
+
+    #[test]
+    fn test_sanitize_strips_zero_width_and_controls() {
+        // ZWSP, BOM, soft hyphen and a stray control char are removed.
+        let input = "a\u{200B}b\u{FEFF}c\u{00AD}d\u{0007}e";
+        assert_eq!(sanitize_pasted_text(input), "abcde");
+    }
+
+    #[test]
+    fn test_sanitize_keeps_newlines_and_tabs() {
+        assert_eq!(sanitize_pasted_text("a\nb\tc"), "a\nb\tc");
+    }
+
+    #[test]
+    fn test_sanitize_normalizes_crlf() {
+        assert_eq!(sanitize_pasted_text("a\r\nb\rc"), "a\nb\nc");
+    }
+
+    #[test]
+    fn test_sanitize_keeps_normal_text_and_nbsp() {
+        // NBSP (U+00A0) and umlauts render with width and must survive.
+        let s = "Hello,\u{00A0}World! Üöä";
+        assert_eq!(sanitize_pasted_text(s), s);
+    }
+
+    #[test]
+    fn test_sanitize_drops_bidi_controls() {
+        let input = "x\u{202E}yz\u{2069}";
+        assert_eq!(sanitize_pasted_text(input), "xyz");
     }
 
     #[test]

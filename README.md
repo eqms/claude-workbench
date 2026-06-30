@@ -107,6 +107,11 @@ cd claude-workbench && cargo build --release
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
 
+### What's New in v1.1.0
+
+- **Terminal pane passthrough for nano / mc / vim (Ctrl+B prefix).** In the **User Terminal pane (F6)** all keys — including F1–F12 and Ctrl+X/S/O/P/E — are now sent straight to the running program, so full-screen TUIs work correctly (e.g. `Ctrl+X` exits nano, `F4`/`F10` drive the Midnight Commander menu). Workbench commands are reached through a tmux-style prefix: `Ctrl+B` then `1-6` (panes), `?` (help), `s` (select), `c` (copy), or `Ctrl+B` again for a literal byte. `Ctrl+Q` stays reserved as a guaranteed quit. Only the User Terminal is affected — Claude and LazyGit panes keep the regular shortcuts. Configurable / disablable via `pty.terminal_prefix` in `config.yaml` (default `"ctrl+b"`). F1–F12 are now encoded as xterm escape sequences so they reach the inner app.
+- **Paste sanitizing in the editor.** Text pasted into the Preview editor (Ctrl+V, bracketed paste, F11 universal paste) is now stripped of invisible/zero-width and control characters (U+200B, BOM, soft hyphen, bidi marks, …) and CRLF is normalized to LF. This fixes the "ghost cursor" where the visible cursor drifted away from the real insertion point. Text forwarded to a PTY is left byte-for-byte intact.
+
 ### What's New in v0.97.0
 
 - **Standard copy/cut/paste/undo in Edit mode.** Replaced the MC-Edit Ctrl+F3/F5/F6/F8 block shortcuts (broken due to global F-key collision) with standard Ctrl+C / Ctrl+X / Ctrl+Z / Ctrl+Shift+Z. `Ctrl+C` and `Ctrl+X` without a selection act on the current line. `Ctrl+X` no longer opens the export dialog when the Preview pane is in Edit mode — that shortcut is reserved for ReadOnly Preview and FileBrowser. Hardware cursor via `f.set_cursor_position()` fixes the invisible cursor in Terminus and certain iTerm2 configurations.

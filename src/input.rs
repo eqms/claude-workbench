@@ -56,6 +56,22 @@ pub fn map_key_to_pty(key: KeyEvent) -> Option<Vec<u8>> {
         KeyCode::Delete => bytes.extend_from_slice(b"\x1b[3~"),
         KeyCode::Insert => bytes.extend_from_slice(b"\x1b[2~"),
 
+        // Function keys (xterm sequences) — required so TUI apps running in the
+        // terminal pane (nano, mc, vim) receive F1-F12 when passthrough forwards
+        // them. F1-F4 use SS3, F5-F12 use CSI, matching xterm terminfo.
+        KeyCode::F(1) => bytes.extend_from_slice(b"\x1bOP"),
+        KeyCode::F(2) => bytes.extend_from_slice(b"\x1bOQ"),
+        KeyCode::F(3) => bytes.extend_from_slice(b"\x1bOR"),
+        KeyCode::F(4) => bytes.extend_from_slice(b"\x1bOS"),
+        KeyCode::F(5) => bytes.extend_from_slice(b"\x1b[15~"),
+        KeyCode::F(6) => bytes.extend_from_slice(b"\x1b[17~"),
+        KeyCode::F(7) => bytes.extend_from_slice(b"\x1b[18~"),
+        KeyCode::F(8) => bytes.extend_from_slice(b"\x1b[19~"),
+        KeyCode::F(9) => bytes.extend_from_slice(b"\x1b[20~"),
+        KeyCode::F(10) => bytes.extend_from_slice(b"\x1b[21~"),
+        KeyCode::F(11) => bytes.extend_from_slice(b"\x1b[23~"),
+        KeyCode::F(12) => bytes.extend_from_slice(b"\x1b[24~"),
+
         _ => return None,
     }
 

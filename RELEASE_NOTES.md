@@ -1,5 +1,30 @@
 # Release Notes
 
+## Version 1.1.0 (30.06.2026)
+
+### Added
+
+- **Terminal-pane prefix passthrough (Ctrl+B).** In the User Terminal pane (F6)
+  all keys — including F1–F12 and Ctrl+X/S/O/P/E — are forwarded straight to the
+  running program, so full-screen TUIs like nano, Midnight Commander (mc) and vim
+  work correctly (e.g. `Ctrl+X` exits nano, `F4`/`F10` drive the mc menu).
+  Workbench commands are reached through a tmux-style prefix: `Ctrl+B` then
+  `1-6` (panes), `?`/`h` (help), `s` (selection), `c` (copy last command), or
+  `Ctrl+B` again to send a literal byte. `Ctrl+Q` stays reserved as a guaranteed
+  quit. Only the User Terminal is affected — Claude and LazyGit panes keep the
+  regular shortcuts. Configurable via `pty.terminal_prefix` in `config.yaml`
+  (default `"ctrl+b"`; set `""` or `"none"` to disable). F1–F12 are now encoded
+  as xterm escape sequences (SS3 / CSI) so they reach the inner application.
+
+### Fixed
+
+- **Paste sanitizing in the editor ("ghost cursor").** Text pasted into the
+  Preview editor (Ctrl+V, bracketed paste, F11 universal paste) is stripped of
+  invisible / zero-width and control characters (U+200B, BOM U+FEFF, soft hyphen,
+  bidi marks, …) and CR/CRLF is normalized to a single LF, so the visible cursor
+  no longer drifts away from the real insertion point. Text forwarded to a PTY is
+  left byte-for-byte intact.
+
 ## Version 1.0.0 (19.06.2026) 🎉
 
 First stable release.

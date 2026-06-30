@@ -40,6 +40,13 @@ pub struct PtyConfig {
     /// Number of lines to copy when pressing F9 in terminal panes (default: 50)
     #[serde(default = "default_copy_lines_count")]
     pub copy_lines_count: usize,
+    /// Leader key for the User-Terminal-pane passthrough (tmux-style). Format
+    /// `"ctrl+<letter>"` (default `"ctrl+b"`). When passthrough is active, all
+    /// keys go straight to the PTY (so nano/mc/vim work) and Workbench commands
+    /// are reached via this prefix. An empty string or `"none"` disables
+    /// passthrough and restores the legacy behavior (F-keys = Workbench).
+    #[serde(default = "default_terminal_prefix")]
+    pub terminal_prefix: String,
 }
 
 fn default_true() -> bool {
@@ -48,6 +55,29 @@ fn default_true() -> bool {
 
 fn default_copy_lines_count() -> usize {
     50
+}
+
+fn default_terminal_prefix() -> String {
+    "ctrl+b".to_string()
+}
+
+impl PtyConfig {
+    /// Parse `terminal_prefix` into the Ctrl+<char> leader key.
+    /// Returns `None` when passthrough is disabled (`""` / `"none"`) or the
+    /// value is malformed. Accepts `"ctrl+b"` and `"c-b"`, case-insensitive.
+    pub fn prefix_key(&self) -> Option<char> {
+        let s = self.terminal_prefix.trim().to_ascii_lowercase();
+        if s.is_empty() || s == "none" {
+            return None;
+        }
+        let rest = s.strip_prefix("ctrl+").or_else(|| s.strip_prefix("c-"))?;
+        let mut chars = rest.chars();
+        let c = chars.next()?;
+        if chars.next().is_some() || !c.is_ascii_alphabetic() {
+            return None;
+        }
+        Some(c)
+    }
 }
 
 /// Detect the best available default shell for this platform.
@@ -97,6 +127,7 @@ impl Default for PtyConfig {
             scrollback_lines: 1000,
             auto_restart: true,
             copy_lines_count: 50,
+            terminal_prefix: default_terminal_prefix(),
         }
     }
 }
@@ -798,5 +829,37 @@ mod tests {
     fn config_default_terminal_shell_path_is_set() {
         let cfg = Config::default();
         assert!(!cfg.terminal.shell_path.is_empty());
+    }
+
+    #[test]
+    fn prefix_key_default_is_ctrl_b() {
+        assert_eq!(PtyConfig::default().prefix_key(), Some('b'));
+    }
+
+    #[test]
+    fn prefix_key_disabled_values_return_none() {
+        let mut c = PtyConfig::default();
+        c.terminal_prefix = String::new();
+        assert_eq!(c.prefix_key(), None);
+        c.terminal_prefix = "none".to_string();
+        assert_eq!(c.prefix_key(), None);
+    }
+
+    #[test]
+    fn prefix_key_is_case_insensitive_and_accepts_c_dash() {
+        let mut c = PtyConfig::default();
+        c.terminal_prefix = "Ctrl+A".to_string();
+        assert_eq!(c.prefix_key(), Some('a'));
+        c.terminal_prefix = "c-x".to_string();
+        assert_eq!(c.prefix_key(), Some('x'));
+    }
+
+    #[test]
+    fn prefix_key_rejects_malformed() {
+        let mut c = PtyConfig::default();
+        c.terminal_prefix = "ctrl+ab".to_string();
+        assert_eq!(c.prefix_key(), None);
+        c.terminal_prefix = "ctrl+1".to_string();
+        assert_eq!(c.prefix_key(), None);
     }
 }

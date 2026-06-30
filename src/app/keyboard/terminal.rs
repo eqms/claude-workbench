@@ -88,29 +88,49 @@ impl App {
             self.show_ssh_image_paste_hint();
         }
 
-        if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
-            if key.modifiers.contains(KeyModifiers::SHIFT) {
-                match key.code {
-                    KeyCode::PageUp => {
-                        pty.scroll_up(10);
-                        return;
-                    }
-                    KeyCode::PageDown => {
-                        pty.scroll_down(10);
-                        return;
-                    }
-                    KeyCode::Up => {
-                        pty.scroll_up(1);
-                        return;
-                    }
-                    KeyCode::Down => {
-                        pty.scroll_down(1);
-                        return;
-                    }
-                    _ => {}
-                }
-            }
+        if self.handle_scrollback_key(key) {
+            return;
+        }
 
+        self.forward_key_to_active_pty(key);
+    }
+
+    /// Shift+PageUp/PageDown/Up/Down → local vt100 scrollback for the active
+    /// pane. Returns true when the key was consumed. Kept as a host-level
+    /// gesture even under terminal-pane passthrough (an escape hatch the inner
+    /// TUI app never needs).
+    pub(super) fn handle_scrollback_key(&mut self, key: KeyEvent) -> bool {
+        if !key.modifiers.contains(KeyModifiers::SHIFT) {
+            return false;
+        }
+        if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
+            match key.code {
+                KeyCode::PageUp => {
+                    pty.scroll_up(10);
+                    return true;
+                }
+                KeyCode::PageDown => {
+                    pty.scroll_down(10);
+                    return true;
+                }
+                KeyCode::Up => {
+                    pty.scroll_up(1);
+                    return true;
+                }
+                KeyCode::Down => {
+                    pty.scroll_down(1);
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// Translate a key event into PTY bytes and write them to the active pane's
+    /// PTY. No-op if the key has no PTY mapping or the pane has no PTY.
+    pub(super) fn forward_key_to_active_pty(&mut self, key: KeyEvent) {
+        if let Some(pty) = self.terminals.get_mut(&self.active_pane) {
             if let Some(bytes) = crate::input::map_key_to_pty(key) {
                 let _ = pty.write_input(&bytes);
             }

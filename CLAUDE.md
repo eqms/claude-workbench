@@ -349,7 +349,7 @@ For updates to work, GitHub Releases must include:
 
 **claude-workbench**
 
-A Rust-based TUI (Terminal User Interface) multiplexer that gives developers an integrated cockpit for Claude Code workflows: file browser with preview, three embedded PTY panes (Claude Code, LazyGit, system terminal), mouse + keyboard navigation, and scrollback. Built with Ratatui, Crossterm, and portable-pty. Currently at v1.0.0, distributed as a single binary via GitHub Releases with self-update.
+A Rust-based TUI (Terminal User Interface) multiplexer that gives developers an integrated cockpit for Claude Code workflows: file browser with preview, three embedded PTY panes (Claude Code, LazyGit, system terminal), mouse + keyboard navigation, and scrollback. Built with Ratatui, Crossterm, and portable-pty. Currently at v1.1.0, distributed as a single binary via GitHub Releases with self-update.
 
 **Core Value:** Stay in one terminal: file navigation, Claude Code, LazyGit, and a shell side-by-side, with the panes always pointing at the same working directory. If everything else fails, the three PTY panes must remain reliably interactive and synchronized.
 

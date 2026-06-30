@@ -284,7 +284,7 @@ impl App {
             PaneId::Preview => {
                 if self.preview.mode == EditorMode::Edit {
                     if let Some(editor) = &mut self.preview.editor {
-                        editor.insert_str(&text);
+                        editor.insert_str(crate::clipboard::sanitize_pasted_text(&text));
                         self.preview.update_modified();
                         self.preview.update_edit_highlighting(&self.syntax_manager);
                     } else {

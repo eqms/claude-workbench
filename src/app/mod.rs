@@ -79,6 +79,9 @@ pub struct App {
     pub show_terminal: bool,
     pub show_lazygit: bool,
     pub show_preview: bool,
+    /// True after the terminal-pane prefix key (Ctrl+B) was pressed and we are
+    /// waiting for the next key to interpret as a Workbench command.
+    pub terminal_prefix_armed: bool,
     // Preview maximize mode (F3 toggle)
     pub preview_maximized: bool,
     pub preview_saved_layout: SavedLayout,
@@ -303,6 +306,7 @@ impl App {
             show_terminal,
             show_lazygit,
             show_preview,
+            terminal_prefix_armed: false,
             preview_maximized: false,
             preview_saved_layout: SavedLayout::default(),
             last_refresh: std::time::Instant::now(),
