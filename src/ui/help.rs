@@ -133,7 +133,7 @@ fn help_content() -> Vec<Line<'static>> {
             Span::raw("Open Markdown Preview (path dialog with tab-complete)"),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+E       ", Style::default().fg(Color::Cyan)),
+            Span::styled("  Ctrl+Alt+E   ", Style::default().fg(Color::Cyan)),
             Span::raw("Open in External Editor (configure in Settings)"),
         ]),
         Line::from(vec![

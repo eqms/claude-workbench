@@ -16,7 +16,7 @@
 | Ctrl+P | Fuzzy Finder |
 | Ctrl+O | Open Markdown Preview (path dialog with tab-complete) |
 | Ctrl+X | Export Markdown as MD/PDF (format chooser + target path) |
-| Ctrl+E | Open in External Editor (Preview file when Preview active, otherwise FileBrowser selection; configure in Settings F8) |
+| Ctrl+Alt+E (Ctrl+Option+E on macOS) | Open in External Editor (Preview file when Preview active, otherwise FileBrowser selection; configure in Settings F8) |
 | Ctrl+V | Paste from clipboard (in input dialogs) |
 | Ctrl+Shift+W | Setup Wizard |
 | F1 | Toggle File Browser |
@@ -335,7 +335,7 @@ image paste to work.
 | Ctrl+P | Fuzzy-Finder |
 | Ctrl+O | Markdown-Preview öffnen (Pfad-Dialog mit Tab-Vervollständigung) |
 | Ctrl+X | Markdown als MD/PDF exportieren (Formatwahl + Zielpfad) |
-| Ctrl+E | In externem Editor öffnen (Vorschau-Datei wenn Vorschau aktiv, sonst Dateibrowser-Auswahl; konfigurierbar in Einstellungen F8) |
+| Ctrl+Alt+E (Ctrl+Option+E auf macOS) | In externem Editor öffnen (Vorschau-Datei wenn Vorschau aktiv, sonst Dateibrowser-Auswahl; konfigurierbar in Einstellungen F8) |
 | Ctrl+V | Aus Zwischenablage einfügen (in Eingabedialogen) |
 | Ctrl+Shift+W | Setup-Assistent |
 | F1 | Dateibrowser ein-/ausblenden |

@@ -105,7 +105,7 @@ impl App {
             }
         }
 
-        // Global shortcuts (F12/F10/F7/?/F9 variants, Ctrl+P/O/X/E, F8, Ctrl+Shift+W)
+        // Global shortcuts (F12/F10/F7/?/F9 variants, Ctrl+P/O/X, Ctrl+Alt+E, F8, Ctrl+Shift+W)
         if self.handle_global_shortcut(key) {
             return;
         }

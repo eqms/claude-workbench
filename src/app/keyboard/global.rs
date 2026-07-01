@@ -1,8 +1,8 @@
 //! Global keyboard shortcuts that fire regardless of which pane is active —
 //! help (F12), about (F10), F7 ~/.claude jump, F9 copy-N-lines / file-menu,
-//! F11 universal paste, Ctrl+P/O/X/E pickers, F8 settings, Ctrl+Shift+W
-//! wizard. Returns true when the key was consumed so the caller can stop
-//! routing it further.
+//! F11 universal paste, Ctrl+P/O/X pickers, Ctrl+Alt+E external editor,
+//! F8 settings, Ctrl+Shift+W wizard. Returns true when the key was consumed
+//! so the caller can stop routing it further.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -158,8 +158,14 @@ impl App {
             // Priority 3: no-op
         }
 
-        // Ctrl+E: Open selected file in external GUI editor
-        if key.code == KeyCode::Char('e') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        // Ctrl+Alt+E (Ctrl+Option+E on macOS): Open selected file in external
+        // GUI editor. Was plain Ctrl+E until Claude Code reserved that combo
+        // for its own use.
+        if key.code == KeyCode::Char('e')
+            && key
+                .modifiers
+                .contains(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        {
             let path_opt = if self.active_pane == PaneId::Preview {
                 self.preview.current_file.clone()
             } else {

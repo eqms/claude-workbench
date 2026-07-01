@@ -99,13 +99,17 @@ cd claude-workbench && cargo build --release
 | Ctrl+Q | Quit |
 | E | Edit file (in Preview) |
 | Ctrl+X | Export Markdown/PDF (format chooser) |
-| Ctrl+E | Open in External Editor (context-aware) |
+| Ctrl+Alt+E (Ctrl+Option+E on macOS) | Open in External Editor (context-aware) |
 | Ctrl+S | Selection mode (in Terminal/Preview) |
 | Ctrl+C | Copy selection to System Clipboard |
 | F11 | Universal Paste — inject system clipboard into active pane (XRDP / broken bracketed-paste workaround) |
 | Right-click | Paste from system clipboard into pane under cursor (mirrors Kitty's `mouse_map right press paste`) |
 
 **See [USAGE.md](USAGE.md) for complete keyboard shortcuts and detailed usage guide.**
+
+### What's New in v1.1.1
+
+- **External editor shortcut moved to Ctrl+Alt+E.** Claude Code now reserves plain `Ctrl+E` for its own use, so the "Open in External Editor" shortcut has been rebound to `Ctrl+Alt+E` (`Ctrl+Option+E` on macOS) to avoid the collision. Behavior is unchanged otherwise — still context-aware (Preview file when Preview is active, otherwise the FileBrowser selection).
 
 ### What's New in v1.1.0
 
@@ -425,13 +429,17 @@ cd claude-workbench && cargo build --release
 | Ctrl+Q | Beenden |
 | E | Datei bearbeiten (in Vorschau) |
 | Ctrl+X | Markdown/PDF exportieren (Format-Auswahl) |
-| Ctrl+E | In externem Editor öffnen (kontextabhängig) |
+| Ctrl+Alt+E (Ctrl+Option+E auf macOS) | In externem Editor öffnen (kontextabhängig) |
 | Ctrl+S | Auswahlmodus (in Terminal/Vorschau) |
 | Ctrl+C | Auswahl in System-Clipboard kopieren |
 | F11 | Universal Paste — System-Clipboard in aktive Pane einfügen (Workaround für XRDP / defektes Bracketed-Paste-Forwarding) |
 | Rechtsklick | Paste aus System-Clipboard in Pane unter dem Cursor (entspricht Kittys `mouse_map right press paste`) |
 
 **Siehe [USAGE.md](USAGE.md) für alle Tastenkürzel und detaillierte Bedienungsanleitung.**
+
+### Neu in v1.1.1
+
+- **Shortcut für externen Editor auf Ctrl+Alt+E verschoben.** Claude Code reserviert inzwischen das einfache `Ctrl+E` für die eigene Nutzung, daher wurde der Shortcut „In externem Editor öffnen“ auf `Ctrl+Alt+E` (`Ctrl+Option+E` unter macOS) umgestellt, um die Kollision zu vermeiden. Das Verhalten bleibt ansonsten unverändert — weiterhin kontextabhängig (Vorschau-Datei wenn Vorschau aktiv, sonst Dateibrowser-Auswahl).
 
 ### Neu in v0.96.0
 
